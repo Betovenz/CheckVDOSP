@@ -1,3 +1,4 @@
+import asyncio
 import re
 import html
 import httpx
@@ -51,7 +52,51 @@ class BilibiliService:
             return "https://" + pic_url[len("http://") :]
         return pic_url
 
-    async def search_videos(self, keyword: str, page: int = 1, limit: int = 16) -> List[Dict[str, Any]]:
+    def _parse_bili_item(self, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        bvid = item.get("bvid") or ""
+        if not bvid:
+            return None
+        title = self._clean_title(item.get("title", ""))
+        cover = self._normalize_pic(item.get("pic", ""))
+        video_url = f"https://www.bilibili.com/video/{bvid}"
+        return {
+            "id": bvid,
+            "platform": "bilibili",
+            "platform_label": "Bilibili 哔哩哔哩",
+            "title": title,
+            "author": item.get("author", "Bilibili User"),
+            "author_avatar": self._normalize_pic(item.get("upic", "")),
+            "cover": cover,
+            "duration": str(item.get("duration", "")),
+            "views": item.get("play", 0) or 0,
+            "likes": item.get("like", 0) or item.get("favorites", 0) or 0,
+            "url": video_url,
+            "download_url": video_url,
+            "description": self._clean_title(item.get("description", "")),
+        }
+
+    async def _fetch_search_page(
+        self, client: httpx.AsyncClient, kw: str, bili_page: int, page_size: int = 42
+    ) -> List[Dict[str, Any]]:
+        try:
+            resp = await client.get(
+                "https://api.bilibili.com/x/web-interface/search/type",
+                params={
+                    "search_type": "video",
+                    "keyword": kw,
+                    "page": bili_page,
+                    "page_size": min(max(page_size, 20), 50),
+                },
+                cookies=self._cookies,
+            )
+            if resp.status_code != 200:
+                return []
+            data = resp.json()
+            return (data.get("data") or {}).get("result") or []
+        except Exception:
+            return []
+
+    async def search_videos(self, keyword: str, page: int = 1, limit: int = 75) -> List[Dict[str, Any]]:
         async with httpx.AsyncClient(
             headers=self.headers,
             cookies=self._cookies,
@@ -59,49 +104,40 @@ class BilibiliService:
             timeout=15.0,
         ) as client:
             await self._ensure_cookies(client)
-            params = {
-                "search_type": "video",
-                "keyword": keyword,
-                "page": page,
-                "page_size": min(limit, 30),
-            }
-            resp = await client.get(
-                "https://api.bilibili.com/x/web-interface/search/type",
-                params=params,
-                cookies=self._cookies,
-            )
-            if resp.status_code != 200:
-                return []
 
-            data = resp.json()
-            results = data.get("data", {}).get("result", []) or []
+            # Each logical batch fetches 2 Bilibili pages (up to 42 items each -> ~84 items)
+            p1 = (page - 1) * 2 + 1
+            p2 = (page - 1) * 2 + 2
+            tasks = [
+                self._fetch_search_page(client, keyword, p1, 42),
+                self._fetch_search_page(client, keyword, p2, 42),
+            ]
+            # Also query sub-keywords so compound queries or deep pages never run dry
+            parts = [p for p in keyword.split() if p]
+            cjk = re.sub(r"[^\u4e00-\u9fff]", "", keyword)
+            if len(parts) > 1:
+                tasks.append(self._fetch_search_page(client, parts[0], page, 40))
+            elif len(cjk) >= 4:
+                tasks.append(self._fetch_search_page(client, cjk[:3], page, 40))
+                tasks.append(self._fetch_search_page(client, cjk[-2:], page, 40))
+
+            pages_results = await asyncio.gather(*tasks, return_exceptions=True)
+
             items: List[Dict[str, Any]] = []
+            seen_bvids: set[str] = set()
 
-            for item in results[:limit]:
-                bvid = item.get("bvid") or ""
-                if not bvid:
+            for batch in pages_results:
+                if isinstance(batch, Exception) or not batch:
                     continue
-                title = self._clean_title(item.get("title", ""))
-                cover = self._normalize_pic(item.get("pic", ""))
-                video_url = f"https://www.bilibili.com/video/{bvid}"
-                items.append(
-                    {
-                        "id": bvid,
-                        "platform": "bilibili",
-                        "platform_label": "Bilibili 哔哩哔哩",
-                        "title": title,
-                        "author": item.get("author", "Bilibili User"),
-                        "author_avatar": self._normalize_pic(item.get("upic", "")),
-                        "cover": cover,
-                        "duration": str(item.get("duration", "")),
-                        "views": item.get("play", 0) or 0,
-                        "likes": item.get("like", 0) or item.get("favorites", 0) or 0,
-                        "url": video_url,
-                        "download_url": video_url,
-                        "description": self._clean_title(item.get("description", "")),
-                    }
-                )
-            return items
+                for raw in batch:
+                    parsed = self._parse_bili_item(raw)
+                    if parsed and parsed["id"] not in seen_bvids:
+                        seen_bvids.add(parsed["id"])
+                        items.append(parsed)
+                        if len(items) >= limit:
+                            return items
+
+            return items[:limit]
 
     async def resolve_url(self, raw_url: str) -> Optional[Dict[str, Any]]:
         async with httpx.AsyncClient(

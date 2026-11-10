@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import json
+import random
 import re
 import time
 from pathlib import Path
@@ -314,70 +315,185 @@ class DouyinService:
         except Exception:
             return []
 
+    @staticmethod
+    def _random_toutiao_ua(idx: int = 0) -> str:
+        v = random.randint(116, 130)
+        b = random.randint(1000, 6500)
+        p = random.randint(10, 199)
+        templates = [
+            f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_{random.randint(4,7)}) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.{random.randint(0,6)} Safari/605.1.15",
+            f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{v}.0) Gecko/20100101 Firefox/{v}.0",
+            f"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:{v}.0) Gecko/20100101 Firefox/{v}.0",
+            f"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_{random.randint(0,5)}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.{b}.{p} Safari/537.36",
+            f"Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.{b}.{p} Mobile Safari/537.36",
+        ]
+        return templates[idx % len(templates)]
+
+    @staticmethod
+    def _extract_cjk_roots(keyword: str) -> List[str]:
+        parts = [p for p in keyword.split() if p]
+        roots: List[str] = list(parts)
+        if keyword not in roots:
+            roots.insert(0, keyword)
+        cjk = re.sub(r"[^\u4e00-\u9fff]", "", keyword)
+        if len(cjk) >= 4:
+            roots.append(cjk[:3])
+            roots.append(cjk[-2:])
+            roots.append(cjk[:2])
+            roots.append(cjk[-3:])
+            for i in range(len(cjk) - 1):
+                roots.append(cjk[i : i + 2])
+        elif len(cjk) == 3:
+            roots.append(cjk)
+            roots.append(cjk[:2])
+            roots.append(cjk[1:])
+        elif len(cjk) == 1:
+            if cjk == "猫":
+                roots.extend(["猫咪", "小猫", "萌宠", "宠物猫", "搞笑猫", "橘猫", "小奶猫"])
+            elif cjk == "狗":
+                roots.extend(["狗狗", "小狗", "萌宠", "宠物狗", "搞笑狗", "小奶狗"])
+            else:
+                roots.extend([f"{cjk}{cjk}", f"小{cjk}"])
+        return list(dict.fromkeys([r for r in roots if r]))
+
     async def _search_via_bytedance_synthesis(
-        self, keyword: str, page: int = 1, limit: int = 16
+        self, keyword: str, page: int = 1, limit: int = 75
     ) -> List[Dict[str, Any]]:
         """
         Searches Douyin (Aweme) videos via ByteDance's synthesis search engine (so.toutiao.com),
         which returns real Douyin short videos without requiring a Douyin login session.
         """
-        parts = [p for p in keyword.split() if p]
-        first_kw = parts[0] if parts else keyword
-        compact_kw = "".join(parts) if len(parts) > 1 else keyword
-        extended: List[str] = []
-        if len(first_kw) == 1:
-            if first_kw == "猫":
-                extended = ["猫咪", "小猫"]
-            elif first_kw == "狗":
-                extended = ["狗狗", "小狗"]
-            else:
-                extended = [f"{first_kw}{first_kw}", f"小{first_kw}"]
-
-        if page <= 1:
-            queries = list(dict.fromkeys([
-                keyword,
-                *extended,
-                first_kw,
-                f"抖音 {first_kw}",
-                f"{compact_kw} 热门视频",
-            ]))
-        else:
-            queries = [
-                f"抖音 {first_kw} 第{page}季",
-                f"{first_kw} 精选视频",
-                f"{compact_kw} 测评视频",
-            ]
-
+        roots = self._extract_cjk_roots(keyword)
         decoder = json.JSONDecoder()
         seen_ids: set[str] = set()
         results: List[Dict[str, Any]] = []
 
+        # Rotating pool of high-yield Chinese video/product patterns for unlimited pagination
+        pattern_pool = [
+            "{r}",
+            "抖音 {r}",
+            "{r} 教程",
+            "{r}推荐",
+            "{r}制作",
+            "{r}视频",
+            "{r}测评",
+            "{r}好物",
+            "{r}开箱",
+            "{r}分享",
+            "{r}日常",
+            "{r}合集",
+            "{r}怎么选",
+            "{r}使用",
+            "{r}技巧",
+            "{r}改造",
+            "{r}实拍",
+            "{r}精选",
+            "抖音{r}",
+            "热门 {r}",
+            "{r} 热门视频",
+            "{r} 种草",
+            "{r} 穿搭",
+            "{r} 对比",
+        ]
+
         async with httpx.AsyncClient(
-            headers={"User-Agent": self.user_agent, "Referer": "https://so.toutiao.com/"},
             follow_redirects=True,
             timeout=15.0,
         ) as client:
-            tasks = [
-                client.get(
-                    "https://so.toutiao.com/search",
-                    params={"keyword": q, "pd": "synthesis"},
-                )
-                for q in queries
-            ]
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            # Fetch live ByteDance search suggestions (search_sug) for root terms
+            sug_keywords: List[str] = []
+            try:
+                sug_tasks = [
+                    client.get(
+                        "https://so.toutiao.com/2/article/search_sug/",
+                        params={"keyword": r},
+                        headers={
+                            "User-Agent": self._random_toutiao_ua(i),
+                            "Referer": "https://so.toutiao.com/",
+                        },
+                    )
+                    for i, r in enumerate(roots[:4])
+                ]
+                sug_resps = await asyncio.gather(*sug_tasks, return_exceptions=True)
+                for sr in sug_resps:
+                    if isinstance(sr, Exception) or sr.status_code != 200:
+                        continue
+                    for item in (sr.json().get("data") or []):
+                        k = item.get("keyword")
+                        if k:
+                            sug_keywords.append(k)
+            except Exception:
+                pass
+
+            # Build full ordered candidate query list across all pages
+            all_candidates: List[str] = []
+            # 1) Bare roots first (highest yield)
+            all_candidates.extend(roots[:6])
+            # 2) Top proven patterns on primary roots
+            for pat in ["抖音 {r}", "{r} 教程", "{r}推荐", "{r}制作"]:
+                for r in roots[:3]:
+                    q_str = pat.format(r=r)
+                    if q_str not in all_candidates:
+                        all_candidates.append(q_str)
+            # 3) Real ByteDance search_sug keywords (curated high-traffic queries)
+            for sk in sug_keywords:
+                if sk not in all_candidates:
+                    all_candidates.append(sk)
+            for sk in sug_keywords[:8]:
+                q_dy = f"抖音 {sk}"
+                if q_dy not in all_candidates:
+                    all_candidates.append(q_dy)
+            # 4) Remaining pattern_pool variations
+            for pat in pattern_pool:
+                for r in roots[:4]:
+                    q_str = pat.format(r=r)
+                    if q_str not in all_candidates:
+                        all_candidates.append(q_str)
+
+            batch_size = 14
+            start_idx = ((max(1, page) - 1) * batch_size) % max(1, len(all_candidates))
+            selected_queries: List[str] = []
+            for i in range(batch_size):
+                q_cand = all_candidates[(start_idx + i) % len(all_candidates)]
+                if page > 1 and (start_idx + i) >= len(all_candidates):
+                    q_cand = f"{q_cand} {page}"
+                selected_queries.append(q_cand)
+
+            sem = asyncio.Semaphore(5)
+
+            async def _fetch_query(idx: int, q: str):
+                async with sem:
+                    return await client.get(
+                        "https://so.toutiao.com/search",
+                        params={"keyword": q, "pd": "synthesis"},
+                        headers={
+                            "User-Agent": self._random_toutiao_ua(idx + page * 3),
+                            "Referer": "https://so.toutiao.com/",
+                        },
+                    )
+
+            responses = await asyncio.gather(
+                *[_fetch_query(i, q) for i, q in enumerate(selected_queries)],
+                return_exceptions=True,
+            )
 
             for resp in responses:
                 if isinstance(resp, Exception) or resp.status_code != 200:
                     continue
                 scripts = re.findall(r"<script[^>]*>(.*?)</script>", resp.text, re.S)
                 for s in scripts:
-                    if "awemevideo" not in s and "tos-cn-i-dy" not in s:
+                    if (
+                        "awemevideo" not in s
+                        and "hotsoon_video" not in s
+                        and "douyin.com" not in s
+                        and "tos-cn-i-dy" not in s
+                    ):
                         continue
                     idx = s.find("data: ")
                     if idx == -1:
                         continue
                     try:
-                        data_json, _ = decoder.raw_decode(s[idx + 6 :])
+                        data_json, _ = decoder.raw_decode(s[idx + 6 :].lstrip())
                         hits = (data_json.get("display") or {}).get("hits") or []
                         for h in hits:
                             gid = str(h.get("group_id") or "")
@@ -424,9 +540,18 @@ class DouyinService:
         return results[:limit]
 
     async def search_videos(
-        self, keyword: str, page: int = 1, limit: int = 16
+        self, keyword: str, page: int = 1, limit: int = 75
     ) -> List[Dict[str, Any]]:
         direct_items = await self._search_via_douyin_api(keyword, page=page, limit=limit)
-        if direct_items:
-            return direct_items
-        return await self._search_via_bytedance_synthesis(keyword, page=page, limit=limit)
+        if direct_items and len(direct_items) >= limit:
+            return direct_items[:limit]
+        synth_items = await self._search_via_bytedance_synthesis(keyword, page=page, limit=limit)
+        if not direct_items:
+            return synth_items
+        seen = {item["id"] for item in direct_items}
+        combined = list(direct_items)
+        for item in synth_items:
+            if item["id"] not in seen:
+                seen.add(item["id"])
+                combined.append(item)
+        return combined[:limit]

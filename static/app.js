@@ -1,11 +1,15 @@
 // Frontend Logic for Douyin & Bilibili Video Search & Downloader Hub
 
+const BATCH_LIMIT_PER_PLATFORM = 75;
+
 const state = {
   keyword: "",
+  displayLabel: "",
   page: 1,
   activeFilter: "all", // 'all' | 'douyin' | 'bilibili'
   items: [],
   currentModalItem: null,
+  isLoadingMore: false,
 };
 
 // DOM Elements
@@ -30,8 +34,9 @@ const loadingState = document.getElementById("loadingState");
 const emptyState = document.getElementById("emptyState");
 const videoGrid = document.getElementById("videoGrid");
 const paginationBar = document.getElementById("paginationBar");
-const prevPageBtn = document.getElementById("prevPageBtn");
-const nextPageBtn = document.getElementById("nextPageBtn");
+const loadMoreBtn = document.getElementById("loadMoreBtn");
+const loadMoreSpinner = document.getElementById("loadMoreSpinner");
+const loadMoreText = document.getElementById("loadMoreText");
 const pageIndicator = document.getElementById("pageIndicator");
 
 // Modal Elements
@@ -233,12 +238,23 @@ function renderGrid() {
   });
 }
 
+function updateSummaryMeta() {
+  const dyCount = state.items.filter((i) => i.platform === "douyin").length;
+  const biliCount = state.items.filter((i) => i.platform === "bilibili").length;
+  const label = state.displayLabel || state.keyword;
+  searchMetaInfo.innerHTML = `คำค้นหา <strong class="text-white">"${escapeHtml(label)}"</strong> — พบจาก Douyin <strong class="text-rose-400">${dyCount}</strong> คลิป และ Bilibili <strong class="text-sky-400">${biliCount}</strong> คลิป (รวม <strong class="text-emerald-400">${state.items.length}</strong> คลิป)`;
+  if (pageIndicator) {
+    pageIndicator.textContent = `แสดงแล้ว ${state.items.length} คลิป (ชุดที่ ${state.page}) • กดโหลดเพิ่มได้ไม่จำกัด`;
+  }
+}
+
 // Perform Keyword Search
 async function performSearch(keyword, page = 1) {
   const kw = (keyword || "").trim();
   if (!kw) return;
 
   state.keyword = kw;
+  state.displayLabel = kw;
   state.page = page;
   searchInput.value = kw;
 
@@ -250,7 +266,7 @@ async function performSearch(keyword, page = 1) {
 
   try {
     const resp = await fetch(
-      `/api/search?q=${encodeURIComponent(kw)}&platform=all&page=${page}&limit=16`
+      `/api/search?q=${encodeURIComponent(kw)}&platform=all&page=${page}&limit=${BATCH_LIMIT_PER_PLATFORM}`
     );
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
@@ -258,14 +274,11 @@ async function performSearch(keyword, page = 1) {
     const data = await resp.json();
     state.items = data.items || [];
 
-    searchMetaInfo.innerHTML = `คำค้นหา <strong class="text-white">"${escapeHtml(kw)}"</strong> — พบจาก Douyin <strong class="text-rose-400">${data.douyin_count}</strong> คลิป และ Bilibili <strong class="text-sky-400">${data.bilibili_count}</strong> คลิป`;
-
+    updateSummaryMeta();
     renderGrid();
 
     if (state.items.length > 0) {
       paginationBar.classList.remove("hidden");
-      pageIndicator.textContent = `หน้าที่ ${page}`;
-      prevPageBtn.disabled = page <= 1;
     }
   } catch (err) {
     showToast(`เกิดข้อผิดพลาดในการค้นหา: ${err.message}`);
@@ -273,6 +286,59 @@ async function performSearch(keyword, page = 1) {
   } finally {
     loadingState.classList.add("hidden");
     searchBtn.disabled = false;
+  }
+}
+
+// Load More Videos (+100 per click, unlimited append)
+async function loadMoreVideos() {
+  if (state.isLoadingMore || !state.keyword) return;
+  state.isLoadingMore = true;
+  const nextPage = state.page + 1;
+
+  if (loadMoreBtn) loadMoreBtn.disabled = true;
+  if (loadMoreSpinner) loadMoreSpinner.classList.remove("hidden");
+  if (loadMoreText) loadMoreText.textContent = "กำลังดึงวิดีโอเพิ่มอีก ~100 คลิป...";
+  showToast(`กำลังโหลดวิดีโอชุดที่ ${nextPage}...`, true, 0);
+
+  try {
+    const resp = await fetch(
+      `/api/search?q=${encodeURIComponent(state.keyword)}&platform=all&page=${nextPage}&limit=${BATCH_LIMIT_PER_PLATFORM}`
+    );
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    const incoming = data.items || [];
+
+    const existingKeys = new Set(state.items.map((i) => `${i.platform}:${i.id}`));
+    let addedCount = 0;
+    for (const item of incoming) {
+      const key = `${item.platform}:${item.id}`;
+      if (!existingKeys.has(key)) {
+        existingKeys.add(key);
+        state.items.push(item);
+        addedCount++;
+      }
+    }
+
+    state.page = nextPage;
+    updateSummaryMeta();
+    renderGrid();
+
+    showToast(
+      addedCount > 0
+        ? `โหลดเพิ่มสำเร็จ +${addedCount} คลิป (รวมทั้งหมด ${state.items.length} คลิป)`
+        : `ดึงข้อมูลชุดที่ ${nextPage} แล้ว กดอีกครั้งเพื่อค้นหาคำใกล้เคียงเพิ่มเติม`,
+      false,
+      3500
+    );
+  } catch (err) {
+    showToast(`เกิดข้อผิดพลาดในการโหลดเพิ่ม: ${err.message}`, false, 4000);
+  } finally {
+    state.isLoadingMore = false;
+    if (loadMoreBtn) loadMoreBtn.disabled = false;
+    if (loadMoreSpinner) loadMoreSpinner.classList.add("hidden");
+    if (loadMoreText) loadMoreText.textContent = "⬇ โหลดวิดีโอเพิ่ม (+100 คลิป)";
   }
 }
 
@@ -303,7 +369,7 @@ async function resolveDirectUrl(rawUrl, customKeyword = "") {
         url: text,
         custom_keyword: customKeyword || "",
         platform: "all",
-        limit: 16,
+        limit: BATCH_LIMIT_PER_PLATFORM,
       }),
     });
     const data = await resp.json();
@@ -318,18 +384,16 @@ async function resolveDirectUrl(rawUrl, customKeyword = "") {
 
     // Populate video grid with the background search results
     state.keyword = search.keyword || product.zh_keyword || "";
+    state.displayLabel = product.thai_keyword || state.keyword;
     state.page = 1;
     state.items = search.items || [];
-    searchInput.value = state.keyword;
+    searchInput.value = state.displayLabel;
 
-    searchMetaInfo.innerHTML = `วิดีโอสินค้า <strong class="text-orange-400">"${escapeHtml(product.thai_keyword)}"</strong> — พบจาก Douyin <strong class="text-rose-400">${search.douyin_count || 0}</strong> คลิป และ Bilibili <strong class="text-sky-400">${search.bilibili_count || 0}</strong> คลิป`;
-
+    updateSummaryMeta();
     renderGrid();
 
     if (state.items.length > 0) {
       paginationBar.classList.remove("hidden");
-      pageIndicator.textContent = "หน้าที่ 1";
-      prevPageBtn.disabled = true;
     }
 
     showToast(
@@ -659,15 +723,11 @@ document.querySelectorAll(".filter-tab").forEach((tab) => {
   });
 });
 
-prevPageBtn.addEventListener("click", () => {
-  if (state.page > 1) {
-    performSearch(state.keyword, state.page - 1);
-  }
-});
-
-nextPageBtn.addEventListener("click", () => {
-  performSearch(state.keyword, state.page + 1);
-});
+if (loadMoreBtn) {
+  loadMoreBtn.addEventListener("click", () => {
+    loadMoreVideos();
+  });
+}
 
 resolveForm.addEventListener("submit", (e) => {
   e.preventDefault();

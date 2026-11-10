@@ -70,7 +70,7 @@ class ShopeeAnalyzeRequest(BaseModel):
     url: str
     custom_keyword: str = ""
     platform: str = "all"
-    limit: int = 16
+    limit: int = 75
 
 
 class SettingsRequest(BaseModel):
@@ -98,7 +98,7 @@ async def search_videos(
     q: str = Query(..., min_length=1, description="Keyword to search (Thai, English, or Chinese)"),
     platform: str = Query("all", description="all | douyin | bilibili"),
     page: int = Query(1, ge=1),
-    limit: int = Query(16, ge=4, le=30),
+    limit: int = Query(75, ge=4, le=150),
 ):
     raw_query = q.strip()
     platform_norm = platform.lower().strip()
@@ -172,7 +172,7 @@ async def analyze_shopee_and_search(payload: ShopeeAnalyzeRequest):
         q=zh_keyword,
         platform=payload.platform or "all",
         page=1,
-        limit=payload.limit or 16,
+        limit=payload.limit or 75,
     )
     return {
         "product": product,
