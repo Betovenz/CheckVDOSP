@@ -10,6 +10,7 @@ const state = {
   items: [],
   currentModalItem: null,
   isLoadingMore: false,
+  lastShopeeProduct: null,
 };
 
 // DOM Elements
@@ -198,22 +199,32 @@ function renderGrid() {
         </div>
 
         <!-- Card Actions -->
-        <div class="px-4 pb-4 pt-1 flex items-center gap-2">
+        <div class="px-4 pb-4 pt-1 space-y-2">
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              data-action="preview"
+              data-index="${idx}"
+              class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition flex items-center justify-center gap-1.5"
+            >
+              <span>▶ ดูตัวอย่าง</span>
+            </button>
+            <button
+              type="button"
+              data-action="download"
+              data-index="${idx}"
+              class="flex-1 py-2 px-3 rounded-xl ${meta.btnBg} text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-md"
+            >
+              <span>⬇ โหลด MP4</span>
+            </button>
+          </div>
           <button
             type="button"
-            data-action="preview"
+            data-action="send-to-studio"
             data-index="${idx}"
-            class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition flex items-center justify-center gap-1.5"
+            class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-fuchsia-600/90 to-indigo-600/90 hover:from-fuchsia-500 hover:to-indigo-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md"
           >
-            <span>▶ ดูตัวอย่าง</span>
-          </button>
-          <button
-            type="button"
-            data-action="download"
-            data-index="${idx}"
-            class="flex-1 py-2 px-3 rounded-xl ${meta.btnBg} text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-md"
-          >
-            <span>⬇ โหลด MP4</span>
+            <span>🎬 ส่งไปทำคลิป (หน้า 2)</span>
           </button>
         </div>
       </article>
@@ -233,6 +244,10 @@ function renderGrid() {
         openPreviewModal(item);
       } else if (action === "download") {
         triggerDownload(item, false);
+      } else if (action === "send-to-studio") {
+        if (window.StudioApp && typeof window.StudioApp.addClipFromPage1 === "function") {
+          window.StudioApp.addClipFromPage1(item);
+        }
       }
     });
   });
@@ -379,6 +394,11 @@ async function resolveDirectUrl(rawUrl, customKeyword = "") {
 
     const product = data.product;
     const search = data.search || {};
+
+    state.lastShopeeProduct = product;
+    if (window.StudioApp && typeof window.StudioApp.syncShopeeProduct === "function") {
+      window.StudioApp.syncShopeeProduct(product, true);
+    }
 
     renderShopeeProductCard(product, search);
 
@@ -541,13 +561,34 @@ function renderShopeeProductCard(product, search) {
 
         <!-- Angle Chips -->
         <div class="space-y-1.5">
-          <div class="flex flex-wrap gap-2">
-            ${suggestionsHtml}
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap gap-2">
+              ${suggestionsHtml}
+            </div>
+            <button
+              type="button"
+              id="sendShopeeProductToStudioBtn"
+              class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5 shrink-0"
+            >
+              <span>🎬 นำข้อมูลสินค้านี้ไปทำคลิป AI (หน้า 2)</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
   `;
+
+  const sendShopeeBtn = document.getElementById("sendShopeeProductToStudioBtn");
+  if (sendShopeeBtn) {
+    sendShopeeBtn.addEventListener("click", () => {
+      if (window.StudioApp && typeof window.StudioApp.syncShopeeProduct === "function") {
+        window.StudioApp.syncShopeeProduct(product, false);
+      }
+      if (typeof window.switchAppPage === "function") {
+        window.switchAppPage("studio");
+      }
+    });
+  }
 
   // Bind clickable Chinese keyword angle chips
   resolvedContainer.querySelectorAll(".shopee-zh-chip").forEach((btn) => {
@@ -769,3 +810,19 @@ modalDownloadMp4Btn.addEventListener("click", () => {
 modalDownloadMp3Btn.addEventListener("click", () => {
   if (state.currentModalItem) triggerDownload(state.currentModalItem, true);
 });
+
+const modalSendToStudioBtn = document.getElementById("modalSendToStudioBtn");
+if (modalSendToStudioBtn) {
+  modalSendToStudioBtn.addEventListener("click", () => {
+    if (state.currentModalItem && window.StudioApp && typeof window.StudioApp.addClipFromPage1 === "function") {
+      window.StudioApp.addClipFromPage1(state.currentModalItem);
+      closePreviewModal();
+    }
+  });
+}
+
+// Expose helpers for Studio (Page 2)
+window.showToast = showToast;
+window.openPreviewModal = openPreviewModal;
+window.getAppLastShopeeProduct = () => state.lastShopeeProduct;
+

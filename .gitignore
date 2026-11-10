@@ -7,3 +7,5 @@ __pycache__/
 env/
 venv/
 shopee_chrome_profile/
+data/*.json
+

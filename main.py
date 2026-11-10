@@ -29,10 +29,20 @@ from services.shopee_service import (
     update_channel_label,
 )
 from services.downloader import (
-     USER_AGENT,
+    USER_AGENT,
     download_with_ytdlp,
     get_referer_for_url,
     sanitize_filename,
+)
+from services.video_studio_service import (
+    VOICE_CATALOG,
+    convert_video_data_url_to_mp4,
+    generate_product_review_script,
+    load_studio_config,
+    save_studio_config,
+    smart_split_scenes,
+    synthesize_voiceover_and_timings,
+    test_gemini_api_key,
 )
 
 app = FastAPI(
@@ -51,7 +61,7 @@ app.add_middleware(
 @app.middleware("http")
 async def disable_static_cache(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path in ("/", "/index.html", "/app.js", "/styles.css"):
+    if request.url.path in ("/", "/index.html", "/app.js", "/studio.js", "/styles.css"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
 
@@ -328,6 +338,7 @@ async def stream_video(
 
     response_headers = {
         "Accept-Ranges": "bytes",
+        "Access-Control-Allow-Origin": "*",
     }
     for h in ["content-length", "content-range", "content-type"]:
         if h in resp.headers:
@@ -506,6 +517,160 @@ async def refresh_guest_session():
     cookies = await douyin_service.ensure_signing_cookies(force_refresh=True)
     has_guest = bool(cookies.get("UIFID_TEMP") or cookies.get("uifid"))
     return {"status": "ok", "has_guest_session": has_guest}
+
+
+# ============================================================================
+# PAGE 2: AI VIDEO MAKER STUDIO API ROUTES
+# ============================================================================
+class StudioConfigSaveRequest(BaseModel):
+    gemini_api_keys: str | List[str] = ""
+    default_voice: str = "th-TH-NiwatNeural"
+
+
+class StudioTestKeyRequest(BaseModel):
+    api_key: str = ""
+
+
+class StudioShopeeInfoRequest(BaseModel):
+    url: str
+
+
+class StudioGenerateRequest(BaseModel):
+    product_title: str = ""
+    product_description: str = ""
+    target_duration: int = 20
+    sales_angle: str = "hard_sell"
+    custom_header: str = ""
+    custom_script: str = ""
+    voice_name: str = "th-TH-NiwatNeural"
+    speed_rate: str = "+15%"
+    api_key: str = ""
+    rewrite_script: bool = True
+
+
+class StudioConvertMp4Request(BaseModel):
+    video_data_url: str
+    fps: int = 30
+
+
+@app.get("/api/studio/config")
+async def api_get_studio_config():
+    cfg = load_studio_config()
+    keys = cfg.get("gemini_api_keys") or []
+    return {
+        "status": "ok",
+        "gemini_api_keys": keys,
+        "gemini_api_keys_text": "\n".join(keys),
+        "key_count": len(keys),
+        "default_voice": cfg.get("default_voice", "th-TH-NiwatNeural"),
+        "voices": VOICE_CATALOG,
+    }
+
+
+@app.post("/api/studio/config")
+async def api_save_studio_config(payload: StudioConfigSaveRequest):
+    cfg = save_studio_config(
+        gemini_keys_raw=payload.gemini_api_keys,
+        default_voice=payload.default_voice,
+    )
+    keys = cfg.get("gemini_api_keys") or []
+    return {
+        "status": "ok",
+        "gemini_api_keys": keys,
+        "gemini_api_keys_text": "\n".join(keys),
+        "key_count": len(keys),
+        "default_voice": cfg.get("default_voice", "th-TH-NiwatNeural"),
+    }
+
+
+@app.post("/api/studio/test-key")
+async def api_test_studio_key(payload: StudioTestKeyRequest):
+    ok, msg = await test_gemini_api_key(payload.api_key)
+    return {
+        "status": "ok" if ok else "error",
+        "valid": ok,
+        "message": msg,
+    }
+
+
+@app.post("/api/studio/shopee-info")
+async def api_studio_shopee_info(payload: StudioShopeeInfoRequest):
+    raw_url = (payload.url or "").strip()
+    if not raw_url:
+        raise HTTPException(status_code=400, detail="กรุณาวางลิงก์สินค้า Shopee")
+    try:
+        product = await fetch_shopee_product_info(raw_input=raw_url)
+        return {"status": "ok", "product": product}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"ไม่สามารถดึงข้อมูลสินค้า Shopee ได้: {exc}")
+
+
+@app.post("/api/studio/generate-all")
+async def api_studio_generate_all(payload: StudioGenerateRequest):
+    try:
+        if payload.rewrite_script or not (payload.custom_script or "").strip():
+            script_res = await generate_product_review_script(
+                product_title=payload.product_title,
+                product_description=payload.product_description,
+                target_duration=payload.target_duration,
+                sales_angle=payload.sales_angle,
+                custom_header=payload.custom_header,
+                api_key=payload.api_key,
+            )
+            short_headline = script_res["short_headline"]
+            spoken_script = script_res["spoken_script"]
+            scenes = script_res["scenes"]
+            model_used = script_res["model_used"]
+        else:
+            spoken_script = payload.custom_script.strip()
+            scenes = smart_split_scenes(spoken_script, target_sec=payload.target_duration)
+            short_headline = (payload.custom_header or payload.product_title[:20] or "รีวิวของเด็ดต้องมี!").strip()
+            model_used = "manual-script"
+
+        voice_res = await synthesize_voiceover_and_timings(
+            scenes=scenes,
+            spoken_script=spoken_script,
+            voice_name=payload.voice_name,
+            speed_rate=payload.speed_rate,
+            api_key=payload.api_key,
+        )
+
+        return {
+            "status": "ok",
+            "short_headline": short_headline,
+            "spoken_script": voice_res["spoken_script"],
+            "scenes": voice_res["scenes"],
+            "audio_base64": voice_res["audio_base64"],
+            "mime_type": voice_res["mime_type"],
+            "audio_duration": voice_res["audio_duration"],
+            "engine": voice_res["engine"],
+            "fallback_notice": voice_res["fallback_notice"],
+            "model_used": model_used,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"สร้างบทและเสียงพากย์ไม่สำเร็จ: {exc}")
+
+
+@app.post("/api/studio/convert-mp4")
+async def api_studio_convert_mp4(payload: StudioConvertMp4Request):
+    try:
+        mp4_bytes = await asyncio.to_thread(
+            convert_video_data_url_to_mp4,
+            payload.video_data_url,
+            payload.fps,
+        )
+        return Response(
+            content=mp4_bytes,
+            media_type="video/mp4",
+            headers={
+                "Content-Disposition": 'attachment; filename="ai-review-video.mp4"',
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # Mount static frontend

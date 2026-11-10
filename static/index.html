@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Douyin & Bilibili Video Hub — ค้นหาและดาวน์โหลดคลิปไร้ลายน้ำ</title>
+  <title>Douyin & Bilibili Hub + AI Video Maker Studio</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Kanit:wght@600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-rose-500 selection:text-white">
@@ -19,26 +19,70 @@
     <div class="absolute bottom-0 left-1/3 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
   </div>
 
-  <!-- Top Navbar -->
-  <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px] shadow-lg shadow-rose-500/20">
-          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold text-lg tracking-tighter">
-            <span class="text-rose-400">D</span><span class="text-sky-400">B</span>
+  <!-- Top Navbar with Page Switcher (Page 1 & Page 2) + API Key Manager Button -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px] shadow-lg shadow-rose-500/20">
+            <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold text-lg tracking-tighter">
+              <span class="text-rose-400">D</span><span class="text-sky-400">B</span>
+            </div>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg sm:text-xl tracking-tight">
+              <span>Douyin & Bilibili</span>
+            </h1>
+            <p class="text-xs text-slate-400">ค้นหาโหลดคลิปไร้ลายน้ำ & สตูดิโอตัดต่อทำคลิปรีวิว AI</p>
           </div>
         </div>
-        <div>
-          <h1 class="font-bold text-lg sm:text-xl tracking-tight">
-            <span>Douyin & Bilibili</span>
-          </h1>
-          <p class="text-xs text-slate-400">ค้นหาวิดีโอทั้ง 2 แพลตฟอร์ม & วางลิงก์ดาวน์โหลดคลิปแบบไม่มีลายน้ำ</p>
+
+        <!-- Mobile API Key button -->
+        <button
+          type="button"
+          id="openApiKeyModalBtnMobile"
+          class="md:hidden px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5"
+        >
+          <span>🔑 API Google AI</span>
+        </button>
+      </div>
+
+      <!-- Page Navigation Tabs + API Key Manager -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="inline-flex p-1 rounded-2xl bg-slate-900 border border-slate-800">
+          <button
+            type="button"
+            id="navPage1Btn"
+            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white shadow-md"
+          >
+            <span>🔍 หน้าที่ 1: ค้นหาและโหลดคลิป</span>
+          </button>
+          <button
+            type="button"
+            id="navPage2Btn"
+            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 text-slate-300 hover:text-white"
+          >
+            <span>🎬 หน้าที่ 2: ทำคลิป AI</span>
+            <span id="studioClipCountBadge" class="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[11px] font-extrabold">0 คลิป</span>
+          </button>
         </div>
+
+        <button
+          type="button"
+          id="openApiKeyModalBtn"
+          class="hidden md:flex px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold transition items-center gap-1.5 shadow-sm"
+        >
+          <span>🔑 ตั้งค่า API Google AI</span>
+          <span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+        </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+  <!-- ====================================================================== -->
+  <!-- PAGE 1: VIDEO SEARCH & DOWNLOADER HUB                                  -->
+  <!-- ====================================================================== -->
+  <main id="pageSearchView" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
 
     <!-- Dual Action Hero Section: 1) Search Keyword & 2) Direct Link Paste -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -56,7 +100,7 @@
           </div>
         </div>
         <p class="text-xs sm:text-sm text-slate-400 mb-4">
-          พิมพ์คำค้นหาที่ต้องการ ระบบจะดึงวิดีโอจากทั้ง <strong class="text-rose-400">Douyin (抖音)</strong> และ <strong class="text-sky-400">Bilibili (哔哩哔哩)</strong> พร้อมเขียนป้ายกำกับแหล่งที่มาชัดเจน
+          พิมพ์คำค้นหาที่ต้องการ ระบบจะดึงวิดีโอจากทั้ง <strong class="text-rose-400">Douyin (抖音)</strong> และ <strong class="text-sky-400">Bilibili (哔哩哔哩)</strong> พร้อมส่งไปตัดต่อทำคลิปในหน้าที่ 2 ได้ทันที
         </p>
 
         <form id="searchForm" class="flex flex-col sm:flex-row gap-2.5">
@@ -102,7 +146,7 @@
             </div>
           </div>
           <p class="text-xs sm:text-sm text-slate-400 mb-4">
-            วางลิงก์สินค้า Shopee เพื่อค้นหาวิดีโอที่เกี่ยวข้อง
+            วางลิงก์สินค้า Shopee เพื่อค้นหาวิดีโอที่เกี่ยวข้อง (พร้อมซิงค์ข้อมูลสินค้าไปหน้าทำคลิปอัตโนมัติ)
           </p>
 
           <form id="resolveForm" class="space-y-2.5">
@@ -201,7 +245,7 @@
           </div>
           <h3 class="text-base font-bold text-slate-200">พร้อมค้นหาและดาวน์โหลดวิดีโอ</h3>
           <p class="text-xs text-slate-400 leading-relaxed">
-            พิมพ์คำค้นหาในช่องด้านซ้าย หรือกดปุ่มคำค้นยอดฮิตเพื่อดูวิดีโอจากทั้ง 2 แพลตฟอร์มพร้อมป้ายกำกับชัดเจน หรือวาง URL ในช่องด้านขวาเพื่อโหลดทันที
+            พิมพ์คำค้นหาในช่องด้านซ้าย หรือวางลิงก์ Shopee ในช่องด้านขวา แล้วกดปุ่ม <strong class="text-fuchsia-400">"🎬 ส่งไปทำคลิป"</strong> เพื่อส่งคลิปเข้าสตูดิโอ AI ในหน้าที่ 2 ได้เลย
           </p>
         </div>
       </div>
@@ -227,7 +271,558 @@
 
   </main>
 
-  <!-- Video Preview Modal -->
+  <!-- ====================================================================== -->
+  <!-- PAGE 2: AI VIDEO MAKER STUDIO (หน้าทำคลิปรีวิว AI)                        -->
+  <!-- ====================================================================== -->
+  <main id="pageStudioView" class="hidden max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- Studio Top Banner -->
+    <div class="rounded-2xl bg-gradient-to-r from-fuchsia-950/60 via-slate-900 to-indigo-950/60 border border-fuchsia-500/30 p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xl">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="px-2.5 py-0.5 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/40 text-fuchsia-300 text-xs font-bold">STUDIO AI • หน้าที่ 2</span>
+          <h2 class="text-lg sm:text-xl font-extrabold text-white">🎬 สตูดิโอทำคลิปรีวิวสินค้า AI (ตัดยำสลับฉาก + พากย์เสียง + ซับไตเติ้ล)</h2>
+        </div>
+        <p class="text-xs text-slate-300">
+          ปิดเสียงคลิปต้นฉบับ 100% • หั่นยำสลับตำแหน่งแบบสุ่ม • AI คิดบทพากย์จาก Shopee • Header ตัวใหญ่มีสโตรกไร้พื้นสี่เหลี่ยม • มี Preview Video ก่อนดาวน์โหลด
+        </p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap shrink-0">
+        <button
+          type="button"
+          id="studioBackToSearchBtn"
+          class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5"
+        >
+          <span>🔍 + เลือกคลิปเพิ่มจากหน้าค้นหา</span>
+        </button>
+        <button
+          type="button"
+          id="studioOpenApiBtn"
+          class="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold transition flex items-center gap-1.5"
+        >
+          <span>🔑 จัดเก็บ API Google AI</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- ================================================================== -->
+      <!-- LEFT COLUMN (7 cols): Controls, Clips, Shopee Info, AI & Templates -->
+      <!-- ================================================================== -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- STEP 1: VIDEO SOURCES & RANDOM CUT REMIX -->
+        <section class="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 space-y-4 shadow-xl">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 font-extrabold text-xs flex items-center justify-center">1</span>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold text-white">คลิปวิดีโอต้นฉบับ & ระบบตัดยำสลับฉากแบบสุ่ม</h3>
+                <p class="text-[11px] text-slate-400">ส่งมาจากหน้าหาคลิป หรือ อัปโหลดจากเครื่อง PC (ระบบปิดเสียงต้นฉบับให้อัตโนมัติ)</p>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold self-start sm:self-auto">
+              🔇 ปิดเสียงคลิปต้นฉบับ 100%
+            </span>
+          </div>
+
+          <!-- Upload from PC + Add from Page 1 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label
+              for="studioPcVideoInput"
+              class="cursor-pointer rounded-xl border-2 border-dashed border-slate-700 hover:border-fuchsia-500 bg-slate-950/70 hover:bg-slate-950 p-4 flex flex-col items-center justify-center text-center transition group"
+            >
+              <input id="studioPcVideoInput" type="file" accept="video/mp4,video/webm,video/quicktime,video/*" multiple class="hidden" />
+              <div class="w-9 h-9 rounded-xl bg-fuchsia-500/15 text-fuchsia-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </div>
+              <span class="text-xs font-bold text-slate-200">💻 อัปโหลดคลิปจากเครื่อง PC</span>
+              <span class="text-[11px] text-slate-400 mt-0.5">เลือกได้หลายไฟล์ (.MP4, .MOV, .WEBM)</span>
+            </label>
+
+            <button
+              type="button"
+              id="studioGoSearchClipsBtn"
+              class="rounded-xl border border-slate-800 hover:border-sky-500/50 bg-slate-950/70 hover:bg-slate-950 p-4 flex flex-col items-center justify-center text-center transition group"
+            >
+              <div class="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center mb-1.5 group-hover:scale-110 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <span class="text-xs font-bold text-slate-200">🔍 เลือกส่งคลิปจากหน้าค้นหา (หน้าที่ 1)</span>
+              <span class="text-[11px] text-slate-400 mt-0.5">กดปุ่ม "🎬 ส่งไปทำคลิป" บนการ์ดวิดีโอ</span>
+            </button>
+          </div>
+
+          <!-- Queued Clips List -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-300">รายการคลิปที่จะนำมาตัดยำรวมกัน (<span id="studioQueueCountText">0</span> คลิป):</span>
+              <button type="button" id="studioClearClipsBtn" class="text-[11px] text-rose-400 hover:underline hidden">ล้างคิวคลิปทั้งหมด</button>
+            </div>
+            <div id="studioClipsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1"></div>
+          </div>
+
+          <!-- Random Cut & Shuffle Settings -->
+          <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800/90 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">ความยาวต่อจังหวะตัดหั่น (Cut Pace):</label>
+              <select id="studioCutPaceSelect" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-fuchsia-500">
+                <option value="1.5">⚡ เร็วมาก (ตัดสลับทุก ~1.5 วินาที)</option>
+                <option value="2.0" selected>🔥 กระชับหยุดนิ้ว (ตัดสลับทุก ~2.0 วินาที • แนะนำ)</option>
+                <option value="2.8">🎬 สมดุลกำลังดี (ตัดสลับทุก ~2.8 วินาที)</option>
+                <option value="3.5">✨ เน้นโชว์รายละเอียดสินค้า (~3.5 วินาที)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">เอฟเฟกต์รอยต่อฉาก (Transition):</label>
+              <select id="studioTransitionSelect" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-fuchsia-500">
+                <option value="random" selected>🎲 สุ่มเอฟเฟกต์อัตโนมัติทุกฉาก</option>
+                <option value="cross-zoom">🔍 Cross Zoom (ซูมซ้อนนุ่มนวล)</option>
+                <option value="whip-slide">💨 Whip Slide (ปัดสไลด์เร็ว)</option>
+                <option value="flash-pop">⚡ Flash Pop (แฟลชเด้งป๊อป)</option>
+                <option value="none">✂️ Hard Cut (ตัดฉับไวไร้เอฟเฟกต์)</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              id="studioReshuffleBtn"
+              class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5"
+            >
+              <span>🔀 สุ่มสลับตำแหน่งคลิปใหม่</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- STEP 2: SHOPEE LINK PRODUCT INFO & GOOGLE AI SCRIPT + VOICE + SUBTITLES -->
+        <section class="rounded-2xl bg-slate-900/90 border border-orange-500/30 p-5 space-y-4 shadow-xl">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 text-orange-300 font-extrabold text-xs flex items-center justify-center">2</span>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold text-white">ลิงก์สินค้า Shopee & ให้ Google AI คิดบท + พากย์เสียง + ซับไตเติ้ล</h3>
+                <p class="text-[11px] text-slate-400">หากค้นหาด้วยลิงก์ Shopee ในหน้า 1 ไว้แล้ว ระบบจะดึงข้อมูลมาให้อัตโนมัติ หรือวางลิงก์ใหม่ด้านล่างได้เลย</p>
+              </div>
+            </div>
+            <span id="studioShopeeSyncBadge" class="hidden px-2.5 py-1 rounded-lg bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[11px] font-bold">
+              ✓ ซิงค์จากหน้า 1 แล้ว
+            </span>
+          </div>
+
+          <!-- Shopee URL Fetch Bar -->
+          <div class="flex flex-col sm:flex-row gap-2">
+            <div class="relative flex-1">
+              <input
+                id="studioShopeeUrlInput"
+                type="text"
+                placeholder="วางลิงก์สินค้า Shopee (https://s.shopee.co.th/... หรือ https://shopee.co.th/product/...)"
+                class="w-full pl-9 pr-14 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+              />
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400 text-sm">🛒</span>
+              <button
+                type="button"
+                id="studioPasteShopeeBtn"
+                class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300"
+              >
+                วาง
+              </button>
+            </div>
+            <button
+              type="button"
+              id="studioFetchShopeeBtn"
+              class="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition shrink-0 flex items-center justify-center gap-1.5 shadow-md"
+            >
+              <span>📥 ดึงชื่อ & รายละเอียดสินค้า</span>
+            </button>
+          </div>
+
+          <!-- Product Title & Details (Editable before sending to Google AI) -->
+          <div class="grid grid-cols-1 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">ชื่อสินค้า (ส่งให้ Google AI):</label>
+              <input
+                id="studioProductTitle"
+                type="text"
+                placeholder="เช่น DJI Osmo Mobile 8P ไม้กันสั่นมือถืออัจฉริยะ มีไฟเสริมและรีโมท..."
+                class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700/90 text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">รายละเอียดสินค้า / จุดเด่น (ส่งให้ Google AI คิดบทขายของ):</label>
+              <textarea
+                id="studioProductDesc"
+                rows="3"
+                placeholder="วางรายละเอียดสินค้า สเปก หรือจุดเด่นที่ต้องการให้ AI นำไปเขียนบทพากย์ป้ายยา..."
+                class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700/90 text-xs text-slate-200 focus:outline-none focus:border-orange-500 leading-relaxed"
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- AI Generation Options (Duration, Angle, Voice, Speed) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">ความยาวคลิปเป้าหมาย:</label>
+              <select id="studioTargetDuration" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                <option value="15">15 วินาที (สั้นกระชับ)</option>
+                <option value="20" selected>20 วินาที (กำลังฮิต TikTok)</option>
+                <option value="30">30 วินาที (รีวิวครบถ้วน)</option>
+                <option value="45">45 วินาที (เจาะลึกละเอียด)</option>
+                <option value="60">60 วินาที (1 นาทีเต็ม)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">สไตล์บทพากย์ AI:</label>
+              <select id="studioSalesAngle" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                <option value="hard_sell" selected>🔥 ป้ายยาขายของหยุดนิ้ว</option>
+                <option value="review_real">⭐ รีวิวใช้จริงป้ายยาเพื่อน</option>
+                <option value="feature_focus">⚡ สรุปจุดเด่นสเปกครบ</option>
+                <option value="flash_promo">🛒 โปรเดือดของมันต้องมี</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">เสียงพากย์ (Voiceover):</label>
+              <select id="studioVoiceSelect" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                <option value="th-TH-NiwatNeural">🎙️ คุณนิวัฒน์ (ชาย • คมชัดฉะฉาน)</option>
+                <option value="th-TH-PremwadeeNeural">🎙️ คุณเปรมวดี (หญิง • สดใสนุ่มนวล)</option>
+                <option value="Puck">✨ Puck (Google AI ชาย • มีพลัง)</option>
+                <option value="Aoede">✨ Aoede (Google AI หญิง • เล่าเรื่อง)</option>
+                <option value="Kore">✨ Kore (Google AI หญิง • สุภาพ)</option>
+                <option value="Fenrir">✨ Fenrir (Google AI ชาย • หนักแน่น)</option>
+                <option value="Charon">✨ Charon (Google AI ชาย • ทุ้มลึก)</option>
+                <option value="Google-Thai">🔊 Google Thai (ฟรีไร้โควตา)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">ความเร็วเสียงพากย์:</label>
+              <select id="studioVoiceSpeed" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                <option value="+0%">1.0x ปกติ</option>
+                <option value="+15%" selected>1.15x กระฉับกระเฉง (แนะนำ)</option>
+                <option value="+25%">1.25x เร็วสไตล์ TikTok</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Generate All Button -->
+          <button
+            type="button"
+            id="studioGenerateAllBtn"
+            class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-rose-500/20 transition flex items-center justify-center gap-2"
+          >
+            <span id="studioGenSpinner" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></span>
+            <span id="studioGenBtnText">✨ ให้ AI คิดบท + สร้าง Header + พากย์เสียง + ทำซับไตเติ้ล</span>
+          </button>
+        </section>
+
+        <!-- STEP 3: TEMPLATE SELECTION + HEADER (NO BG BOX, BIG BOLD WITH STROKE) + SUBTITLES -->
+        <section class="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 space-y-5 shadow-xl">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 font-extrabold text-xs flex items-center justify-center">3</span>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold text-white">เลือก Template & ปรับแต่ง Header (ตัวใหญ่ มีสโตรก ไร้พื้นหลัง) + ซับไตเติ้ล</h3>
+                <p class="text-[11px] text-slate-400">ปรับแต่งปุ๊บ เห็นผลบนจอ Preview Video ด้านขวาแบบเรียลไทม์ทันที</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Template Selector Grid -->
+          <div>
+            <label class="block text-xs font-bold text-slate-200 mb-2">🎨 เลือกสไตล์ Template (มี Header + เสียงพากย์ + Subtitle ในตัว):</label>
+            <div id="studioTemplateGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+          </div>
+
+          <!-- Header Styling Panel (Strictly NO background box, Large Bold + Adjustable Stroke) -->
+          <div class="p-4 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-3.5">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[11px] font-bold">HEADER พาดหัวด้านบน</span>
+                <span class="text-xs text-slate-300 font-semibold">ตัวใหญ่เด่นชัด • ใส่เส้นขอบ Stroke • ไม่มีพื้นสี่เหลี่ยมด้านหลัง</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">ข้อความ Header บนคลิป (AI คิดให้ หรือพิมพ์ปรับเองได้เลย):</label>
+              <input
+                id="studioHeaderInput"
+                type="text"
+                value="ไอเทมเด็ด ของมันต้องมี!"
+                placeholder="พิมพ์พาดหัวตัวใหญ่เด่นๆ บนคลิป..."
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-amber-500/40 text-sm font-extrabold text-amber-300 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">ขนาด Header (<span id="studioHeaderSizeVal">86</span>px):</label>
+                <input id="studioHeaderSizeRange" type="range" min="58" max="115" value="86" class="w-full accent-amber-400" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">ความหนาขอบ Stroke (<span id="studioHeaderStrokeVal">20</span>px):</label>
+                <input id="studioHeaderStrokeRange" type="range" min="6" max="32" value="20" class="w-full accent-amber-400" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">สีตัวอักษร Header:</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="studioHeaderColor" type="color" value="#fde047" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0" />
+                  <button type="button" data-hcolor="#fde047" class="hdr-color-preset w-5 h-5 rounded-full bg-yellow-300 border border-white/40" title="เหลืองทอง"></button>
+                  <button type="button" data-hcolor="#ffffff" class="hdr-color-preset w-5 h-5 rounded-full bg-white border border-white/40" title="ขาว"></button>
+                  <button type="button" data-hcolor="#4ade80" class="hdr-color-preset w-5 h-5 rounded-full bg-green-400 border border-white/40" title="เขียวนีออน"></button>
+                  <button type="button" data-hcolor="#fb923c" class="hdr-color-preset w-5 h-5 rounded-full bg-orange-400 border border-white/40" title="ส้ม"></button>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">สีเส้นขอบ (Stroke):</label>
+                <div class="flex items-center gap-1.5">
+                  <input id="studioHeaderStrokeColor" type="color" value="#000000" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0" />
+                  <button type="button" data-scolor="#000000" class="hdr-stroke-preset w-5 h-5 rounded-full bg-black border border-white/40" title="ขอบดำ"></button>
+                  <button type="button" data-scolor="#7f1d1d" class="hdr-stroke-preset w-5 h-5 rounded-full bg-red-900 border border-white/40" title="ขอบแดงเข้ม"></button>
+                  <button type="button" data-scolor="#1e1b4b" class="hdr-stroke-preset w-5 h-5 rounded-full bg-indigo-950 border border-white/40" title="ขอบกรมท่า"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Script & Subtitles Editor -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <label class="text-xs font-bold text-slate-200">💬 บทพากย์ & ซับไตเติ้ล (แก้ไขคำพูดแล้วกดพากย์เสียงใหม่ได้):</label>
+              <button
+                type="button"
+                id="studioRevoiceBtn"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <span>🔄 พากย์เสียง & ซิงค์ซับไตเติ้ลตามบทที่แก้</span>
+              </button>
+            </div>
+            <textarea
+              id="studioScriptTextarea"
+              rows="4"
+              placeholder="บทพากย์ที่ AI เขียนให้จะแสดงที่นี่ สามารถพิมพ์แก้ไขเองได้ตามต้องการ..."
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-slate-100 focus:outline-none focus:border-indigo-500 leading-relaxed"
+            ></textarea>
+
+            <!-- Subtitle Style Quick Controls -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">ขนาดซับไตเติ้ล (<span id="studioSubSizeVal">54</span>px):</label>
+                <input id="studioSubSizeRange" type="range" min="38" max="76" value="54" class="w-full accent-sky-400" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">ความหนาขอบซับ (<span id="studioSubStrokeVal">14</span>px):</label>
+                <input id="studioSubStrokeRange" type="range" min="6" max="24" value="14" class="w-full accent-sky-400" />
+              </div>
+              <div class="flex items-center gap-3 pt-4">
+                <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input id="studioSubBgCheck" type="checkbox" class="rounded accent-sky-500" />
+                  <span>แสดงแถบพื้นหลังซับไตเติ้ล</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- RIGHT COLUMN (5 cols): LIVE PREVIEW VIDEO PLAYER & MP4 EXPORT      -->
+      <!-- ================================================================== -->
+      <div class="lg:col-span-5 lg:sticky lg:top-20 space-y-5">
+
+        <!-- LIVE INTERACTIVE PREVIEW VIDEO CARD -->
+        <section class="rounded-2xl bg-slate-900/95 border border-slate-800 p-4 sm:p-5 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <h3 class="text-sm sm:text-base font-extrabold text-white">▶ Preview Video (พรีวิวคลิปเรียลไทม์)</h3>
+            </div>
+            <span id="studioVoiceEngineBadge" class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-semibold">
+              9:16 Full HD (1080×1920)
+            </span>
+          </div>
+
+          <!-- 9:16 Vertical Preview Viewport -->
+          <div class="relative mx-auto w-full max-w-[310px] aspect-[9/16] rounded-2xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-2xl">
+            <canvas id="studioPreviewCanvas" width="1080" height="1920" class="w-full h-full object-contain block cursor-pointer"></canvas>
+
+            <!-- Center Play Overlay when paused -->
+            <button
+              type="button"
+              id="studioCanvasPlayOverlay"
+              class="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition group"
+              title="คลิกเพื่อเล่น/หยุดพรีวิว"
+            >
+              <div class="w-14 h-14 rounded-full bg-white/95 text-slate-950 flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition">
+                <svg class="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                </svg>
+              </div>
+            </button>
+          </div>
+
+          <!-- Interactive Player Controls (Play/Pause, Scrubber, Timecode, Mute) -->
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+            <div class="flex items-center gap-2">
+              <input
+                id="studioTimelineScrubber"
+                type="range"
+                min="0"
+                max="20"
+                step="0.05"
+                value="0"
+                class="w-full accent-rose-500 cursor-pointer"
+              />
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  id="studioPlayPauseBtn"
+                  class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1"
+                >
+                  <span>▶ เล่นพรีวิว</span>
+                </button>
+                <button
+                  type="button"
+                  id="studioRestartBtn"
+                  class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition"
+                  title="เล่นซ้ำตั้งแต่ต้น"
+                >
+                  ↺ เริ่มใหม่
+                </button>
+                <button
+                  type="button"
+                  id="studioMuteVoiceBtn"
+                  class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition"
+                  title="เปิด/ปิดเสียงพากย์ขณะพรีวิว"
+                >
+                  🔊 เสียงพากย์
+                </button>
+              </div>
+              <span id="studioTimecodeText" class="text-xs font-mono text-slate-300">00.0s / 20.0s</span>
+            </div>
+          </div>
+
+          <!-- Visual Randomized Cut Sequence Strip -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>ลำดับฉากที่สุ่มตัดยำ (Random Cut Timeline):</span>
+              <span id="studioCutSummaryText">0 ฉาก</span>
+            </div>
+            <div id="studioCutPreviewStrip" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]"></div>
+          </div>
+
+          <!-- Render & Export MP4 Button -->
+          <div class="pt-1 space-y-2.5">
+            <button
+              type="button"
+              id="studioExportMp4Btn"
+              class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2"
+            >
+              <span>💾 เรนเดอร์และสร้างไฟล์วิดีโอ (.MP4)</span>
+            </button>
+
+            <!-- Export Progress Bar -->
+            <div id="studioExportProgressWrap" class="hidden p-3 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span id="studioExportProgressText" class="text-emerald-300 font-semibold">กำลังเรนเดอร์วิดีโอ...</span>
+                <span id="studioExportPctText" class="font-mono text-white font-bold">0%</span>
+              </div>
+              <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div id="studioExportProgressBar" class="h-full bg-gradient-to-r from-emerald-400 to-sky-400 transition-all duration-150" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- FINAL RENDERED MP4 VIDEO PREVIEW PLAYER CARD -->
+        <section id="studioFinalMp4Card" class="hidden rounded-2xl bg-gradient-to-b from-emerald-950/50 to-slate-900 border border-emerald-500/50 p-4 sm:p-5 shadow-2xl space-y-3.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 text-[11px] font-extrabold">MP4 READY</span>
+              <h4 class="text-sm font-bold text-white">🎬 พรีวิวไฟล์วิดีโอ .MP4 ที่เรนเดอร์เสร็จแล้ว</h4>
+            </div>
+          </div>
+
+          <div class="mx-auto w-full max-w-[280px] aspect-[9/16] rounded-xl overflow-hidden bg-black border border-slate-800">
+            <video id="studioFinalVideoPlayer" controls playsinline class="w-full h-full object-contain"></video>
+          </div>
+
+          <button
+            type="button"
+            id="studioDownloadFinalMp4Btn"
+            class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-2"
+          >
+            <span>⬇ ดาวน์โหลดคลิป .MP4 ลงเครื่อง</span>
+          </button>
+        </section>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ====================================================================== -->
+  <!-- GOOGLE AI API KEY MANAGER MODAL (หน้าจัดเก็บ API Google AI)              -->
+  <!-- ====================================================================== -->
+  <div id="apiKeyModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="text-lg">🔑</span>
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white">หน้าจัดเก็บ API Google AI (Gemini API Key)</h3>
+            <p class="text-[11px] text-slate-400">ใช้สำหรับให้ AI คิดบทขายของ, สร้าง Header และพากย์เสียง Google AI</p>
+          </div>
+        </div>
+        <button type="button" id="closeApiKeyModalBtn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-200">รายการ Google Gemini API Key (ใส่หลายคีย์ได้ บรรทัดละ 1 คีย์):</label>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="text-[11px] text-amber-400 hover:underline">รับ API Key ฟรีที่ Google AI Studio ↗</a>
+          </div>
+          <textarea
+            id="geminiApiKeysInput"
+            rows="4"
+            placeholder="AIzaSy... (วางได้หลายคีย์ บรรทัดละ 1 คีย์ ระบบจะสลับคีย์อัตโนมัติ)"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-amber-200 placeholder-slate-600 focus:outline-none focus:border-amber-500"
+          ></textarea>
+        </div>
+
+        <div id="apiKeyStatusBox" class="hidden p-3 rounded-xl text-xs font-medium"></div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-2">
+          <button
+            type="button"
+            id="testApiKeyBtn"
+            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold transition"
+          >
+            ⚡ ทดสอบ API Key
+          </button>
+          <button
+            type="button"
+            id="saveApiKeyBtn"
+            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-extrabold transition shadow-lg"
+          >
+            💾 บันทึก API Key
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Preview Modal (Used on both Page 1 & Page 2 source clips) -->
   <div id="previewModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl">
       <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between gap-3">
@@ -248,7 +843,10 @@
           <span class="mx-2">•</span>
           <a id="modalOriginalLink" href="#" target="_blank" rel="noopener" class="text-indigo-400 hover:underline">เปิดลิงก์ต้นฉบับ ↗</a>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="modalSendToStudioBtn" class="px-4 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold transition flex items-center gap-1.5">
+            <span>🎬 ส่งไปทำคลิป (หน้า 2)</span>
+          </button>
           <button id="modalDownloadMp4Btn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
             <span>⬇ โหลดวิดีโอ (.MP4 ไร้ลายน้ำ)</span>
           </button>
@@ -266,6 +864,7 @@
     <span id="toastText"></span>
   </div>
 
-  <script src="/app.js?v=10"></script>
+  <script src="/app.js?v=12"></script>
+  <script src="/studio.js?v=12"></script>
 </body>
 </html>
