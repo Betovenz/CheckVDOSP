@@ -508,11 +508,17 @@ function renderShopeeProductCard(product, search) {
 
         <!-- Product Keyword Bar -->
         <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2 text-xs">
-            <span class="text-slate-400">คำค้นหาวิดีโอ:</span>
-            <span class="px-2.5 py-1 rounded-lg bg-orange-500/15 text-orange-300 border border-orange-500/30 font-bold">
-              ${escapeHtml(product.thai_keyword)}
-            </span>
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <span class="text-slate-400 mr-1">คำค้นหาวิดีโอ:</span>
+            ${(product.thai_keyword || "")
+              .split(/[,|]+/)
+              .map((k) => k.trim())
+              .filter(Boolean)
+              .map(
+                (k) =>
+                  `<span class="px-2.5 py-1 rounded-lg bg-orange-500/15 text-orange-300 border border-orange-500/30 font-bold">${escapeHtml(k)}</span>`
+              )
+              .join('<span class="text-slate-500 font-bold">+</span>')}
           </div>
 
           <!-- Inline Custom Product Keyword Override -->
@@ -521,8 +527,8 @@ function renderShopeeProductCard(product, search) {
               id="customShopeeKwInput"
               type="text"
               value="${escapeHtml(product.thai_keyword)}"
-              placeholder="ระบุคำค้นหา..."
-              class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500 w-40 sm:w-44"
+              placeholder="ค้นหลายคำได้ เช่น ขาตั้งกล้อง, ไม้กันสั่น"
+              class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500 w-48 sm:w-56"
             />
             <button
               type="submit"

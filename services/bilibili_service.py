@@ -96,6 +96,31 @@ class BilibiliService:
         except Exception:
             return []
 
+    @staticmethod
+    def _split_search_terms(keyword: str) -> List[str]:
+        """
+        Splits a single or multi-keyword string (e.g. '数据线 | 三脚架 手机支架' or '大疆 Osmo Mobile 8P | 手机稳定器 云台')
+        into distinct search terms while keeping English model names intact.
+        """
+        raw = (keyword or "").strip()
+        if not raw:
+            return []
+        # First split by explicit pipe/comma/slash
+        groups = [g.strip() for g in re.split(r"[|｜,，/]+", raw) if g.strip()]
+        terms: List[str] = []
+        for g in groups:
+            # If the group has ASCII/English words (like "大疆 Osmo Mobile 8P"), keep the group intact
+            if re.search(r"[A-Za-z0-9]", g):
+                if g not in terms:
+                    terms.append(g)
+            else:
+                # Pure CJK group: split by spaces into distinct Chinese terms (e.g. "手机稳定器 云台" -> ["手机稳定器", "云台"])
+                for part in g.split():
+                    p = part.strip()
+                    if p and p not in terms:
+                        terms.append(p)
+        return terms if terms else [raw]
+
     async def search_videos(self, keyword: str, page: int = 1, limit: int = 75) -> List[Dict[str, Any]]:
         async with httpx.AsyncClient(
             headers=self.headers,
@@ -105,35 +130,45 @@ class BilibiliService:
         ) as client:
             await self._ensure_cookies(client)
 
-            # Each logical batch fetches 2 Bilibili pages (up to 42 items each -> ~84 items)
+            terms = self._split_search_terms(keyword)
             p1 = (page - 1) * 2 + 1
             p2 = (page - 1) * 2 + 2
-            tasks = [
-                self._fetch_search_page(client, keyword, p1, 42),
-                self._fetch_search_page(client, keyword, p2, 42),
-            ]
-            # Also query sub-keywords so compound queries or deep pages never run dry
-            parts = [p for p in keyword.split() if p]
-            cjk = re.sub(r"[^\u4e00-\u9fff]", "", keyword)
-            if len(parts) > 1:
-                tasks.append(self._fetch_search_page(client, parts[0], page, 40))
-            elif len(cjk) >= 4:
-                tasks.append(self._fetch_search_page(client, cjk[:3], page, 40))
-                tasks.append(self._fetch_search_page(client, cjk[-2:], page, 40))
 
-            pages_results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Fetch 2 pages for EACH keyword term concurrently so all keywords get equal representation
+            term_tasks = []
+            for t in terms[:5]:
+                term_tasks.append(self._fetch_search_page(client, t, p1, 42))
+                term_tasks.append(self._fetch_search_page(client, t, p2, 42))
 
-            items: List[Dict[str, Any]] = []
+            pages_results = await asyncio.gather(*term_tasks, return_exceptions=True)
+
+            # Group results per term so we can interleave (สลับฟันปลา) across all keywords equally
+            per_term_lists: List[List[Dict[str, Any]]] = []
             seen_bvids: set[str] = set()
 
-            for batch in pages_results:
-                if isinstance(batch, Exception) or not batch:
-                    continue
-                for raw in batch:
+            for i in range(0, len(pages_results), 2):
+                batch1 = pages_results[i] if not isinstance(pages_results[i], Exception) else []
+                batch2 = (
+                    pages_results[i + 1]
+                    if (i + 1 < len(pages_results) and not isinstance(pages_results[i + 1], Exception))
+                    else []
+                )
+                term_items: List[Dict[str, Any]] = []
+                for raw in (batch1 or []) + (batch2 or []):
                     parsed = self._parse_bili_item(raw)
                     if parsed and parsed["id"] not in seen_bvids:
                         seen_bvids.add(parsed["id"])
-                        items.append(parsed)
+                        term_items.append(parsed)
+                if term_items:
+                    per_term_lists.append(term_items)
+
+            # Interleave items round-robin across all keyword terms
+            items: List[Dict[str, Any]] = []
+            max_len = max((len(lst) for lst in per_term_lists), default=0)
+            for idx in range(max_len):
+                for lst in per_term_lists:
+                    if idx < len(lst):
+                        items.append(lst[idx])
                         if len(items) >= limit:
                             return items
 

@@ -331,29 +331,50 @@ class DouyinService:
 
     @staticmethod
     def _extract_cjk_roots(keyword: str) -> List[str]:
-        parts = [p for p in keyword.split() if p]
-        roots: List[str] = list(parts)
-        if keyword not in roots:
-            roots.insert(0, keyword)
-        cjk = re.sub(r"[^\u4e00-\u9fff]", "", keyword)
-        if len(cjk) >= 4:
-            roots.append(cjk[:3])
-            roots.append(cjk[-2:])
-            roots.append(cjk[:2])
-            roots.append(cjk[-3:])
-            for i in range(len(cjk) - 1):
-                roots.append(cjk[i : i + 2])
-        elif len(cjk) == 3:
-            roots.append(cjk)
-            roots.append(cjk[:2])
-            roots.append(cjk[1:])
-        elif len(cjk) == 1:
-            if cjk == "猫":
-                roots.extend(["猫咪", "小猫", "萌宠", "宠物猫", "搞笑猫", "橘猫", "小奶猫"])
-            elif cjk == "狗":
-                roots.extend(["狗狗", "小狗", "萌宠", "宠物狗", "搞笑狗", "小奶狗"])
+        """
+        Extracts clean, on-topic search roots from single or multi-keyword strings
+        (e.g. '数据线 | 三脚架 手机支架' or '大疆 Osmo Mobile 8P | 手机稳定器 云台').
+        Never splits English model names into isolated generic words or chops Chinese nouns into off-topic 2-char prefixes.
+        """
+        raw = (keyword or "").strip()
+        if not raw:
+            return []
+
+        groups = [g.strip() for g in re.split(r"[|｜,，/]+", raw) if g.strip()]
+        roots: List[str] = []
+
+        for g in groups:
+            if re.search(r"[A-Za-z0-9]", g):
+                # Keep brand+model phrase together (e.g. "大疆 Osmo Mobile 8P")
+                if g not in roots:
+                    roots.append(g)
+                # Also add pure Chinese prefix if mixed (e.g. "大疆" from "大疆 Osmo Mobile 8P")
+                cjk_part = re.sub(r"[^\u4e00-\u9fff]", "", g).strip()
+                if len(cjk_part) >= 2 and cjk_part not in roots:
+                    roots.append(cjk_part)
             else:
-                roots.extend([f"{cjk}{cjk}", f"小{cjk}"])
+                for tok in g.split():
+                    t = tok.strip()
+                    if not t:
+                        continue
+                    if t not in roots:
+                        roots.append(t)
+                    # Decompose glued compound translations like "鲨鱼夹发夹" -> "鲨鱼夹", "发夹"
+                    if len(t) >= 5 and t.endswith(("发夹", "抓夹")):
+                        prefix = t[:-2]
+                        suffix = t[-2:]
+                        if len(prefix) >= 2 and prefix not in roots:
+                            roots.append(prefix)
+                        if suffix not in roots:
+                            roots.append(suffix)
+                    elif len(t) == 1:
+                        if t == "猫":
+                            roots.extend(["猫咪", "小猫", "萌宠", "宠物猫"])
+                        elif t == "狗":
+                            roots.extend(["狗狗", "小狗", "萌宠", "宠物狗"])
+                        else:
+                            roots.extend([f"{t}{t}", f"小{t}"])
+
         return list(dict.fromkeys([r for r in roots if r]))
 
     async def _search_via_bytedance_synthesis(
@@ -415,27 +436,37 @@ class DouyinService:
                     for i, r in enumerate(roots[:4])
                 ]
                 sug_resps = await asyncio.gather(*sug_tasks, return_exceptions=True)
+                sug_lists: List[List[str]] = []
                 for sr in sug_resps:
                     if isinstance(sr, Exception) or sr.status_code != 200:
                         continue
-                    for item in (sr.json().get("data") or []):
-                        k = item.get("keyword")
-                        if k:
-                            sug_keywords.append(k)
+                    s_list = [
+                        item.get("keyword")
+                        for item in (sr.json().get("data") or [])
+                        if item.get("keyword")
+                    ]
+                    if s_list:
+                        sug_lists.append(s_list)
+                # Interleave suggestions across all roots so multi-keyword queries are balanced
+                max_sug = max((len(sl) for sl in sug_lists), default=0)
+                for s_idx in range(max_sug):
+                    for sl in sug_lists:
+                        if s_idx < len(sl) and sl[s_idx] not in sug_keywords:
+                            sug_keywords.append(sl[s_idx])
             except Exception:
                 pass
 
-            # Build full ordered candidate query list across all pages
+            # Build full ordered candidate query list across all pages (round-robin across roots)
             all_candidates: List[str] = []
             # 1) Bare roots first (highest yield)
             all_candidates.extend(roots[:6])
-            # 2) Top proven patterns on primary roots
+            # 2) Top proven patterns on primary roots (round-robin across roots)
             for pat in ["抖音 {r}", "{r} 教程", "{r}推荐", "{r}制作"]:
-                for r in roots[:3]:
+                for r in roots[:4]:
                     q_str = pat.format(r=r)
                     if q_str not in all_candidates:
                         all_candidates.append(q_str)
-            # 3) Real ByteDance search_sug keywords (curated high-traffic queries)
+            # 3) Real ByteDance search_sug keywords (already interleaved across roots)
             for sk in sug_keywords:
                 if sk not in all_candidates:
                     all_candidates.append(sk)
@@ -477,9 +508,11 @@ class DouyinService:
                 return_exceptions=True,
             )
 
+            per_query_results: List[List[Dict[str, Any]]] = []
             for resp in responses:
                 if isinstance(resp, Exception) or resp.status_code != 200:
                     continue
+                q_items: List[Dict[str, Any]] = []
                 scripts = re.findall(r"<script[^>]*>(.*?)</script>", resp.text, re.S)
                 for s in scripts:
                     if (
@@ -516,7 +549,7 @@ class DouyinService:
                             views = int(h.get("play_count") or 0)
                             canonical_url = f"https://www.douyin.com/video/{gid}"
 
-                            results.append(
+                            q_items.append(
                                 {
                                     "id": gid,
                                     "platform": "douyin",
@@ -536,6 +569,15 @@ class DouyinService:
                             )
                     except Exception:
                         continue
+                if q_items:
+                    per_query_results.append(q_items)
+
+            # Interleave across all query buckets so all keywords appear evenly
+            max_q_len = max((len(ql) for ql in per_query_results), default=0)
+            for item_idx in range(max_q_len):
+                for ql in per_query_results:
+                    if item_idx < len(ql):
+                        results.append(ql[item_idx])
 
         return results[:limit]
 

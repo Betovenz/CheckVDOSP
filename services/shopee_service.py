@@ -72,12 +72,18 @@ THAI_TO_ZH_PRODUCT_DICT: List[Tuple[str, str]] = [
     ("เมาส์ไร้สาย", "无线鼠标"),
     ("เมาส์เกมมิ่ง", "游戏鼠标"),
     ("เมาส์", "鼠标"),
-    ("ขาตั้งมือถือ", "手机支架"),
-    ("ขาตั้งกล้อง", "三脚架"),
+    ("ไม้กันสั่นมือถือ", "手机稳定器 云台"),
+    ("ไม้กันสั่น", "手机稳定器 云台"),
+    ("กิมบอล", "手机云台 稳定器"),
+    ("ขาตั้งไม้เซลฟี่", "自拍杆 手机支架"),
+    ("ขาตั้งมือถือ", "手机支架 桌面支架"),
+    ("ขาตั้งกล้อง", "三脚架 拍摄支架 手机支架"),
     ("ไม้เซลฟี่", "自拍杆"),
     ("ไฟไลฟ์สด", "补光灯"),
     ("ไมโครโฟนไร้สาย", "无线麦克风"),
     ("ไมค์ไร้สาย", "无线领夹麦克风"),
+    ("ไมค์ติดปกเสื้อ", "领夹麦克风"),
+    ("กล้องแอคชั่น", "运动相机"),
     ("กล้องวงจรปิด", "监控摄像头"),
     ("กล้องติดรถยนต์", "行车记录仪"),
     ("โปรเจคเตอร์", "投影仪"),
@@ -197,73 +203,154 @@ def _clean_shopee_title(raw_title: str) -> str:
     return t.strip()
 
 
+def _extract_brand_model_from_title(title: str) -> str:
+    """
+    Extracts prominent English brand + model phrase from the beginning of a Shopee title,
+    e.g. "[พร้อมส่ง] DJI Osmo Mobile 8P - Smartphone Stabilizer | ไม้กันสั่นมีรีโมท" -> "DJI Osmo Mobile 8P"
+    """
+    if not title:
+        return ""
+    cleaned = re.sub(r'\[[^\]]*\]|\([^\)]*\)|【[^】]*】', ' ', title)
+    # Split by pipe or dash or slash into segments
+    segments = [s.strip() for s in re.split(r'[|｜/]+|\s+-\s+', cleaned) if s.strip()]
+    generic_en = {
+        "smartphone", "stabilizer", "official", "store", "original", "authentic",
+        "warranty", "free", "shipping", "ready", "stock", "new", "version", "mini",
+        "pro", "max", "plus", "ultra", "lite", "usb", "type", "cable", "fast", "charge",
+    }
+    for seg in segments[:2]:
+        # Find contiguous English/number words (at least 2 chars, starting with letter)
+        m = re.search(r'\b([A-Za-z][A-Za-z0-9]*(?:\s+[A-Za-z0-9\-\.+]+){0,4})\b', seg)
+        if m:
+            candidate = m.group(1).strip()
+            words = [w.lower() for w in candidate.split()]
+            # Must contain at least one non-generic brand/model word or alphanumeric model code
+            if len(candidate) >= 3 and any(w not in generic_en for w in words):
+                return candidate
+    return ""
+
+
 def extract_core_thai_keyword(title: str, description: str = "") -> str:
     """
-    Extract the core Thai product type/keyword from the Shopee product title and description.
-    Examples:
-    - "[ส่งฟรี] หม้อทอดไร้น้ำมัน Philips รุ่น HD9200 ขนาด 4.1 ลิตร 1400W" -> "หม้อทอดไร้น้ำมัน"
-    - "เกรดสูงประกายเพชรกลวงออกดอกไม้กลับช้อนที่มีผมขดลวดคลิปฉลาม" + desc "ชื่อสินค้า: กิ๊บติดผม" -> "กิ๊บติดผม คลิปฉลาม"
+    Extract the core product keyword(s) from the Shopee product title (and explicit product name in description).
+    Supports extracting multiple keywords (e.g. Brand/Model + Thai Category: "DJI Osmo Mobile 8P, ไม้กันสั่น").
+    Never scans raw description body for random accessory words like 'สายชาร์จ' or 'ขาตั้งกล้อง'.
     """
-    full_text = f"{title} {description}"
+    # 1. Check dictionary matches strictly in TITLE first
+    matched_thai_terms: List[str] = []
+    for th_term, _ in THAI_TO_ZH_PRODUCT_DICT:
+        if th_term in title:
+            # Avoid adding a shorter substring if a more specific term already matched (e.g. 'พัดลมพกพา' vs 'พัดลม')
+            if not any(th_term in existing or existing in th_term for existing in matched_thai_terms):
+                matched_thai_terms.append(th_term)
 
-    # 1. Check if description explicitly states "ชื่อสินค้า: ..." or "ประเภทสินค้า: ..."
+    # 2. Extract Brand/Model from title if present (e.g. "DJI Osmo Mobile 8P")
+    brand_model = _extract_brand_model_from_title(title)
+
+    # 3. Check if description explicitly states "ชื่อสินค้า: ..." or "ประเภทสินค้า: ..."
     desc_product_name = ""
-    if description:
+    if description and not matched_thai_terms:
         m_desc = re.search(r'(?:ชื่อสินค้า|ประเภทสินค้า|ชนิดสินค้า)\s*[:：]\s*([^\r\n✨☆•,，|/]{2,35})', description)
         if m_desc:
             desc_product_name = m_desc.group(1).strip()
 
-    # 2. Check dictionary matches in title & description
-    matched_thai_terms: List[str] = []
-    for th_term, _ in THAI_TO_ZH_PRODUCT_DICT:
-        if th_term in title:
-            if th_term not in matched_thai_terms:
-                matched_thai_terms.append(th_term)
-    if not matched_thai_terms and description:
-        for th_term, _ in THAI_TO_ZH_PRODUCT_DICT:
-            if th_term in description:
-                if th_term not in matched_thai_terms:
-                    matched_thai_terms.append(th_term)
+    keywords_out: List[str] = []
+    if brand_model:
+        keywords_out.append(brand_model)
+    for t in matched_thai_terms[:2]:
+        if t not in keywords_out:
+            keywords_out.append(t)
+    if not keywords_out and desc_product_name:
+        keywords_out.append(desc_product_name)
 
-    if desc_product_name and matched_thai_terms:
-        combined = [desc_product_name] + [t for t in matched_thai_terms if t not in desc_product_name]
-        return " ".join(combined[:2])
-    if matched_thai_terms:
-        return " ".join(matched_thai_terms[:2])
-    if desc_product_name:
-        return desc_product_name
+    if keywords_out:
+        return ", ".join(keywords_out[:3])
 
-    # 3. Clean noisy promotional words, brackets, capacities, and model codes from title
+    # 4. Clean noisy promotional words, brackets, capacities, and model codes from title
     cleaned = title
     cleaned = re.sub(r'\[[^\]]*\]|\([^\)]*\)|【[^】]*】|🔥|⚡|✨|❤️|⭐|✅|🚚', ' ', cleaned)
     promo_patterns = [
         r'พร้อมส่ง(?:ในไทย)?', r'ส่งฟรี', r'ส่งไว', r'ของแท้\s*100%?', r'แท้\s*100%?',
         r'รับประกัน\s*\d*\s*(?:ปี|เดือน|วัน)?', r'ประกันศูนย์(?:\s*\d+\s*ปี)?',
         r'เก็บเงินปลายทาง', r'ราคาถูก', r'โปรโมชั่น', r'ลดราคา', r'เกรดสูง',
-        r'\b\d+(?:\.\d+)?\s*(?:ลิตร|L|ml|มล\.|วัตต์|W|mAh|นิ้ว|ซม\.|cm|mm|ชิ้น|อัน|แพ็ค|กล่อง)\b',
-        r'รุ่น\s*[A-Za-z0-9\-_]+',
+        r'\b\d+(?:\.\d+)?\s*(?:ลิตร|L|ml|มล\.|วัตต์|W|mAh|นิ้ว|ซม\.|cm|mm|ชิ้น|อัน|แพ็ค|กล่อง|ชม\.|ชั่วโมง)\b',
     ]
     for pat in promo_patterns:
         cleaned = re.sub(pat, ' ', cleaned, flags=re.I)
 
+    # Split by pipe '|' and take the first 1-2 meaningful segments
+    segs = [re.sub(r'\s+', ' ', s).strip(" -|/") for s in re.split(r'[|｜]+', cleaned) if s.strip(" -|/")]
+    if segs:
+        return ", ".join(segs[:2])[:45].strip()
+
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    # Keep first meaningful segment (up to 35 chars)
     if len(cleaned) > 38:
         cleaned = cleaned[:38].strip()
     return cleaned or title[:35].strip()
 
 
-async def translate_to_chinese(text: str) -> str:
+def split_multi_keywords(raw_query: str) -> List[str]:
     """
-    Translates Thai, English, or any input keyword into Simplified Chinese (zh-CN)
-    for high-quality search on Douyin and Bilibili.
-    Uses:
-    1. Curated Thai E-Commerce Dictionary
-    2. MyMemory autodetect|zh-CN
-    3. Google Translate Chrome Dictionary (clients5)
-    4. Google Translate GTX
+    Splits a multi-keyword input string into individual keyword phrases so each one can be
+    translated and searched equally.
+    Examples:
+    - "สายชาร์จ ขาตั้งกล้อง" -> ["สายชาร์จ", "ขาตั้งกล้อง"]
+    - "สายชาร์จ, ขาตั้งกล้อง" -> ["สายชาร์จ", "ขาตั้งกล้อง"]
+    - "DJI Osmo Mobile 8P, ไม้กันสั่น" -> ["DJI Osmo Mobile 8P", "ไม้กันสั่น"]
+    - "DJI Osmo Mobile 8P ไม้กันสั่น" -> ["DJI Osmo Mobile 8P", "ไม้กันสั่น"]
+    - "air fryer" -> ["air fryer"]
     """
-    q = (text or "").strip()
+    q = (raw_query or "").strip()
+    if not q:
+        return []
+
+    # 1. Explicit delimiters (comma, pipe, slash, plus)
+    if re.search(r'[,，|｜/+]', q):
+        parts = [p.strip() for p in re.split(r'[,，|｜/+]+', q) if p.strip()]
+        if len(parts) > 1:
+            return parts
+
+    # 2. Space-separated tokens: group contiguous ASCII/English words together (e.g. "DJI Osmo Mobile 8P" or "air fryer"),
+    #    while splitting distinct Thai or Chinese words (e.g. "สายชาร์จ ขาตั้งกล้อง" -> ["สายชาร์จ", "ขาตั้งกล้อง"])
+    raw_tokens = [t.strip() for t in q.split() if t.strip()]
+    if len(raw_tokens) <= 1:
+        return [q]
+
+    grouped: List[str] = []
+    current_ascii: List[str] = []
+    for tok in raw_tokens:
+        is_ascii_phrase = bool(re.match(r'^[A-Za-z0-9\-\.+]+$', tok))
+        if is_ascii_phrase:
+            current_ascii.append(tok)
+        else:
+            if current_ascii:
+                grouped.append(" ".join(current_ascii))
+                current_ascii = []
+            grouped.append(tok)
+    if current_ascii:
+        grouped.append(" ".join(current_ascii))
+
+    return grouped if grouped else [q]
+
+
+BRAND_EN_TO_ZH: List[Tuple[str, str]] = [
+    ("dji osmo mobile", "大疆 Osmo Mobile"),
+    ("osmo mobile", "大疆 Osmo Mobile"),
+    ("osmo pocket", "大疆 Osmo Pocket"),
+    ("osmo action", "大疆 Osmo Action"),
+    ("dji", "大疆 DJI"),
+    ("insta360", "影石 Insta360"),
+    ("gopro", "GoPro"),
+    ("ulanzi", "优篮子"),
+    ("jisulife", "几素"),
+    ("baseus", "倍思"),
+    ("ugreen", "绿联"),
+    ("anker", "安克"),
+]
+
+
+async def _translate_single_phrase_to_chinese(phrase: str) -> str:
+    q = (phrase or "").strip()
     if not q:
         return ""
 
@@ -271,9 +358,27 @@ async def translate_to_chinese(text: str) -> str:
     if re.search(r'[\u4e00-\u9fff]', q):
         return q
 
-    # Check curated Thai dictionary first
+    # Check known brand/model mappings (keep model numbers like "8P" intact!)
+    q_lower = q.lower()
+    for brand_en, brand_zh in BRAND_EN_TO_ZH:
+        if brand_en in q_lower:
+            # Replace brand prefix case-insensitively while keeping model suffix (e.g. "8P")
+            translated_brand = re.sub(re.escape(brand_en), brand_zh, q, flags=re.I).strip()
+            # If the whole phrase is ASCII/model name, return it directly without mangling model numbers
+            if not re.search(r'[\u0e00-\u0e7f]', translated_brand):
+                return translated_brand
+
+    # If pure English Brand + Alphanumeric model (e.g. "iPhone 16 Pro", "Sony ZV-E10"), keep it intact if it has model digits
+    if re.match(r'^[A-Za-z0-9\s\-\.+]+$', q) and re.search(r'\d', q):
+        return q
+
+    # Exact match in curated Thai dictionary
     for th_term, zh_term in THAI_TO_ZH_PRODUCT_DICT:
         if q == th_term:
+            return zh_term
+    # Partial match if phrase starts with a curated Thai term (e.g. "ไม้กันสั่นมีรีโมท" -> "手机稳定器 云台")
+    for th_term, zh_term in THAI_TO_ZH_PRODUCT_DICT:
+        if th_term in q and len(th_term) >= 4:
             return zh_term
 
     async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
@@ -327,59 +432,66 @@ async def translate_to_chinese(text: str) -> str:
     return q
 
 
+async def translate_to_chinese(text: str) -> str:
+    """
+    Translates single or multiple Thai/English keywords into Simplified Chinese (zh-CN).
+    When multiple keywords are provided (e.g. "สายชาร์จ ขาตั้งกล้อง" or "DJI Osmo Mobile 8P, ไม้กันสั่น"),
+    translates each keyword individually and joins them with ' | ' so downstream search engines
+    fetch videos for ALL keywords equally!
+    """
+    phrases = split_multi_keywords(text)
+    if not phrases:
+        return ""
+    if len(phrases) == 1:
+        return await _translate_single_phrase_to_chinese(phrases[0])
+
+    translated_list = await asyncio.gather(
+        *[_translate_single_phrase_to_chinese(p) for p in phrases]
+    )
+    cleaned_list: List[str] = []
+    for t in translated_list:
+        t_clean = (t or "").strip()
+        if t_clean and t_clean not in cleaned_list:
+            cleaned_list.append(t_clean)
+    return " | ".join(cleaned_list)
+
+
 translate_thai_to_chinese = translate_to_chinese
 
 
 async def build_chinese_search_keywords(title: str, description: str = "", custom_keyword: str = "") -> Dict[str, Any]:
     """
-    Build the primary Chinese keyword and suggested search angles for Douyin & Bilibili.
-    Combines:
-    1. Curated Thai-to-Chinese E-Commerce Product Dictionary
-    2. Multi-provider Thai-to-Chinese Translation
+    Build the primary Chinese keyword(s) and suggested search angles for Douyin & Bilibili.
+    Supports multi-keyword extraction and individual keyword chips.
     """
     if custom_keyword and custom_keyword.strip():
         core_th = custom_keyword.strip()
     else:
         core_th = extract_core_thai_keyword(title, description)
 
-    # Check dictionary matches first
-    dict_zh_matches: List[str] = []
-    search_space = f"{core_th} {title} {description}"
-    for th_term, zh_term in THAI_TO_ZH_PRODUCT_DICT:
-        if th_term in core_th:
-            if zh_term not in dict_zh_matches:
-                dict_zh_matches.append(zh_term)
-    if not dict_zh_matches and not custom_keyword:
-        for th_term, zh_term in THAI_TO_ZH_PRODUCT_DICT:
-            if th_term in search_space:
-                if zh_term not in dict_zh_matches:
-                    dict_zh_matches.append(zh_term)
-
-    # Translate core_th and full title concurrently
-    translated_core, translated_title = await asyncio.gather(
-        translate_thai_to_chinese(core_th),
-        translate_thai_to_chinese(title[:60]) if title and title != core_th else asyncio.sleep(0, result="")
+    phrases_th = split_multi_keywords(core_th)
+    translated_phrases = await asyncio.gather(
+        *[_translate_single_phrase_to_chinese(p) for p in phrases_th]
     )
+    zh_list = [t.strip() for t in translated_phrases if t and t.strip()]
+    primary_zh = " | ".join(dict.fromkeys(zh_list)) if zh_list else core_th
 
-    if dict_zh_matches:
-        primary_zh = " ".join(dict_zh_matches[:2])
-    else:
-        primary_zh = translated_core or translated_title or core_th
-
-    # Build suggested search angle pills so user can switch search angles with 1 click
+    # Build suggested search angle pills so user can switch between combined multi-keyword or individual keywords
     suggestions: List[Dict[str, str]] = [
-        {"keyword": primary_zh, "label": "วิดีโอสินค้า"},
+        {"keyword": primary_zh, "label": "วิดีโอสินค้า (รวมทุกคีย์เวิร์ด)" if len(zh_list) > 1 else "วิดีโอสินค้า"},
     ]
-    if translated_title and translated_title != primary_zh:
-        short_title_zh = translated_title[:18]
-        suggestions.append({"keyword": short_title_zh, "label": "รุ่นตรงปก"})
-    suggestions.append({"keyword": f"{primary_zh} 测评", "label": "รีวิวการใช้งาน"})
-    suggestions.append({"keyword": f"{primary_zh} 开箱", "label": "แกะกล่องสินค้าจริง"})
+    if len(phrases_th) > 1 and len(zh_list) == len(phrases_th):
+        for th_p, zh_p in zip(phrases_th, zh_list):
+            suggestions.append({"keyword": zh_p, "label": f"เฉพาะ: {th_p}"})
+
+    first_zh = zh_list[0] if zh_list else primary_zh
+    suggestions.append({"keyword": f"{first_zh} 测评", "label": "รีวิวการใช้งาน"})
+    suggestions.append({"keyword": f"{first_zh} 开箱", "label": "แกะกล่องสินค้าจริง"})
 
     return {
         "thai_keyword": core_th,
         "zh_keyword": primary_zh,
-        "translated_title_zh": translated_title,
+        "translated_title_zh": primary_zh,
         "suggested_keywords": suggestions,
     }
 
