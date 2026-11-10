@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Douyin & Bilibili Video Hub — ค้นหาและดาวน์โหลดคลิปไร้ลายน้ำ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-rose-500 selection:text-white">
+
+  <!-- Background Glow -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/4 -right-32 w-96 h-96 bg-sky-500/15 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-0 left-1/3 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+  </div>
+
+  <!-- Top Navbar -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px] shadow-lg shadow-rose-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold text-lg tracking-tighter">
+            <span class="text-rose-400">D</span><span class="text-sky-400">B</span>
+          </div>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg sm:text-xl tracking-tight">
+            <span>Douyin & Bilibili</span>
+          </h1>
+          <p class="text-xs text-slate-400">ค้นหาวิดีโอทั้ง 2 แพลตฟอร์ม & วางลิงก์ดาวน์โหลดคลิปแบบไม่มีลายน้ำ</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+
+    <!-- Dual Action Hero Section: 1) Search Keyword & 2) Direct Link Paste -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+      <!-- Left/Main Card: Keyword Search (Douyin + Bilibili) -->
+      <div class="lg:col-span-7 rounded-2xl bg-slate-900/90 border border-slate-800/90 p-5 sm:p-6 shadow-xl relative overflow-hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-xs font-semibold">โหมดที่ 1</span>
+            <h2 class="text-base sm:text-lg font-bold text-white">ค้นหาวิดีโอจากคำค้นหา (Douyin & Bilibili)</h2>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="badge-douyin text-[11px] px-2 py-0.5 rounded-md font-semibold">🎵 Douyin</span>
+            <span class="badge-bilibili text-[11px] px-2 py-0.5 rounded-md font-semibold">📺 Bilibili</span>
+          </div>
+        </div>
+        <p class="text-xs sm:text-sm text-slate-400 mb-4">
+          พิมพ์คำค้นหาที่ต้องการ ระบบจะดึงวิดีโอจากทั้ง <strong class="text-rose-400">Douyin (抖音)</strong> และ <strong class="text-sky-400">Bilibili (哔哩哔哩)</strong> พร้อมเขียนป้ายกำกับแหล่งที่มาชัดเจน
+        </p>
+
+        <form id="searchForm" class="flex flex-col sm:flex-row gap-2.5">
+          <div class="relative flex-1">
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="พิมพ์คำค้นหาภาษาไทย หรือ ภาษาอังกฤษ (เช่น แมว, cat, อาหาร, air fryer)..."
+              class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
+              required
+            />
+            <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button
+            type="submit"
+            id="searchBtn"
+            class="px-6 py-3 rounded-xl bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 hover:opacity-95 text-white font-semibold text-sm shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2 shrink-0"
+          >
+            <span>ค้นหาวิดีโอ</span>
+          </button>
+        </form>
+
+        <!-- Quick Keyword Chips -->
+        <div class="mt-3.5 flex flex-wrap items-center gap-1.5 text-xs">
+          <span class="text-slate-500 mr-1">คำค้นยอดฮิต:</span>
+          <button type="button" data-kw="แมว" class="kw-chip px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition">🐱 แมว (Cat)</button>
+          <button type="button" data-kw="อาหาร" class="kw-chip px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition">🍜 อาหาร (Food)</button>
+          <button type="button" data-kw="เต้น" class="kw-chip px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition">💃 เต้น (Dance)</button>
+          <button type="button" data-kw="ตลก" class="kw-chip px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition">😂 ตลก (Funny)</button>
+          <button type="button" data-kw="หม้อทอดไร้น้ำมัน" class="kw-chip px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition">🍳 หม้อทอดไร้น้ำมัน</button>
+        </div>
+      </div>
+
+      <!-- Right Card: Shopee Product Link Input -->
+      <div class="lg:col-span-5 rounded-2xl bg-slate-900/90 border border-orange-500/30 p-5 sm:p-6 shadow-xl flex flex-col justify-between relative overflow-hidden">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg bg-orange-500/15 text-orange-300 border border-orange-500/30 text-xs font-semibold">โหมดที่ 2</span>
+              <h2 class="text-base sm:text-lg font-bold text-white">วางลิงก์สินค้า Shopee ค้นหาวิดีโอ</h2>
+            </div>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-400 mb-4">
+            วางลิงก์สินค้า Shopee เพื่อค้นหาวิดีโอที่เกี่ยวข้อง
+          </p>
+
+          <form id="resolveForm" class="space-y-2.5">
+            <div class="relative">
+              <input
+                id="resolveInput"
+                type="text"
+                placeholder="วางลิงก์ Shopee เช่น https://shopee.co.th/... หรือ https://s.shopee.co.th/..."
+                class="w-full pl-9 pr-16 py-3 rounded-xl bg-slate-950 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition"
+                required
+              />
+              <svg class="w-4 h-4 text-orange-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              <button
+                type="button"
+                id="pasteClipboardBtn"
+                class="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition"
+                title="วางจากคลิปบอร์ด"
+              >
+                วาง
+              </button>
+            </div>
+            <button
+              type="submit"
+              id="resolveBtn"
+              class="w-full py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-rose-600 hover:from-orange-500 hover:to-rose-500 text-white font-semibold text-sm shadow-lg shadow-orange-600/20 transition flex items-center justify-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span>ค้นหาวิดีโอ</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Shopee Product Details Box -->
+    <section id="resolvedSection" class="hidden">
+      <div class="rounded-2xl bg-gradient-to-r from-orange-950/40 via-slate-900 to-slate-900 border border-orange-500/40 p-5 shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span>
+            <h3 class="font-bold text-sm sm:text-base text-orange-300">รายละเอียดสินค้าจาก Shopee</h3>
+          </div>
+          <button id="closeResolvedBtn" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800/80">ปิด ✕</button>
+        </div>
+        <div id="resolvedContainer"></div>
+      </div>
+    </section>
+
+    <!-- Filter Bar & Status Section for Search Results -->
+    <section class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button data-filter="all" class="filter-tab active px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+            <span>ทั้งหมด (All)</span>
+            <span id="countAll" class="px-2 py-0.5 rounded-full bg-slate-800 text-xs">0</span>
+          </button>
+          <button data-filter="douyin" class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            <span>มาจาก: Douyin (抖音)</span>
+            <span id="countDouyin" class="px-2 py-0.5 rounded-full bg-slate-800 text-xs">0</span>
+          </button>
+          <button data-filter="bilibili" class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+            <span>มาจาก: Bilibili (哔哩哔哩)</span>
+            <span id="countBilibili" class="px-2 py-0.5 rounded-full bg-slate-800 text-xs">0</span>
+          </button>
+        </div>
+
+        <div id="searchMetaInfo" class="text-xs text-slate-400">
+          เลือกคำค้นหาด้านบนเพื่อแสดงวิดีโอจากทั้ง Douyin และ Bilibili
+        </div>
+      </div>
+
+      <!-- Loading Skeleton -->
+      <div id="loadingState" class="hidden py-16 text-center space-y-4">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 shadow-inner">
+          <div class="w-7 h-7 border-3 border-rose-500 border-t-sky-400 rounded-full animate-spin"></div>
+        </div>
+        <div>
+          <p class="text-base font-semibold text-slate-200">กำลังค้นหาวิดีโอจาก Douyin และ Bilibili...</p>
+          <p class="text-xs text-slate-400 mt-1">ระบบกำลังดึงข้อมูลปกคลิปและลิงก์ดาวน์โหลดแบบไม่มีลายน้ำ</p>
+        </div>
+      </div>
+
+      <!-- Empty / Initial State -->
+      <div id="emptyState" class="py-14 text-center rounded-2xl bg-slate-900/40 border border-dashed border-slate-800">
+        <div class="max-w-md mx-auto space-y-3 px-4">
+          <div class="flex justify-center gap-2">
+            <span class="badge-douyin px-3 py-1 rounded-lg text-xs font-bold">🎵 Douyin 抖音</span>
+            <span class="badge-bilibili px-3 py-1 rounded-lg text-xs font-bold">📺 Bilibili 哔哩哔哩</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-200">พร้อมค้นหาและดาวน์โหลดวิดีโอ</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            พิมพ์คำค้นหาในช่องด้านซ้าย หรือกดปุ่มคำค้นยอดฮิตเพื่อดูวิดีโอจากทั้ง 2 แพลตฟอร์มพร้อมป้ายกำกับชัดเจน หรือวาง URL ในช่องด้านขวาเพื่อโหลดทันที
+          </p>
+        </div>
+      </div>
+
+      <!-- Video Cards Grid -->
+      <div id="videoGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5"></div>
+
+      <!-- Pagination -->
+      <div id="paginationBar" class="hidden pt-4 flex items-center justify-center gap-3">
+        <button id="prevPageBtn" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold disabled:opacity-40 transition">
+          ← หน้าก่อนหน้า
+        </button>
+        <span id="pageIndicator" class="text-xs font-semibold text-slate-300 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+          หน้าที่ 1
+        </span>
+        <button id="nextPageBtn" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold transition">
+          หน้าถัดไป →
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Video Preview Modal -->
+  <div id="previewModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl">
+      <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span id="modalPlatformBadge" class="px-2.5 py-0.5 rounded-md text-xs font-bold shrink-0"></span>
+          <h3 id="modalTitle" class="text-sm font-bold text-white truncate"></h3>
+        </div>
+        <button id="closeModalBtn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center shrink-0">✕</button>
+      </div>
+
+      <div class="bg-black aspect-video max-h-[65vh] w-full flex items-center justify-center relative">
+        <video id="modalVideo" controls playsinline class="w-full h-full max-h-[65vh] object-contain"></video>
+      </div>
+
+      <div class="p-4 bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="text-xs text-slate-400">
+          <span>ผู้โพสต์: <strong id="modalAuthor" class="text-slate-200"></strong></span>
+          <span class="mx-2">•</span>
+          <a id="modalOriginalLink" href="#" target="_blank" rel="noopener" class="text-indigo-400 hover:underline">เปิดลิงก์ต้นฉบับ ↗</a>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="modalDownloadMp4Btn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+            <span>⬇ โหลดวิดีโอ (.MP4 ไร้ลายน้ำ)</span>
+          </button>
+          <button id="modalDownloadMp3Btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
+            <span>🎵 โหลดเฉพาะเสียง (.MP3)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastBox" class="fixed bottom-5 right-5 z-50 hidden px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-medium text-white shadow-2xl flex items-center gap-2.5">
+    <span id="toastSpinner" class="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin hidden"></span>
+    <span id="toastText"></span>
+  </div>
+
+  <script src="/app.js?v=8"></script>
+</body>
+</html>

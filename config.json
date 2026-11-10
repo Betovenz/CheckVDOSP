@@ -1,0 +1,14 @@
+{
+  "user_cookie": "",
+  "guest_cookies": {
+    "__ac_nonce": "06af3238600fd49462830",
+    "_waftokenid": "eyJ2Ijp7ImEiOiJiR2t5OFE4Uy9uK3l0eXo3bVB4WTRDL0RuWDBNc3hkY3lTa2tkeFdtOHBBPSIsImIiOjE3OTQzMTkyMzgsImMiOiJRb05HUG9uNFB6NG5wdlplOFkwMC9sVndtNnlrSFFyZWEvSVl2RWZrTTI4PSJ9LCJzIjoiMVdhTEl4S1RpMHpyRUFhL0JZRWNyK3c3aTN3UnhsdkUzUjBWOHFRdDh2OD0ifQ",
+    "__ac_signature": "_02B4Z6wo00f013oBPGAAAIDCCNLDq-93RM96ITjAALR-fd",
+    "__ac_referer": "https://www.douyin.com/",
+    "ttwid": "1%7CSocYeCn7UmeKKBW-8lxzVjJzvJ6Phxfm9RCF_XcE06s%7C1794319238%7Cd897d807b0867d4ded8b80d43d8b09f93ba953066faeaf1fe72142ea51a734de",
+    "enter_pc_once": "1",
+    "web_sign_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2IjoxLCJpZCI6Ijc3MDY1NDI0MDYxMjQzNTcxNjMiLCJkIjoxLCJzIjoiMSIsInRzIjoxNzk0MzE5MjM5fQ.NDuXLSCgSB8XWiiPJo_9QzQdj772vydDqifD2D4RZ4c",
+    "UIFID_TEMP": "63bdc4b4b456901f349a081bfd3a24da10a1c6623f0a2d5eadd83f51c9f4d112ee196cffea840676c207d0af72ee26dcc9f5cbe111d9cdd170f82863c47d5823d8ab193fd8446884f9d298a0d834bd67"
+  },
+  "guest_minted_at": 1794319240
+}
