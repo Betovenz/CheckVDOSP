@@ -8,4 +8,6 @@ env/
 venv/
 shopee_chrome_profile/
 data/*.json
+data/clip_cache/
+
 

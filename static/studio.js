@@ -4,12 +4,12 @@
  * ============================================================================
  * Features:
  * 1. Receive clips from Page 1 (Douyin/Bilibili) or upload from PC (.mp4/.mov/.webm)
- * 2. Auto-mute 100% original clip audio & Random Cut/Slice Shuffle remixing
- * 3. Google AI (Gemini) API Key Manager (multi-key rotation + test + save)
- * 4. Shopee Link auto-sync from Page 1 or direct fetch in Page 2
- * 5. AI Script + Header + Thai Voiceover (Gemini TTS / Edge Neural TTS) + 2-Line Subtitles
- * 6. 6 Selectable Templates + Prominent Stroked Header (NO rectangular background box)
- * 7. Real-Time Interactive 9:16 Preview Video Player + Final MP4 Video Preview & Download
+ * 2. Auto-mute 100% original clip audio & Auto-cut / Random Shuffle remixing
+ *    with local RAM Blob caching + frame buffer so Preview Video plays immediately!
+ * 3. Word-safe Thai line wrapping via Intl.Segmenter('th', { granularity: 'word' })
+ *    so Header & Subtitles NEVER split a Thai word in half!
+ * 4. Natural, realistic script generation (calls product by simple category noun,
+ *    never reads full Shopee title or exaggerates)
  */
 
 (function () {
@@ -73,17 +73,127 @@
   const ZOOM_EFFECTS = ["zoomIn", "zoomOut", "panLeft", "panRight", "kenBurns"];
   const TRANSITION_POOL = ["cross-zoom", "whip-slide", "flash-pop"];
 
+  // Thai Word Segmenter (Guarantees Thai words are NEVER broken in the middle!)
+  const thaiWordSegmenter =
+    typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
+      ? new Intl.Segmenter("th", { granularity: "word" })
+      : null;
+
+  function segmentThaiWords(text) {
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    if (!clean) return [];
+    if (thaiWordSegmenter) {
+      const tokens = [];
+      for (const part of thaiWordSegmenter.segment(clean)) {
+        tokens.push(part.segment);
+      }
+      return tokens;
+    }
+    return clean.split(" ");
+  }
+
+  /**
+   * Wrap Thai/English text into lines ONLY at whole-word boundaries (NEVER splits a word in half).
+   */
+  function wrapThaiTextByWords(ctx, text, maxWidth, maxLines = 2) {
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    if (!clean) return [];
+    if (ctx.measureText(clean).width <= maxWidth) {
+      return [clean];
+    }
+
+    const tokens = segmentThaiWords(clean);
+    // Group into non-empty word chunks while preserving spaces
+    const lines = [];
+    let currentLine = "";
+
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i];
+      const candidate = currentLine + tok;
+      if (ctx.measureText(candidate.trim()).width > maxWidth && currentLine.trim().length > 0) {
+        lines.push(currentLine.trim());
+        currentLine = tok.trimStart();
+      } else {
+        currentLine = candidate;
+      }
+    }
+    if (currentLine.trim()) {
+      lines.push(currentLine.trim());
+    }
+
+    // If we got 2 lines and the second line is super short while first is huge, balance by word boundaries
+    if (lines.length === 2) {
+      const wordList = tokens.filter((t) => t.trim().length > 0);
+      if (wordList.length >= 2) {
+        let bestIdx = 1;
+        let bestDiff = 999999;
+        for (let splitAt = 1; splitAt < wordList.length; splitAt++) {
+          const topStr = tokens
+            .slice(0, tokens.indexOf(wordList[splitAt]))
+            .join("")
+            .trim();
+          const botStr = tokens
+            .slice(tokens.indexOf(wordList[splitAt]))
+            .join("")
+            .trim();
+          if (!topStr || !botStr) continue;
+          const w1 = ctx.measureText(topStr).width;
+          const w2 = ctx.measureText(botStr).width;
+          if (w1 <= maxWidth * 1.08 && w2 <= maxWidth * 1.08) {
+            const diff = Math.abs(w1 - w2);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              bestIdx = splitAt;
+            }
+          }
+        }
+        // Rebuild balanced 2 lines using word tokens
+        let accWords = 0;
+        let topPart = "";
+        let botPart = "";
+        for (const t of tokens) {
+          if (accWords < bestIdx) {
+            topPart += t;
+            if (t.trim().length > 0) accWords++;
+          } else {
+            botPart += t;
+          }
+        }
+        if (topPart.trim() && botPart.trim()) {
+          return [topPart.trim(), botPart.trim()];
+        }
+      }
+    }
+
+    if (lines.length > maxLines) {
+      const head = lines.slice(0, maxLines - 1);
+      const tail = lines.slice(maxLines - 1).join(" ");
+      return [...head, tail];
+    }
+    return lines;
+  }
+
+  // Hidden DOM container so Chrome/Edge hardware-decodes <video> frames immediately
+  let hiddenVideoPool = document.getElementById("studioHiddenVideoPool");
+  if (!hiddenVideoPool) {
+    hiddenVideoPool = document.createElement("div");
+    hiddenVideoPool.id = "studioHiddenVideoPool";
+    hiddenVideoPool.style.cssText =
+      "position:fixed;left:-9999px;top:-9999px;width:320px;height:568px;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1;";
+    document.body.appendChild(hiddenVideoPool);
+  }
+
   const studioState = {
     activePage: "search", // 'search' | 'studio'
-    clips: [], // { id, title, platform, url, thumb, videoEl, duration, sourceLabel }
+    clips: [], // { id, title, platform, url, blobUrl, thumb, thumbImg, videoEl, lastFrameCanvas, hasDecodedFrame, duration, sourceLabel, isCaching }
     cutSegments: [], // { index, start, duration, clipId, trimStart, zoomEffect, transition }
     selectedTemplateId: "slide-zoom",
     cutPaceSec: 2.0,
     transitionMode: "random",
 
     // Header Config (Strictly NO background box behind Header, large bold with thick stroke)
-    headerText: "ไอเทมเด็ด ของมันต้องมี!",
-    headerFontSize: 86,
+    headerText: "ของใช้ตรงปก หยิบใช้ง่ายสะดวก",
+    headerFontSize: 80,
     headerColor: "#fde047",
     headerStrokeColor: "#000000",
     headerStrokeWidth: 20,
@@ -95,8 +205,8 @@
         start: 0,
         duration: 5,
         line_top: "ส่งคลิปเข้าสตูดิโอ",
-        line_bottom: "หรืออัปโหลดจาก PC",
-        full_narration: "ส่งคลิปเข้าสตูดิโอ หรืออัปโหลดจาก PC",
+        line_bottom: "ตัดสลับฉากให้อัตโนมัติ",
+        full_narration: "ส่งคลิปเข้าสตูดิโอ ตัดสลับฉากให้อัตโนมัติ",
       },
       {
         index: 1,
@@ -110,9 +220,9 @@
         index: 2,
         start: 10,
         duration: 5,
-        line_top: "ตัดยำสลับฉากอัตโนมัติ",
-        line_bottom: "พร้อมพากย์เสียงไทย",
-        full_narration: "ตัดยำสลับฉากอัตโนมัติ พร้อมพากย์เสียงไทย",
+        line_top: "บอกแค่ว่าเป็นสินค้าอะไร",
+        line_bottom: "รีวิวจริงไม่ขายเว่อร์",
+        full_narration: "บอกแค่ว่าเป็นสินค้าอะไร รีวิวจริงไม่ขายเว่อร์",
       },
       {
         index: 3,
@@ -124,7 +234,7 @@
       },
     ],
     spokenScript:
-      "ส่งคลิปเข้าสตูดิโอ หรืออัปโหลดจาก PC วางลิงก์สินค้า Shopee ให้ AI คิดบทพากย์ ตัดยำสลับฉากอัตโนมัติ พร้อมพากย์เสียงไทย พรีวิววิดีโอได้ทันที เรนเดอร์ไฟล์ MP4 คมชัด",
+      "ส่งคลิปเข้าสตูดิโอ ตัดสลับฉากให้อัตโนมัติ วางลิงก์สินค้า Shopee ให้ AI คิดบทพากย์ บอกแค่ว่าเป็นสินค้าอะไร รีวิวจริงไม่ขายเว่อร์ พรีวิววิดีโอได้ทันที เรนเดอร์ไฟล์ MP4 คมชัด",
     subFontSize: 54,
     subStrokeWidth: 14,
     subShowBg: false,
@@ -260,14 +370,18 @@
     if (!isStudio) {
       pauseStudioPreview();
     } else {
-      // Auto-sync Shopee product from Page 1 if user searched one and Page 2 is still empty
       if (typeof window.getAppLastShopeeProduct === "function") {
         const lastProd = window.getAppLastShopeeProduct();
         if (lastProd && (!studioProductTitle || !studioProductTitle.value.trim())) {
           syncShopeeProduct(lastProd, true);
         }
       }
-      renderCurrentStudioFrame();
+      // Automatically start playing the random cut preview if we have clips!
+      if (studioState.clips.length > 0 && !studioState.isPlaying) {
+        startStudioPreview();
+      } else {
+        renderCurrentStudioFrame();
+      }
     }
   }
 
@@ -367,26 +481,120 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 3. VIDEO SOURCES (FROM PAGE 1 OR PC UPLOAD) & AUTO-MUTE + RANDOM CUT SHUFFLE
+  // 3. VIDEO SOURCES & INSTANT AUTO-CUT + RAM BLOB PREVIEW
   // ---------------------------------------------------------------------------
-  function createMutedVideoElement(srcUrl, onLoaded) {
+  function setupClipVideoAndFrameBuffer(clip) {
+    // 1. Frame buffer canvas so seeking never flashes blank dark background
+    const frameCanvas = document.createElement("canvas");
+    frameCanvas.width = 540;
+    frameCanvas.height = 960;
+    clip.lastFrameCanvas = frameCanvas;
+    clip.hasDecodedFrame = false;
+
+    // 2. Load thumbnail image immediately so even while MP4 downloads, preview shows the video cover
+    if (clip.thumb) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        clip.thumbImg = img;
+        if (!clip.hasDecodedFrame) {
+          const fctx = clip.lastFrameCanvas.getContext("2d");
+          if (fctx) {
+            fctx.drawImage(img, 0, 0, frameCanvas.width, frameCanvas.height);
+            clip.hasDecodedFrame = true;
+          }
+          renderCurrentStudioFrame();
+        }
+      };
+      img.src = clip.thumb;
+    }
+
+    // 3. Create muted <video> inside hidden DOM pool for hardware-accelerated decoding
     const vid = document.createElement("video");
     vid.crossOrigin = "anonymous";
-    vid.src = srcUrl;
     vid.muted = true;
     vid.defaultMuted = true;
     vid.volume = 0;
     vid.loop = true;
     vid.playsInline = true;
     vid.preload = "auto";
+    vid.style.cssText = "width:160px;height:284px;object-fit:cover;";
+    hiddenVideoPool.appendChild(vid);
+    clip.videoEl = vid;
+
+    const captureFirstFrame = () => {
+      if (vid.readyState >= 2 && vid.videoWidth > 0) {
+        clip.lastFrameCanvas.width = vid.videoWidth;
+        clip.lastFrameCanvas.height = vid.videoHeight;
+        const fctx = clip.lastFrameCanvas.getContext("2d");
+        if (fctx) {
+          try {
+            fctx.drawImage(vid, 0, 0, vid.videoWidth, vid.videoHeight);
+            clip.hasDecodedFrame = true;
+          } catch (_) {}
+        }
+        renderCurrentStudioFrame();
+      }
+    };
+
     vid.addEventListener("loadedmetadata", () => {
-      if (typeof onLoaded === "function") onLoaded(vid);
+      if (Number.isFinite(vid.duration) && vid.duration > 1) {
+        clip.duration = vid.duration;
+        buildRandomCutPlan();
+        renderCurrentStudioFrame();
+      }
     });
+
     vid.addEventListener("loadeddata", () => {
-      renderCurrentStudioFrame();
+      captureFirstFrame();
+      // Prime decoder by playing briefly muted
+      vid
+        .play()
+        .then(() => {
+          captureFirstFrame();
+          if (!studioState.isPlaying && !studioState.isExporting) {
+            vid.pause();
+          }
+        })
+        .catch(() => {});
     });
+
+    vid.addEventListener("seeked", captureFirstFrame);
+    vid.addEventListener("timeupdate", captureFirstFrame);
+
+    vid.src = clip.url;
     vid.load();
-    return vid;
+
+    // 4. If remote clip, download into browser RAM Blob so random cuts seek in 0ms!
+    if (!clip.url.startsWith("blob:")) {
+      clip.isCaching = true;
+      updateClipsUI();
+      fetch(clip.url)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.blob();
+        })
+        .then((blob) => {
+          if (blob && blob.size > 10000) {
+            const localBlobUrl = URL.createObjectURL(blob);
+            clip.blobUrl = localBlobUrl;
+            clip.isCaching = false;
+            const curT = vid.currentTime || 0;
+            vid.src = localBlobUrl;
+            vid.load();
+            vid.currentTime = curT;
+            if (studioState.isPlaying && studioState.activePage === "studio") {
+              vid.play().catch(() => {});
+            }
+            updateClipsUI();
+            renderCurrentStudioFrame();
+          }
+        })
+        .catch(() => {
+          clip.isCaching = false;
+          updateClipsUI();
+        });
+    }
   }
 
   function addClipFromPage1(item) {
@@ -398,7 +606,8 @@
       return;
     }
 
-    const streamUrl = `/api/stream?platform=${encodeURIComponent(item.platform)}&id=${encodeURIComponent(item.id)}&direct_url=${encodeURIComponent(item.direct_video_url || "")}`;
+    // Use backend local clip cache endpoint for fast seeking & zero range-request stalls
+    const cacheClipUrl = `/api/studio/clip-file?platform=${encodeURIComponent(item.platform)}&id=${encodeURIComponent(item.id)}&direct_url=${encodeURIComponent(item.direct_video_url || "")}`;
     const thumbUrl = item.cover ? `/api/proxy-image?url=${encodeURIComponent(item.cover)}` : "";
 
     const newClip = {
@@ -406,27 +615,31 @@
       title: item.title || `คลิปจาก ${item.platform}`,
       platform: item.platform,
       sourceLabel: item.platform === "douyin" ? "🎵 Douyin" : "📺 Bilibili",
-      url: streamUrl,
+      url: cacheClipUrl,
+      blobUrl: "",
       thumb: thumbUrl,
+      thumbImg: null,
       duration: 12.0,
       rawItem: item,
       videoEl: null,
+      lastFrameCanvas: null,
+      hasDecodedFrame: false,
+      isCaching: false,
     };
 
-    newClip.videoEl = createMutedVideoElement(streamUrl, (vid) => {
-      if (Number.isFinite(vid.duration) && vid.duration > 1) {
-        newClip.duration = vid.duration;
-        buildRandomCutPlan();
-        renderCurrentStudioFrame();
-      }
-    });
-
+    setupClipVideoAndFrameBuffer(newClip);
     studioState.clips.push(newClip);
+
     updateClipsUI();
     buildRandomCutPlan();
-    renderCurrentStudioFrame();
+    seekStudioPreview(0);
+    if (studioState.activePage === "studio") {
+      startStudioPreview();
+    } else {
+      renderCurrentStudioFrame();
+    }
 
-    toast(`🎬 ส่งคลิปเข้าสตูดิโอ (หน้าที่ 2) แล้ว! (รวม ${studioState.clips.length} คลิป)`);
+    toast(`🎬 ส่งคลิปเข้าสตูดิโอแล้ว! ตัดยำสลับฉากให้อัตโนมัติ (รวม ${studioState.clips.length} คลิป)`);
   }
 
   function handlePcVideoUpload(fileList) {
@@ -442,18 +655,17 @@
         platform: "pc",
         sourceLabel: "💻 PC Upload",
         url: objUrl,
+        blobUrl: objUrl,
         thumb: "",
+        thumbImg: null,
         duration: 12.0,
         rawItem: null,
         videoEl: null,
+        lastFrameCanvas: null,
+        hasDecodedFrame: false,
+        isCaching: false,
       };
-      newClip.videoEl = createMutedVideoElement(objUrl, (vid) => {
-        if (Number.isFinite(vid.duration) && vid.duration > 1) {
-          newClip.duration = vid.duration;
-          buildRandomCutPlan();
-          renderCurrentStudioFrame();
-        }
-      });
+      setupClipVideoAndFrameBuffer(newClip);
       studioState.clips.push(newClip);
       added++;
     });
@@ -461,16 +673,23 @@
     if (added > 0) {
       updateClipsUI();
       buildRandomCutPlan();
-      renderCurrentStudioFrame();
-      toast(`อัปโหลดคลิปจาก PC สำเร็จ +${added} คลิป (ปิดเสียงต้นฉบับอัตโนมัติ)`);
+      seekStudioPreview(0);
+      startStudioPreview();
+      toast(`อัปโหลดคลิปจาก PC สำเร็จ +${added} คลิป (ตัดยำขึ้นพรีวิวอัตโนมัติ)`);
     }
   }
 
   function removeStudioClip(clipId) {
     const target = studioState.clips.find((c) => c.id === clipId);
-    if (target && target.videoEl) {
-      target.videoEl.pause();
-      target.videoEl.removeAttribute("src");
+    if (target) {
+      if (target.videoEl) {
+        target.videoEl.pause();
+        target.videoEl.removeAttribute("src");
+        target.videoEl.remove();
+      }
+      if (target.blobUrl && target.platform !== "pc") {
+        URL.revokeObjectURL(target.blobUrl);
+      }
     }
     studioState.clips = studioState.clips.filter((c) => c.id !== clipId);
     updateClipsUI();
@@ -483,6 +702,10 @@
       if (c.videoEl) {
         c.videoEl.pause();
         c.videoEl.removeAttribute("src");
+        c.videoEl.remove();
+      }
+      if (c.blobUrl && c.platform !== "pc") {
+        URL.revokeObjectURL(c.blobUrl);
       }
     });
     studioState.clips = [];
@@ -499,7 +722,6 @@
       window.openPreviewModal(clip.rawItem);
       return;
     }
-    // For PC uploaded clip, open in previewModal directly
     const previewModal = document.getElementById("previewModal");
     const modalVideo = document.getElementById("modalVideo");
     const modalTitle = document.getElementById("modalTitle");
@@ -511,8 +733,8 @@
         modalPlatformBadge.textContent = clip.sourceLabel;
       }
       if (modalTitle) modalTitle.textContent = clip.title;
-      if (modalAuthor) modalAuthor.textContent = "ไฟล์วิดีโอจากเครื่อง PC";
-      modalVideo.src = clip.url;
+      if (modalAuthor) modalAuthor.textContent = "ไฟล์วิดีโอในสตูดิโอ";
+      modalVideo.src = clip.blobUrl || clip.url;
       previewModal.classList.remove("hidden");
       modalVideo.play().catch(() => {});
     }
@@ -547,9 +769,14 @@
             }
           </div>
           <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
               <span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-slate-300">${escapeHtml(clip.sourceLabel)}</span>
               <span class="text-[10px] text-emerald-400 font-semibold">🔇 ปิดเสียงแล้ว</span>
+              ${
+                clip.isCaching
+                  ? `<span class="text-[10px] text-amber-300 animate-pulse">⏳ กำลังซิงค์ลงพรีวิว...</span>`
+                  : `<span class="text-[10px] text-sky-400 font-semibold">✓ พร้อมตัดสลับ</span>`
+              }
             </div>
             <p class="text-xs font-semibold text-slate-200 truncate mt-0.5" title="${escapeHtml(clip.title)}">
               ${escapeHtml(clip.title)}
@@ -589,7 +816,6 @@
 
   /**
    * Build randomized cut & shuffle segments across totalDuration
-   * Cuts source video(s) into short slices and shuffles their offsets & order randomly!
    */
   function buildRandomCutPlan() {
     const totalDur = Math.max(4, Number(studioState.totalDuration) || 20);
@@ -601,10 +827,8 @@
     const rawSlices = [];
 
     if (clips.length > 0) {
-      // Build a rich pool of non-sequential candidate slices from all queued clips
       clips.forEach((clip, cIdx) => {
         const vidDur = Math.max(4, Number(clip.duration) || 12);
-        // Skip first 0.3s and last 0.5s to avoid black/logo frames
         const usableStart = vidDur > 3 ? 0.3 : 0;
         const usableEnd = Math.max(usableStart + basePace, vidDur - 0.5);
         let cursor = usableStart;
@@ -614,11 +838,11 @@
             clipIndex: cIdx + 1,
             trimStart: Number(cursor.toFixed(2)),
           });
-          cursor += basePace * 0.9;
+          cursor += basePace * 0.85;
         }
       });
 
-      // Fisher-Yates random shuffle so positions are genuinely remixed!
+      // Fisher-Yates random shuffle
       for (let i = rawSlices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         const tmp = rawSlices[i];
@@ -632,8 +856,7 @@
     let idx = 0;
 
     while (t < totalDur - 0.15) {
-      // Slight random jitter (+/- 15%) around basePace for dynamic editing feel
-      const jitter = 0.88 + Math.random() * 0.24;
+      const jitter = 0.9 + Math.random() * 0.2;
       let segDur = Number((basePace * jitter).toFixed(2));
       if (t + segDur > totalDur - 0.4) {
         segDur = Number((totalDur - t).toFixed(2));
@@ -641,10 +864,9 @@
 
       const slice =
         rawSlices.length > 0
-          ? rawSlices[idx % rawSlices.length]
+          ? { ...rawSlices[idx % rawSlices.length] }
           : { clipId: null, clipIndex: 0, trimStart: 0 };
 
-      // Avoid identical adjacent trimStart if more than 1 slice exists
       if (
         segments.length > 0 &&
         rawSlices.length > 1 &&
@@ -720,26 +942,57 @@
   // ---------------------------------------------------------------------------
   // 4. SHOPEE PRODUCT LINK SYNC & FETCH
   // ---------------------------------------------------------------------------
+  const STORE_POLICY_WORDS = [
+    "เสียหาย",
+    "แตกหัก",
+    "สูญหาย",
+    "ค่าชดเชย",
+    "ความคิดเห็นเชิงลบ",
+    "ผู้ขายที่ซื่อสัตย์",
+    "ติดต่อฉัน",
+    "ทางออกที่น่าพอใจ",
+  ];
+
+  function filterStorePolicyFromDesc(rawDesc) {
+    if (!rawDesc) return "";
+    return String(rawDesc)
+      .split(/[\r\n☆•●]+/)
+      .map((l) => l.trim())
+      .filter((l) => l.length >= 4 && !STORE_POLICY_WORDS.some((w) => l.includes(w)))
+      .join("\n");
+  }
+
   function syncShopeeProduct(product, silent = false) {
     if (!product) return;
     if (studioShopeeUrlInput) {
       studioShopeeUrlInput.value = product.input_url || product.canonical_url || "";
     }
+    const cleanCategory = (product.thai_keyword || "").split(/[,|]+/)[0].trim();
     if (studioProductTitle) {
-      studioProductTitle.value = product.title || "";
+      studioProductTitle.value = cleanCategory
+        ? `${cleanCategory} (${product.title || ""})`
+        : product.title || "";
     }
+    const filteredDesc = filterStorePolicyFromDesc(product.description || "");
     const highlights = Array.isArray(product.description_highlights)
-      ? product.description_highlights.join(" • ")
+      ? product.description_highlights
+          .filter((h) => !STORE_POLICY_WORDS.some((w) => String(h).includes(w)))
+          .join(" • ")
       : "";
-    const fullDesc = [product.description || "", highlights].filter(Boolean).join("\n");
+    const fullDesc = [filteredDesc, highlights].filter(Boolean).join("\n");
     if (studioProductDesc) {
-      studioProductDesc.value = fullDesc || product.title || "";
+      studioProductDesc.value = fullDesc || cleanCategory || product.title || "";
+    }
+    if (cleanCategory) {
+      studioState.headerText = `${cleanCategory} ใช้งานง่ายสะดวก`;
+      if (studioHeaderInput) studioHeaderInput.value = studioState.headerText;
+      renderCurrentStudioFrame();
     }
     if (studioShopeeSyncBadge) {
       studioShopeeSyncBadge.classList.remove("hidden");
     }
     if (!silent) {
-      toast("ดึงชื่อและรายละเอียดสินค้าจาก Shopee เข้าสตูดิโอเรียบร้อย!");
+      toast("ดึงข้อมูลประเภทสินค้าจาก Shopee เข้าสตูดิโอเรียบร้อย!");
     }
   }
 
@@ -750,7 +1003,7 @@
       return;
     }
     if (studioFetchShopeeBtn) studioFetchShopeeBtn.disabled = true;
-    toast("กำลังดึงชื่อและรายละเอียดสินค้าจากลิงก์ Shopee...", true, 0);
+    toast("กำลังดึงข้อมูลสินค้าจากลิงก์ Shopee...", true, 0);
 
     try {
       const resp = await fetch("/api/studio/shopee-info", {
@@ -779,7 +1032,7 @@
     const customScript = (studioScriptTextarea?.value || "").trim();
 
     if (rewriteScript && !title && !desc) {
-      toast("กรุณาวางลิงก์ Shopee หรือใส่ชื่อสินค้าก่อนให้ AI คิดบทครับ");
+      toast("กรุณาวางลิงก์ Shopee หรือใส่ประเภทสินค้าก่อนให้ AI คิดบทครับ");
       studioProductTitle?.focus();
       return;
     }
@@ -808,7 +1061,7 @@
           product_title: title,
           product_description: desc,
           target_duration: Number(studioTargetDuration?.value || 20),
-          sales_angle: studioSalesAngle?.value || "hard_sell",
+          sales_angle: studioSalesAngle?.value || "review_real",
           custom_header: rewriteScript ? "" : studioHeaderInput?.value || "",
           custom_script: rewriteScript ? "" : customScript,
           voice_name: studioVoiceSelect?.value || "th-TH-NiwatNeural",
@@ -822,18 +1075,15 @@
         throw new Error(data.detail || "สร้างบทและเสียงพากย์ไม่สำเร็จ");
       }
 
-      // 1. Update Header
       if (data.short_headline) {
         studioState.headerText = data.short_headline;
         if (studioHeaderInput) studioHeaderInput.value = data.short_headline;
       }
 
-      // 2. Update Script & Subtitles
       studioState.spokenScript = data.spoken_script || "";
       if (studioScriptTextarea) studioScriptTextarea.value = studioState.spokenScript;
       studioState.scenes = Array.isArray(data.scenes) && data.scenes.length > 0 ? data.scenes : studioState.scenes;
 
-      // 3. Load Voiceover Audio & Sync Total Duration
       const dur = Math.max(4, Number(data.audio_duration) || Number(studioTargetDuration?.value) || 20);
       studioState.totalDuration = dur;
 
@@ -854,7 +1104,6 @@
         studioVoiceEngineBadge.textContent = studioState.voiceEngineLabel;
       }
 
-      // 4. Rebuild Random Cut Plan to match exact voiceover duration & start Preview!
       buildRandomCutPlan();
       seekStudioPreview(0);
       startStudioPreview();
@@ -879,7 +1128,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 6. TEMPLATES & REAL-TIME 9:16 CANVAS RENDERER (NO BG BOX ON HEADER!)
+  // 6. TEMPLATES & REAL-TIME 9:16 CANVAS RENDERER
   // ---------------------------------------------------------------------------
   function renderTemplateSelectorGrid() {
     if (!studioTemplateGrid) return;
@@ -948,10 +1197,9 @@
   }
 
   /**
-   * Draw source video frame inside viewport with zoom/pan & transitions
+   * Draw source video frame inside viewport with zero blank-frame flicker!
    */
   function drawVideoLayer(ctx, w, h, timeSec, tpl) {
-    // Background gradient
     const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
     bgGrad.addColorStop(0, "#090d16");
     bgGrad.addColorStop(1, "#1e1b4b");
@@ -963,7 +1211,6 @@
       ? studioState.clips.find((c) => c.id === activeSeg.clipId) || studioState.clips[0]
       : studioState.clips[0];
 
-    // Viewport frame based on template
     let vx = 0,
       vy = 0,
       vw = w,
@@ -990,16 +1237,47 @@
       ctx.clip();
     }
 
-    if (clipObj && clipObj.videoEl && clipObj.videoEl.readyState >= 2) {
-      const vid = clipObj.videoEl;
-      const vwSrc = vid.videoWidth || 1080;
-      const vhSrc = vid.videoHeight || 1920;
+    // Choose best visual source: live <video> -> cached frame buffer -> thumbnail image
+    let drawableSource = null;
+    let srcW = 1080;
+    let srcH = 1920;
 
+    if (clipObj) {
+      const vid = clipObj.videoEl;
+      if (vid && vid.readyState >= 2 && vid.videoWidth > 0) {
+        drawableSource = vid;
+        srcW = vid.videoWidth;
+        srcH = vid.videoHeight;
+        // Update frame cache so if next frame seeks, we still have a crisp frame!
+        if (clipObj.lastFrameCanvas) {
+          if (clipObj.lastFrameCanvas.width !== srcW || clipObj.lastFrameCanvas.height !== srcH) {
+            clipObj.lastFrameCanvas.width = srcW;
+            clipObj.lastFrameCanvas.height = srcH;
+          }
+          const fctx = clipObj.lastFrameCanvas.getContext("2d");
+          if (fctx) {
+            try {
+              fctx.drawImage(vid, 0, 0, srcW, srcH);
+              clipObj.hasDecodedFrame = true;
+            } catch (_) {}
+          }
+        }
+      } else if (clipObj.hasDecodedFrame && clipObj.lastFrameCanvas) {
+        drawableSource = clipObj.lastFrameCanvas;
+        srcW = clipObj.lastFrameCanvas.width || 540;
+        srcH = clipObj.lastFrameCanvas.height || 960;
+      } else if (clipObj.thumbImg && clipObj.thumbImg.complete) {
+        drawableSource = clipObj.thumbImg;
+        srcW = clipObj.thumbImg.naturalWidth || 540;
+        srcH = clipObj.thumbImg.naturalHeight || 960;
+      }
+    }
+
+    if (drawableSource) {
       const localT = activeSeg ? Math.max(0, timeSec - activeSeg.start) : timeSec;
       const segDur = activeSeg ? Math.max(0.4, activeSeg.duration) : 3.0;
       const prog = Math.max(0, Math.min(1, localT / segDur));
 
-      // Compute dynamic zoom/pan
       let zoom = 1.05;
       let panX = 0;
       let panY = 0;
@@ -1018,8 +1296,7 @@
         panY = (0.5 - prog) * 30;
       }
 
-      // Transition entry effect on first 0.28s of cut
-      const transDur = 0.28;
+      const transDur = 0.26;
       let slideOffsetX = 0;
       let flashAlpha = 0;
       if (activeSeg && activeSeg.index > 0 && localT < transDur) {
@@ -1027,20 +1304,20 @@
         if (activeSeg.transition === "whip-slide") {
           slideOffsetX = (1 - tp) * vw * (activeSeg.index % 2 === 0 ? 1 : -1);
         } else if (activeSeg.transition === "cross-zoom") {
-          zoom *= 1.18 - 0.18 * tp;
+          zoom *= 1.16 - 0.16 * tp;
         } else if (activeSeg.transition === "flash-pop") {
-          flashAlpha = (1 - tp) * 0.65;
+          flashAlpha = (1 - tp) * 0.55;
         }
       }
 
-      const scale = Math.max(vw / vwSrc, vh / vhSrc) * zoom;
-      const drawW = vwSrc * scale;
-      const drawH = vhSrc * scale;
+      const scale = Math.max(vw / srcW, vh / srcH) * zoom;
+      const drawW = srcW * scale;
+      const drawH = srcH * scale;
       const drawX = vx + (vw - drawW) / 2 + panX + slideOffsetX;
       const drawY = vy + (vh - drawH) / 2 + panY;
 
       try {
-        ctx.drawImage(vid, drawX, drawY, drawW, drawH);
+        ctx.drawImage(drawableSource, drawX, drawY, drawW, drawH);
       } catch (_) {}
 
       if (flashAlpha > 0.02) {
@@ -1048,7 +1325,7 @@
         ctx.fillRect(vx, vy, vw, vh);
       }
     } else {
-      // Stylish animated placeholder when no clip is loaded yet
+      // Only shown when 0 clips are in the queue
       const pGrad = ctx.createLinearGradient(vx, vy, vx + vw, vy + vh);
       pGrad.addColorStop(0, "#0f172a");
       pGrad.addColorStop(0.5, "#1e1b4b");
@@ -1056,7 +1333,6 @@
       ctx.fillStyle = pGrad;
       ctx.fillRect(vx, vy, vw, vh);
 
-      // Animated subtle rings
       ctx.strokeStyle = "rgba(255,255,255,0.06)";
       ctx.lineWidth = 4;
       for (let r = 120; r <= 480; r += 120) {
@@ -1067,7 +1343,6 @@
     }
     ctx.restore();
 
-    // Draw frame border if framed mode
     if (radius > 0) {
       ctx.save();
       ctx.strokeStyle = tpl.accentColor;
@@ -1080,7 +1355,6 @@
       ctx.restore();
     }
 
-    // Top & bottom subtle gradient vignette for crisp text readability
     const vig = ctx.createLinearGradient(0, 0, 0, h);
     vig.addColorStop(0, "rgba(0,0,0,0.45)");
     vig.addColorStop(0.28, "rgba(0,0,0,0.04)");
@@ -1090,9 +1364,6 @@
     ctx.fillRect(0, 0, w, h);
   }
 
-  /**
-   * Draw Template Overlays (Progress bar, HUD, waveform, tickers — NO box behind top Header)
-   */
   function drawTemplateDecorations(ctx, w, h, timeSec, tpl) {
     const totalDur = Math.max(1, studioState.totalDuration || 20);
     const prog = Math.max(0, Math.min(1, timeSec / totalDur));
@@ -1101,14 +1372,12 @@
 
     ctx.save();
 
-    // Top sleek progress bar
     ctx.fillStyle = "rgba(255,255,255,0.18)";
     ctx.fillRect(0, 0, w, 10);
     ctx.fillStyle = accent;
     ctx.fillRect(0, 0, w * prog, 10);
 
     if (tpl.id === "cyberpunk-tech-hud") {
-      // Sweeping laser scanline
       const scanY = h * 0.22 + ((Math.sin(timeSec * 1.8) + 1) * 0.5) * (h * 0.52);
       ctx.strokeStyle = accent;
       ctx.lineWidth = 3;
@@ -1117,7 +1386,6 @@
       ctx.lineTo(w - 48, scanY);
       ctx.stroke();
 
-      // Corner HUD brackets
       const m = 44,
         len = 56;
       ctx.lineWidth = 5;
@@ -1134,7 +1402,6 @@
         ctx.stroke();
       });
     } else if (tpl.id === "cinematic-letterbox") {
-      // Viewfinder brackets + REC indicator at bottom
       const m = 54,
         len = 48;
       ctx.strokeStyle = "rgba(255,255,255,0.65)";
@@ -1152,7 +1419,6 @@
         ctx.stroke();
       });
     } else if (tpl.id === "breaking-news-hud") {
-      // Bottom scrolling news ticker
       const tickerH = 74;
       const tickerY = h - tickerH;
       ctx.fillStyle = "#090d16";
@@ -1160,7 +1426,7 @@
       ctx.fillStyle = "#ef4444";
       ctx.fillRect(0, tickerY, w, 5);
 
-      const tickerText = `🔥 รีวิวจัดเต็ม: ${studioState.headerText} • พิกัดสินค้าในตะกร้า/ลิงก์ด้านล่าง • `;
+      const tickerText = `🔥 รีวิวของใช้จริง: ${studioState.headerText} • กดดูรายละเอียดที่ตะกร้าด้านล่าง • `;
       ctx.font = `700 30px "IBM Plex Sans Thai", sans-serif`;
       const tw = Math.max(350, ctx.measureText(tickerText).width);
       const offset = -((timeSec * 150) % tw);
@@ -1171,7 +1437,6 @@
       }
     }
 
-    // Bottom Audio Waveform Spectrum (for templates without bottom ticker)
     if (tpl.id !== "breaking-news-hud") {
       const bars = 28;
       const barW = 10;
@@ -1199,50 +1464,41 @@
   /**
    * Draw HEADER at the top:
    * - STRICTLY NO rectangular background box behind the Header
-   * - Extra-large bold prominent text with customizable thick Stroke/Outline + drop shadow
+   * - Word-safe wrapping via Intl.Segmenter('th') + auto font-scaling so words NEVER break in half!
    */
   function drawProminentStrokedHeader(ctx, w, h, timeSec) {
     const rawHeader = (studioState.headerText || "").trim();
     if (!rawHeader) return;
 
-    const fontSize = Number(studioState.headerFontSize) || 86;
+    let fontSize = Number(studioState.headerFontSize) || 80;
     const strokeWidth = Number(studioState.headerStrokeWidth) || 20;
     const fillColor = studioState.headerColor || "#fde047";
     const strokeColor = studioState.headerStrokeColor || "#000000";
 
     ctx.save();
-    ctx.font = `900 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Wrap into max 2 lines if wider than 90% of canvas width
-    const maxW = w * 0.9;
-    const words = rawHeader.split(/\s+/).filter(Boolean);
-    let lines = [];
-    if (ctx.measureText(rawHeader).width <= maxW) {
-      lines = [rawHeader];
-    } else if (words.length >= 2) {
-      let cur = "";
-      words.forEach((word) => {
-        const cand = cur ? `${cur} ${word}` : word;
-        if (ctx.measureText(cand).width > maxW && cur) {
-          lines.push(cur);
-          cur = word;
-        } else {
-          cur = cand;
-        }
-      });
-      if (cur) lines.push(cur);
-    } else {
-      const mid = Math.ceil(rawHeader.length / 2);
-      lines = [rawHeader.slice(0, mid), rawHeader.slice(mid)];
+    const maxW = w * 0.88;
+    ctx.font = `900 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
+
+    // Wrap ONLY on complete Thai word boundaries
+    let lines = wrapThaiTextByWords(ctx, rawHeader, maxW, 2);
+
+    // Auto-scale font size down slightly if any line still exceeds maxW
+    while (
+      fontSize > 42 &&
+      lines.some((line) => ctx.measureText(line).width > maxW)
+    ) {
+      fontSize -= 2;
+      ctx.font = `900 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
+      lines = wrapThaiTextByWords(ctx, rawHeader, maxW, 2);
     }
 
-    // Subtle pop pulse on entry
-    const popScale = 1 + Math.sin(timeSec * 3.5) * 0.018;
+    const popScale = 1 + Math.sin(timeSec * 3.5) * 0.015;
     const centerX = w / 2;
     const centerY = h * 0.135;
-    const lineHeight = fontSize * 1.2;
+    const lineHeight = fontSize * 1.22;
 
     ctx.translate(centerX, centerY);
     ctx.scale(popScale, popScale);
@@ -1250,7 +1506,6 @@
     lines.forEach((line, idx) => {
       const ly = (idx - (lines.length - 1) / 2) * lineHeight;
 
-      // Outer thick stroke with deep shadow (NO rectangular background box!)
       if (strokeWidth > 0) {
         ctx.save();
         ctx.strokeStyle = strokeColor;
@@ -1265,7 +1520,6 @@
         ctx.restore();
       }
 
-      // Crisp main fill
       ctx.fillStyle = fillColor;
       ctx.fillText(line, 0, ly);
     });
@@ -1274,29 +1528,46 @@
   }
 
   /**
-   * Draw Synchronized 2-Line Voiceover Subtitles
+   * Draw Synchronized 2-Line Voiceover Subtitles (Word-safe + Auto-fit)
    */
   function drawSynchronizedSubtitle(ctx, w, h, timeSec, tpl) {
     const activeScene = getActiveSubtitleScene(timeSec);
     if (!activeScene) return;
 
-    const topLine = (activeScene.line_top || "").trim();
-    const botLine = (activeScene.line_bottom || "").trim();
-    const lines = [topLine, botLine].filter(Boolean);
-    if (lines.length === 0) return;
-
-    const fontSize = Number(studioState.subFontSize) || 54;
+    let fontSize = Number(studioState.subFontSize) || 54;
     const strokeWidth = Number(studioState.subStrokeWidth) || 14;
     const showBg = Boolean(studioState.subShowBg);
+    const maxW = w * 0.88;
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `800 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
+
+    // Prefer full_narration wrapped cleanly by whole Thai words so words never break across lines
+    const fullText = (
+      activeScene.full_narration ||
+      `${activeScene.line_top || ""} ${activeScene.line_bottom || ""}`
+    ).trim();
+    if (!fullText) {
+      ctx.restore();
+      return;
+    }
+
+    let lines = wrapThaiTextByWords(ctx, fullText, maxW, 2);
+
+    while (
+      fontSize > 34 &&
+      lines.some((line) => ctx.measureText(line).width > maxW)
+    ) {
+      fontSize -= 2;
+      ctx.font = `800 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
+      lines = wrapThaiTextByWords(ctx, fullText, maxW, 2);
+    }
 
     const localT = Math.max(0, timeSec - (activeScene.start || 0));
     const entryP = Math.min(1, localT / 0.14);
-    const scale = 0.88 + 0.12 * entryP;
-
-    ctx.save();
-    ctx.font = `800 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    const scale = 0.9 + 0.1 * entryP;
 
     const centerX = w / 2;
     const centerY = h * 0.77;
@@ -1335,7 +1606,6 @@
         ctx.restore();
       }
 
-      // Highlight top line in white, bottom line in template accent color
       ctx.fillStyle = idx === 0 ? "#ffffff" : tpl.accentColor || "#fde047";
       ctx.fillText(line, 0, ly);
     });
@@ -1367,7 +1637,7 @@
         const targetTime = ((activeSeg.trimStart || 0) + Math.max(0, timeSec - activeSeg.start)) % dur;
 
         if (shouldPlay) {
-          if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.65) {
+          if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.7) {
             try {
               vid.currentTime = targetTime;
             } catch (_) {}
@@ -1377,7 +1647,7 @@
           }
         } else {
           if (!vid.paused) vid.pause();
-          if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.15) {
+          if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.2) {
             try {
               vid.currentTime = targetTime;
             } catch (_) {}
@@ -1480,7 +1750,6 @@
     lastTickTs = now;
 
     if (studioState.activePage === "studio" && !studioState.isExporting && studioState.isPlaying) {
-      // Keep timeline synced to voiceAudio if available and playing
       if (studioState.voiceAudio && !studioState.voiceAudio.paused) {
         studioState.currentTime = studioState.voiceAudio.currentTime;
       } else {
@@ -1537,7 +1806,6 @@
       const canvasStream = offCanvas.captureStream(fps);
       const videoTrack = canvasStream.getVideoTracks()[0];
 
-      // Decode & attach AI voiceover audio into MediaRecorder stream
       let audioCtx = null;
       let audioSource = null;
       let audioTracks = [];
@@ -1675,7 +1943,6 @@
         studioExportProgressText.textContent = "เรนเดอร์ไฟล์ .MP4 เสร็จสมบูรณ์!";
       }
 
-      // Open Final Rendered MP4 Preview Player Card
       if (studioFinalMp4Card) studioFinalMp4Card.classList.remove("hidden");
       if (studioFinalVideoPlayer) {
         studioFinalVideoPlayer.src = mp4Url;

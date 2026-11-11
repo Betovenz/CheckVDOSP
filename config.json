@@ -1,14 +1,15 @@
 {
   "user_cookie": "",
   "guest_cookies": {
-    "__ac_nonce": "06af3238600fd49462830",
-    "_waftokenid": "eyJ2Ijp7ImEiOiJiR2t5OFE4Uy9uK3l0eXo3bVB4WTRDL0RuWDBNc3hkY3lTa2tkeFdtOHBBPSIsImIiOjE3OTQzMTkyMzgsImMiOiJRb05HUG9uNFB6NG5wdlplOFkwMC9sVndtNnlrSFFyZWEvSVl2RWZrTTI4PSJ9LCJzIjoiMVdhTEl4S1RpMHpyRUFhL0JZRWNyK3c3aTN3UnhsdkUzUjBWOHFRdDh2OD0ifQ",
-    "__ac_signature": "_02B4Z6wo00f013oBPGAAAIDCCNLDq-93RM96ITjAALR-fd",
+    "__ac_nonce": "06af356040001edb6119d",
+    "_waftokenid": "eyJ2Ijp7ImEiOiJiR2t5OFE4Uy9uK3l0eXo3bVB4WTRDL0RuWDBNc3hkY3lTa2tkeFdtOHBBPSIsImIiOjE3OTQzMzIxNjQsImMiOiJvUmg0WFdWK0prbEdlNFc5UkQ0YmRPSHZ4MjQwQVF3NFA3ZTNNTGpkK280PSJ9LCJzIjoiRWxpYjBsd2QvZDliM2NERzR0MUQ4aUdjQmwveEw4ZWx2UkF4UUhFSUdxZz0ifQ",
+    "__ac_signature": "_02B4Z6wo00f01CWV.2AAAIDBV0YAqVAwO8AltfvAAGOcd4",
     "__ac_referer": "https://www.douyin.com/",
-    "ttwid": "1%7CSocYeCn7UmeKKBW-8lxzVjJzvJ6Phxfm9RCF_XcE06s%7C1794319238%7Cd897d807b0867d4ded8b80d43d8b09f93ba953066faeaf1fe72142ea51a734de",
+    "ttwid": "1%7CAOJHbwSyLGJX5zCM09B3UM00TdOuwqtONbVln7JxHFA%7C1794332165%7C730aff1ea270ec10517543178b1e0ab2a586638f26d2646619258c32d45c2ca9",
     "enter_pc_once": "1",
-    "web_sign_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2IjoxLCJpZCI6Ijc3MDY1NDI0MDYxMjQzNTcxNjMiLCJkIjoxLCJzIjoiMSIsInRzIjoxNzk0MzE5MjM5fQ.NDuXLSCgSB8XWiiPJo_9QzQdj772vydDqifD2D4RZ4c",
-    "UIFID_TEMP": "63bdc4b4b456901f349a081bfd3a24da10a1c6623f0a2d5eadd83f51c9f4d112ee196cffea840676c207d0af72ee26dcc9f5cbe111d9cdd170f82863c47d5823d8ab193fd8446884f9d298a0d834bd67"
+    "web_sign_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2IjoxLCJpZCI6Ijc3MDY1OTc5MjU1MjMwNDc5NzIiLCJkIjowLCJzIjoiIiwidHMiOjE3OTQzMzIxNjV9.-SHHCF0Ls0NSXDsW1m-j3eeP_iVh8BCydcXp28mPRPw",
+    "UIFID_TEMP": "63bdc4b4b456901f349a081bfd3a24da10a1c6623f0a2d5eadd83f51c9f4d112ee196cffea840676c207d0af72ee26dca65dd01e87287d8da9ed2a83c91b6464451f4c1ca109a5a8bcff96432a13db83",
+    "x-web-secsdk-uid": "af62d846-e731-4ecb-a106-262d2538de64"
   },
-  "guest_minted_at": 1794319240
+  "guest_minted_at": 1794332166
 }

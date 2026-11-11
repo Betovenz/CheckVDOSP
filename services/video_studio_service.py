@@ -8,7 +8,6 @@ import os
 import random
 import re
 import shutil
-import struct
 import subprocess
 import tempfile
 import wave
@@ -21,6 +20,8 @@ import httpx
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 STUDIO_CONFIG_PATH = DATA_DIR / "studio_config.json"
+CLIP_CACHE_DIR = DATA_DIR / "clip_cache"
+CLIP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 
@@ -73,6 +74,51 @@ VOICE_CATALOG = [
         "gender": "Female",
         "engine": "gtts",
     },
+]
+
+# Map raw keywords/patterns to simple, everyday spoken Thai product nouns
+SIMPLE_PRODUCT_NOUN_PATTERNS: List[Tuple[List[str], str]] = [
+    (["คลิปฉลาม", "กิ๊บฉลาม", "กิ๊บหนีบผม", "กิ๊บติดผม", "กิ๊บ"], "กิ๊บติดผม"),
+    (["ยางรัดผม", "ยางมัดผม", "โดนัทรัดผม"], "ยางรัดผม"),
+    (["ที่คาดผม"], "ที่คาดผม"),
+    (["หม้อทอดไร้น้ำมัน", "หม้อทอดอากาศ", "หม้ออบลมร้อน"], "หม้อทอดไร้น้ำมัน"),
+    (["หม้อต้มไฟฟ้า", "หม้อชาบู", "หม้อไฟฟ้า", "หม้ออเนกประสงค์", "หม้อหุงข้าว"], "หม้อไฟฟ้า"),
+    (["กระทะไฟฟ้า", "กระทะปิ้งย่าง"], "กระทะไฟฟ้า"),
+    (["กาต้มน้ำ", "กาน้ำร้อน"], "กาต้มน้ำไฟฟ้า"),
+    (["เครื่องปั่น"], "เครื่องปั่น"),
+    (["เครื่องชงกาแฟ"], "เครื่องชงกาแฟ"),
+    (["กระเป๋าสะพาย", "กระเป๋าถือ", "กระเป๋าเป้", "กระเป๋าเดินทาง", "กระเป๋าตังค์", "กระเป๋า"], "กระเป๋า"),
+    (["ไม้กันสั่น", "กิมบอล", "stabilizer", "osmo mobile"], "ไม้กันสั่นมือถือ"),
+    (["ขาตั้งกล้อง", "ขาตั้งมือถือ", "ไม้เซลฟี่", "tripod"], "ขาตั้งมือถือ"),
+    (["พัดลมพกพา", "พัดลมคล้องคอ", "พัดลมตั้งโต๊ะ", "พัดลมไร้สาย", "พัดลม"], "พัดลมพกพา"),
+    (["สายชาร์จ"], "สายชาร์จ"),
+    (["พาวเวอร์แบงค์", "แบตสำรอง"], "แบตสำรอง"),
+    (["หัวชาร์จ", "อะแดปเตอร์"], "หัวชาร์จ"),
+    (["หูฟังบลูทูธ", "หูฟังไร้สาย", "หูฟัง"], "หูฟังไร้สาย"),
+    (["ลำโพงบลูทูธ", "ลำโพง"], "ลำโพงบลูทูธ"),
+    (["ไมโครโฟนไร้สาย", "ไมค์ไร้สาย", "ไมค์ติดปกเสื้อ", "ไมค์"], "ไมค์ไร้สาย"),
+    (["ไฟไลฟ์สด", "โคมไฟตั้งโต๊ะ", "ไฟแต่งห้อง", "โคมไฟ"], "โคมไฟ"),
+    (["เครื่องดูดฝุ่น", "หุ่นยนต์ดูดฝุ่น"], "เครื่องดูดฝุ่น"),
+    (["เครื่องฟอกอากาศ"], "เครื่องฟอกอากาศ"),
+    (["เตารีดไอน้ำ", "เตารีด"], "เตารีดไอน้ำ"),
+    (["ไดร์เป่าผม"], "ไดร์เป่าผม"),
+    (["เครื่องหนีบผม", "เครื่องม้วนผม"], "ที่จัดแต่งทรงผม"),
+    (["เครื่องนวด", "ปืนนวด"], "เครื่องนวด"),
+    (["แก้วเก็บความเย็น", "กระบอกน้ำ"], "แก้วเก็บความเย็น"),
+    (["กล่องเก็บของ", "กล่องจัดระเบียบ"], "กล่องเก็บของ"),
+    (["ชั้นวางของ"], "ชั้นวางของ"),
+    (["รองเท้าผ้าใบ", "รองเท้าแตะ", "รองเท้า"], "รองเท้า"),
+    (["แว่นกันแดด", "แว่นกรองแสง", "แว่นตา"], "แว่นตา"),
+    (["เคสโทรศัพท์", "เคสไอโฟน", "เคส"], "เคสมือถือ"),
+    (["เก้าอี้เกมมิ่ง", "เก้าอี้ทำงาน", "เก้าอี้"], "เก้าอี้"),
+    (["โต๊ะปรับระดับ", "โต๊ะทำงาน", "โต๊ะพับ", "โต๊ะ"], "โต๊ะ"),
+    (["ลิปสติก", "ลิป"], "ลิป"),
+    (["คุชชั่น"], "คุชชั่น"),
+    (["ครีมกันแดด"], "ครีมกันแดด"),
+    (["เซรั่ม"], "เซรั่ม"),
+    (["นาฬิกาอัจฉริยะ", "สมาร์ทวอทช์", "นาฬิกา"], "นาฬิกา"),
+    (["คีย์บอร์ด"], "คีย์บอร์ด"),
+    (["เมาส์"], "เมาส์ไร้สาย"),
 ]
 
 _KEY_ROTATION_INDEX = 0
@@ -161,7 +207,7 @@ async def test_gemini_api_key(api_key: str) -> Tuple[bool, str]:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={test_key}"
     payload = {
         "contents": [{"parts": [{"text": "ตอบคำว่า OK สั้นๆ"}]}],
-        "generationConfig": {"maxOutputTokens": 10},
+        "generationConfig": {"maxOutputTokens": 10, "thinkingConfig": {"thinkingBudget": 0}},
     }
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
@@ -176,20 +222,91 @@ async def test_gemini_api_key(api_key: str) -> Tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
-# Thai Text & Verbatim Two-Line Subtitle Helpers (Ported from Make VSO)
+# Simple Product Category Extractor & Boilerplate Filter
+# ---------------------------------------------------------------------------
+def extract_simple_product_category(title: str, description: str = "") -> str:
+    """
+    Extract a simple everyday Thai noun for the product (e.g. 'กิ๊บติดผม', 'หม้อไฟฟ้า', 'กระเป๋า')
+    instead of reading out a noisy or machine-translated Shopee product title.
+    """
+    combined_title = (title or "").lower()
+    for patterns, noun in SIMPLE_PRODUCT_NOUN_PATTERNS:
+        for pat in patterns:
+            if pat.lower() in combined_title:
+                return noun
+
+    combined_desc = (description or "").lower()
+    for patterns, noun in SIMPLE_PRODUCT_NOUN_PATTERNS:
+        for pat in patterns:
+            if pat.lower() in combined_desc:
+                return noun
+
+    return "ไอเทมชิ้นนี้"
+
+
+STORE_BOILERPLATE_KEYWORDS = [
+    "เสียหาย",
+    "แตกหัก",
+    "สูญหาย",
+    "ค่าชดเชย",
+    "ความคิดเห็นเชิงลบ",
+    "ผู้ขายที่ซื่อสัตย์",
+    "ติดต่อฉัน",
+    "ฝากข้อความ",
+    "ทางออกที่น่าพอใจ",
+    "ถ่ายวิดีโอตอนแกะ",
+    "ไม่รับเปลี่ยนคืน",
+    "ขนส่งล่าช้า",
+    "ให้คะแนน",
+    "5 ดาว",
+    "ขอบคุณสำหรับการสนับสนุน",
+]
+
+
+def filter_real_product_features(raw_desc: str) -> str:
+    if not raw_desc:
+        return ""
+    lines = re.split(r"[\r\n☆•●◆▪▸►]+", raw_desc)
+    kept: List[str] = []
+    for line in lines:
+        s = line.strip()
+        if len(s) < 4:
+            continue
+        if any(bad in s for bad in STORE_BOILERPLATE_KEYWORDS):
+            continue
+        kept.append(s)
+    return "\n".join(kept[:12])
+
+
+# ---------------------------------------------------------------------------
+# Word-Safe Thai Subtitle & Text Helpers (NEVER split a Thai word in half!)
 # ---------------------------------------------------------------------------
 THAI_COMBINING_MARKS = set("\u0e31\u0e34\u0e35\u0e36\u0e37\u0e38\u0e39\u0e3a\u0e47\u0e48\u0e49\u0e4a\u0e4b\u0e4c\u0e4d\u0e4e")
 THAI_LEADING_VOWELS = set("\u0e40\u0e41\u0e42\u0e43\u0e44")
 
-
-def _adjust_thai_Cluster_split(text: str, pos: int) -> int:
-    n = len(text)
-    pos = max(0, min(n, pos))
-    while pos < n and text[pos] in THAI_COMBINING_MARKS:
-        pos += 1
-    while pos > 0 and text[pos - 1] in THAI_LEADING_VOWELS:
-        pos -= 1
-    return pos
+# Natural Thai connector words where a line break is safe if there are no spaces
+SAFE_THAI_BREAK_PREFIXES = (
+    "เพราะ",
+    "ช่วยให้",
+    "ทำให้",
+    "เหมาะกับ",
+    "ใช้งาน",
+    "พกพา",
+    "วัสดุ",
+    "ดีไซน์",
+    "สามารถ",
+    "ไม่ว่าจะ",
+    "แถมยัง",
+    "เวลา",
+    "สำหรับ",
+    "ตัวนี้",
+    "ใบนี้",
+    "ชิ้นนี้",
+    "แบบ",
+    "พร้อม",
+    "หรือ",
+    "และ",
+)
 
 
 def clean_spoken_text(raw: str) -> str:
@@ -197,16 +314,20 @@ def clean_spoken_text(raw: str) -> str:
         return ""
     s = re.sub(r"#[^\s#]+", "", str(raw))
     s = re.sub(r"https?://\S+", "", s)
-    s = re.sub(r"[*_~`>|•●◆▪▸►]+", " ", s)
+    s = re.sub(r"[*_~`>|•●◆▪▸►☆★]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
 
 def split_verbatim_two_lines(phrase: str) -> Tuple[str, str]:
+    """
+    Split a spoken phrase into at most 2 subtitle lines ONLY at spaces or natural word boundaries.
+    NEVER cuts a Thai word in the middle!
+    """
     p = re.sub(r"\s+", " ", (phrase or "").strip())
     if not p:
         return "", ""
-    if len(p) <= 18:
+    if len(p) <= 22:
         return p, ""
 
     words = [w for w in p.split(" ") if w]
@@ -222,10 +343,23 @@ def split_verbatim_two_lines(phrase: str) -> Tuple[str, str]:
                 best_idx = i
         return " ".join(words[:best_idx]), " ".join(words[best_idx:])
 
-    mid = _adjust_thai_Cluster_split(p, len(p) // 2)
-    if mid <= 0 or mid >= len(p):
-        return p, ""
-    return p[:mid].strip(), p[mid:].strip()
+    # No spaces in phrase: look for a safe connector word near the middle
+    mid = len(p) // 2
+    best_pos = -1
+    best_dist = 999
+    for prefix in SAFE_THAI_BREAK_PREFIXES:
+        idx = p.find(prefix, 6)
+        if 6 <= idx <= len(p) - 6:
+            dist = abs(idx - mid)
+            if dist < best_dist:
+                best_dist = dist
+                best_pos = idx
+
+    if best_pos > 0:
+        return p[:best_pos].strip(), p[best_pos:].strip()
+
+    # Keep intact on 1 line rather than cutting a Thai word in half!
+    return p, ""
 
 
 def smart_split_scenes(text: str, target_sec: int = 20) -> List[Dict[str, str]]:
@@ -233,9 +367,9 @@ def smart_split_scenes(text: str, target_sec: int = 20) -> List[Dict[str, str]]:
     if not cleaned:
         return []
 
-    raw_chunks = [c.strip() for c in re.split(r"[\n\r.!?;•—–]+|\s{2,}", cleaned) if c.strip()]
+    raw_chunks = [c.strip() for c in re.split(r"[\n\r.!?;—–]+|\s{2,}", cleaned) if c.strip()]
     phrases: List[str] = []
-    max_phrase_len = 36
+    max_phrase_len = 34
 
     for chunk in raw_chunks:
         words = chunk.split(" ")
@@ -251,19 +385,8 @@ def smart_split_scenes(text: str, target_sec: int = 20) -> List[Dict[str, str]]:
         if cur:
             phrases.append(cur)
 
-    final_phrases: List[str] = []
-    for ph in phrases:
-        while len(ph) > 42:
-            cut = _adjust_thai_Cluster_split(ph, 28)
-            if cut <= 0 or cut >= len(ph):
-                break
-            final_phrases.append(ph[:cut].strip())
-            ph = ph[cut:].strip()
-        if ph:
-            final_phrases.append(ph)
-
     scenes: List[Dict[str, str]] = []
-    for ph in final_phrases:
+    for ph in phrases:
         top, bottom = split_verbatim_two_lines(ph)
         scenes.append(
             {
@@ -273,27 +396,6 @@ def smart_split_scenes(text: str, target_sec: int = 20) -> List[Dict[str, str]]:
             }
         )
     return scenes
-
-
-def extract_fallback_headline(title: str, script: str) -> str:
-    base = re.sub(r"\[[^\]]*\]|\([^\)]*\)", "", title or "").strip()
-    base = re.sub(r"^(พร้อมส่ง|ส่งฟรี|ของแท้|โค้ดส่วนลด|ใหม่ล่าสุด)\s*", "", base, flags=re.IGNORECASE).strip()
-    parts = [p.strip() for p in re.split(r"[|/•\-–—]+", base) if len(p.strip()) >= 3]
-    candidate = parts[0] if parts else base
-    if len(candidate) > 26:
-        words = candidate.split(" ")
-        acc = ""
-        for w in words:
-            if len(acc) + len(w) + 1 <= 26:
-                acc = f"{acc} {w}".strip()
-            else:
-                break
-        if len(acc) >= 6:
-            candidate = acc
-        else:
-            cut_pos = _adjust_thai_Cluster_split(candidate, 24)
-            candidate = candidate[:cut_pos].strip()
-    return candidate or "ไอเทมเด็ดต้องมี!"
 
 
 # ---------------------------------------------------------------------------
@@ -308,64 +410,79 @@ async def generate_product_review_script(
     api_key: str = "",
 ) -> Dict[str, Any]:
     target_sec = max(10, min(90, int(target_duration or 20)))
-    target_scenes = max(4, min(20, int(round(target_sec / 3.2))))
-    target_chars = int(target_sec * 13.5)
-    min_chars = int(target_chars * 0.8)
+    target_scenes = max(4, min(18, int(round(target_sec / 3.2))))
+    target_chars = int(target_sec * 12.5)
+    min_chars = int(target_chars * 0.78)
+
+    simple_noun = extract_simple_product_category(product_title, product_description)
+    clean_features = filter_real_product_features(product_description)
 
     angle_instructions = {
-        "hard_sell": "โทนป้ายยาขายของสุดเร้าใจ เปิดด้วยปัญหาหรือจุดเด่นที่หยุดนิ้วคนดู บอกฟีเจอร์เด่นและปิดท้ายด้วยพิกัดตะกร้า/ลิงก์",
-        "review_real": "โทนรีวิวใช้จริงเหมือนเพื่อนป้ายยา เล่าข้อดีที่ใช้งานแล้วชอบมาก คุ้มค่าราคา พูดเป็นธรรมชาติ",
-        "feature_focus": "โทนเจาะลึกสเปกและฟังก์ชันเด่น สรุปสั้นกระชับเป็นข้อๆ เข้าใจง่ายในคลิปเดียว",
-        "flash_promo": "โทนโปรโมชันลดแรง ของมันต้องมี รีบตำก่อนของหมด กระตุ้นการตัดสินใจซื้อทันที",
+        "hard_sell": "เล่าจุดเด่นและการใช้งานจริงแบบเข้าใจง่าย ชวนให้น่าลองใช้แบบเป็นธรรมชาติ ไม่โฆษณาเกินจริง",
+        "review_real": "เล่าเหมือนเพื่อนมารีวิวของใช้จริงให้ฟัง บอกว่าใช้ทำอะไร สะดวกยังไง พูดธรรมดาเป็นธรรมชาติ",
+        "feature_focus": "อธิบายลักษณะการใช้งาน วัสดุ และความสะดวกในการใช้ในชีวิตประจำวันแบบตรงไปตรงมา",
+        "flash_promo": "แนะนำของใช้ที่น่าสนใจ บอกจุดเด่นสั้นๆ กระชับ เข้าใจง่าย ไม่พูดเว่อร์",
     }
-    tone_desc = angle_instructions.get(sales_angle, angle_instructions["hard_sell"])
+    tone_desc = angle_instructions.get(sales_angle, angle_instructions["review_real"])
 
-    prompt_text = f"""คุณคือครีเอเตอร์และนักเขียนบทวิดีโอสั้นขายสินค้า (TikTok / Shopee Video / Reels) มืออาชีพ
-หน้าที่ของคุณ: เขียน "บทพากย์รีวิวสินค้า (Spoken Script)" และ "พาดหัวบนสุดของคลิป (short_headline)" จากข้อมูลสินค้าด้านล่าง ให้มีความยาวพอดีกับเวลา {target_sec} วินาที
+    prompt_text = f"""คุณคือคนรีวิวของใช้จริงในชีวิตประจำวันสำหรับคลิปสั้น (TikTok / Shopee Video)
+หน้าที่ของคุณ: เขียน "บทพากย์ภาษาไทย" และ "พาดหัวด้านบนคลิป (short_headline)" ความยาวประมาณ {target_sec} วินาที
 
-ข้อมูลสินค้า:
-- ชื่อสินค้า: {product_title or 'สินค้าขายดี'}
-- รายละเอียดสินค้า: {(product_description or '')[:2500]}
-- สไตล์การเล่าเรื่อง: {tone_desc}
+ข้อมูลอ้างอิง:
+- ประเภทสินค้าที่ต้องใช้เรียกในคลิป: "{simple_noun}"
+- ข้อมูลเสริมจากร้านค้า (ใช้ดูเฉพาะลักษณะสินค้า ห้ามลอกคำแปลกๆ มาพูด): {product_title[:120]} | {clean_features[:800]}
+- โทนการพูด: {tone_desc}
 
-กฎเหล็กสำคัญมาก:
-1. "short_headline": ข้อความพาดหัว Header ด้านบนคลิป ต้อง **สั้น กระชับ ตัวใหญ่สะดุดตา 3-5 คำ (ไม่เกิน 20 ตัวอักษร)** เช่น "ไม้กันสั่น AI ตามติดชีวิต!" หรือ "พัดลมเทอร์โบ ลมแรงสะใจ!" หรือ "ของมันต้องมี คุ้มเกินราคา!"
-2. "spoken_script": บทพูดพากย์ไทยต่อเนื่องกัน ความยาวรวมประมาณ {target_chars} ตัวอักษร (ห้ามสั้นกว่า {min_chars} ตัวอักษร) ใช้ภาษาพูดที่ลื่นไหล น่าฟัง กระชับ ไม่เยิ่นเย้อ
-3. แบ่งบทพูดออกเป็น {target_scenes} ท่อนซับไตเติ้ล (scenes) เรียงตามลำดับการพูด โดยคำพูดในซับไตเติ้ลต้องตรงกับคำพูดจริง 100%:
-   - "full_narration": ประโยคพูดของท่อนนี้
-   - "line_top": ซับไตเติ้ลบรรทัดบน (กระชับ ไม่เกิน 16 ตัวอักษร)
-   - "line_bottom": ซับไตเติ้ลบรรทัดล่าง (กระชับ ไม่เกิน 16 ตัวอักษร)
+กฎเหล็กสำคัญมาก (ต้องทำตาม 100%):
+1. **ห้ามพูดชื่อสินค้าเต็มๆ ห้ามพูดชื่อรุ่นยาวๆ และห้ามเอาคำแปลภาษาจีนแปลกๆ ในชื่อสินค้ามาพูดเด็ดขาด!**
+   - ให้เรียกสินค้าสั้นๆ แค่ว่าเป็นอะไร เช่น "{simple_noun}ตัวนี้", "{simple_noun}ชิ้นนี้", หรือ "{simple_noun}รุ่นนี้" เท่านั้น!
+2. **ห้ามขายของเกินจริงเด็ดขาด!**
+   - ห้ามใช้คำเว่อร์ๆ เช่น ดีที่สุดในโลก, วิเศษ, เทพสุดๆ, เปลี่ยนชีวิต
+   - ห้ามเอาข้อความเงื่อนไขการรับประกัน การจัดส่ง หรือการเคลมสินค้าของร้านค้ามาพูดเด็ดขาด
+   - ให้พูดรีวิวแบบคนทั่วไปใช้งานจริง เช่น ใช้ทำอะไรได้บ้าง หยิบใช้ง่ายยังไง พกพาสะดวกไหม
+3. **"short_headline" (Header ด้านบนคลิป)**:
+   - ต้องเป็นคำไทยสั้นๆ ที่อ่านเข้าใจทันที บอกแค่ว่าคืออะไร เช่น "{simple_noun} หยิบใช้ง่ายพกพาสะดวก" หรือ "{simple_noun} เก็บทรงสวยใช้งานง่าย"
+   - ความยาวไม่เกิน 18 ตัวอักษร และเว้นวรรคระหว่างวลีให้ชัดเจน **ห้ามตัดคำกลางคันเด็ดขาด**
+4. **การแบ่งท่อนซับไตเติ้ล ("scenes") จำนวนประมาณ {target_scenes} ท่อน**:
+   - แต่ละท่อนมี "line_top" (บรรทัดบน) และ "line_bottom" (บรรทัดล่าง)
+   - "line_top" และ "line_bottom" ต้องเป็นคำเต็มๆ ที่อ่านรู้เรื่องทันที **ห้ามฉีกคำเดียวกันแยกคนละบรรทัดเด็ดขาด!** (บรรทัดละไม่เกิน 15 ตัวอักษร)
+   - "full_narration" คือคำพูดของท่อนนั้น (มีเว้นวรรคระหว่างคำพูดอย่างเป็นธรรมชาติ)
+   - ความยาวบทพูดรวมทั้งหมดประมาณ {target_chars} ตัวอักษร (ไม่ต่ำกว่า {min_chars} ตัวอักษร)
 
 ตอบกลับเป็น JSON เท่านั้น โครงสร้าง:
 {{
-  "short_headline": "พาดหัวสั้นๆ เด่นๆ ไม่เกิน 20 ตัวอักษร",
-  "spoken_script": "บทพากย์รวมทั้งหมด...",
+  "short_headline": "{simple_noun} ใช้งานง่ายสะดวก",
+  "spoken_script": "บทพูดรวมทั้งหมด...",
   "scenes": [
     {{
-      "line_top": "บรรทัดบน",
-      "line_bottom": "บรรทัดล่าง",
-      "full_narration": "ประโยคพูดของท่อนนี้"
+      "line_top": "บรรทัดบนคำเต็ม",
+      "line_bottom": "บรรทัดล่างคำเต็ม",
+      "full_narration": "บรรทัดบนคำเต็ม บรรทัดล่างคำเต็ม"
     }}
   ]
 }}"""
 
     keys = pick_rotated_keys(api_key)
-    models = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
     parsed_result: Optional[Dict[str, Any]] = None
     model_used: Optional[str] = None
 
     for key in keys:
         for m in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={key}"
+            gen_cfg: Dict[str, Any] = {
+                "responseMimeType": "application/json",
+                "temperature": 0.65,
+            }
+            if "2.5" in m:
+                gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
+
             payload = {
                 "contents": [{"parts": [{"text": prompt_text}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.75,
-                },
+                "generationConfig": gen_cfg,
             }
             try:
-                async with httpx.AsyncClient(timeout=25.0) as client:
+                async with httpx.AsyncClient(timeout=20.0) as client:
                     resp = await client.post(url, json=payload)
                     if resp.status_code != 200:
                         continue
@@ -383,54 +500,74 @@ async def generate_product_review_script(
                             model_used = m
                             break
             except Exception as exc:
-                print(f"[Studio] Gemini script generation ({m}) warning: {exc}")
+                print(f"[Studio] Gemini script generation ({m}) notice: {repr(exc)}")
         if parsed_result:
             break
 
     if parsed_result:
-        scenes = parsed_result.get("scenes") or []
+        raw_scenes = parsed_result.get("scenes") or []
         spoken_script = (parsed_result.get("spoken_script") or "").strip()
         short_headline = (custom_header or parsed_result.get("short_headline") or "").strip()
-        if not scenes and spoken_script:
-            scenes = smart_split_scenes(spoken_script, target_sec=target_sec)
-    else:
-        # Fallback auto-script from Shopee product info when no API key or quota reached
-        clean_title = clean_spoken_text(product_title) or "ไอเทมเด็ดขายดี"
-        clean_desc = clean_spoken_text(product_description)
-        fallback_lines = [
-            f"ใครกำลังมองหา {clean_title[:35]} บอกเลยว่าตัวนี้ตอบโจทย์สุดๆ",
-            clean_desc[:140] if clean_desc else "วัสดุพรีเมียม แข็งแรงทนทาน ใช้งานง่ายพกพาสะดวกมากๆ",
-            "ช่วยให้ชีวิตง่ายขึ้นเยอะ ฟังก์ชันครบจบในตัวเดียว คุ้มค่าเกินราคาแน่นอน",
-            "ใครสนใจรีบกดดูที่พิกัดตะกร้าได้เลย ก่อนของจะหมดนะครับ",
-        ]
-        spoken_script = " ".join(fallback_lines)
-        scenes = smart_split_scenes(spoken_script, target_sec=target_sec)
-        short_headline = (custom_header or extract_fallback_headline(product_title, spoken_script)).strip()
 
-    # Normalize scenes so line_top & line_bottom match full_narration 100%
-    normalized_scenes: List[Dict[str, str]] = []
-    for s in scenes:
-        narr = clean_spoken_text(s.get("full_narration") or f"{s.get('line_top', '')} {s.get('line_bottom', '')}")
-        if not narr:
-            continue
-        top, bot = split_verbatim_two_lines(narr)
-        normalized_scenes.append(
+        normalized_scenes: List[Dict[str, str]] = []
+        for s in raw_scenes:
+            top = clean_spoken_text(s.get("line_top") or "")
+            bot = clean_spoken_text(s.get("line_bottom") or "")
+            narr = clean_spoken_text(s.get("full_narration") or f"{top} {bot}")
+            if not narr:
+                continue
+            if not top and not bot:
+                top, bot = split_verbatim_two_lines(narr)
+            normalized_scenes.append(
+                {
+                    "line_top": top,
+                    "line_bottom": bot,
+                    "full_narration": narr,
+                }
+            )
+        if not normalized_scenes and spoken_script:
+            normalized_scenes = smart_split_scenes(spoken_script, target_sec=target_sec)
+    else:
+        # Clean, realistic, non-exaggerated fallback using only simple_noun!
+        short_headline = (custom_header or f"{simple_noun} ใช้งานง่ายพกพาสะดวก").strip()
+        normalized_scenes = [
             {
-                "line_top": top,
-                "line_bottom": bot,
-                "full_narration": narr,
-            }
-        )
+                "line_top": f"ใครกำลังมองหา{simple_noun}",
+                "line_bottom": "ไว้ใช้งานในชีวิตประจำวัน",
+                "full_narration": f"ใครกำลังมองหา{simple_noun} ไว้ใช้งานในชีวิตประจำวัน",
+            },
+            {
+                "line_top": f"{simple_noun}ตัวนี้ออกแบบมา",
+                "line_bottom": "ให้หยิบใช้งานได้สะดวกมาก",
+                "full_narration": f"{simple_noun}ตัวนี้ออกแบบมา ให้หยิบใช้งานได้สะดวกมาก",
+            },
+            {
+                "line_top": "งานประกอบเรียบร้อยแข็งแรง",
+                "line_bottom": "ขนาดกำลังดีพกพาง่าย",
+                "full_narration": "งานประกอบเรียบร้อยแข็งแรง ขนาดกำลังดีพกพาง่าย",
+            },
+            {
+                "line_top": "ตอบโจทย์การใช้งานจริง",
+                "line_bottom": "ในราคาที่คุ้มค่าสบายกระเป๋า",
+                "full_narration": "ตอบโจทย์การใช้งานจริง ในราคาที่คุ้มค่าสบายกระเป๋า",
+            },
+            {
+                "line_top": "ใครสนใจกดดูรายละเอียด",
+                "line_bottom": "ที่พิกัดตะกร้าได้เลยครับ",
+                "full_narration": "ใครสนใจกดดูรายละเอียด ที่พิกัดตะกร้าได้เลยครับ",
+            },
+        ]
 
     combined_script = " ".join(s["full_narration"] for s in normalized_scenes)
     if not short_headline:
-        short_headline = extract_fallback_headline(product_title, combined_script)
+        short_headline = f"{simple_noun} ใช้งานง่ายสะดวก"
 
     return {
         "short_headline": short_headline,
         "spoken_script": combined_script,
         "scenes": normalized_scenes,
-        "model_used": model_used or "smart-fallback",
+        "simple_product_noun": simple_noun,
+        "model_used": model_used or "clean-fallback",
     }
 
 
@@ -453,7 +590,7 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
         raise RuntimeError("No Gemini API key configured")
 
     actual_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
-    tts_models = ["gemini-2.5-flash-preview-tts", "gemini-2.0-flash-exp"]
+    tts_models = ["gemini-2.5-flash-preview-tts"]
 
     last_err = ""
     for key in keys:
@@ -464,7 +601,7 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
                     {
                         "parts": [
                             {
-                                "text": f"อ่านออกเสียงภาษาไทยด้วยน้ำเสียงนักรีวิวสินค้าที่กระฉับกระเฉง ชัดเจน เป็นธรรมชาติ ห้ามอ่านตกหล่น:\n{text}"
+                                "text": f"อ่านออกเสียงภาษาไทยด้วยน้ำเสียงเป็นธรรมชาติ ชัดเจน ไม่เร่งรีบจนเกินไป:\n{text}"
                             }
                         ]
                     }

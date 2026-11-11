@@ -35,6 +35,7 @@ from services.downloader import (
     sanitize_filename,
 )
 from services.video_studio_service import (
+    CLIP_CACHE_DIR,
     VOICE_CATALOG,
     convert_video_data_url_to_mp4,
     generate_product_review_script,
@@ -651,6 +652,70 @@ async def api_studio_generate_all(payload: StudioGenerateRequest):
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"สร้างบทและเสียงพากย์ไม่สำเร็จ: {exc}")
+
+
+@app.get("/api/studio/clip-file")
+async def api_studio_clip_file(
+    platform: str = Query(...),
+    id: str = Query(...),
+    direct_url: str = Query(""),
+):
+    plat = platform.lower().strip()
+    safe_id = re.sub(r"[^a-zA-Z0-9_\-]", "", id)[:60] or "clip"
+    cached_path = CLIP_CACHE_DIR / f"{plat}_{safe_id}.mp4"
+
+    if cached_path.exists() and cached_path.stat().st_size > 10000:
+        return FileResponse(
+            path=str(cached_path),
+            media_type="video/mp4",
+            headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600"},
+        )
+
+    stream_target = direct_url.strip()
+    if plat == "douyin":
+        if not stream_target or "douyin.com/video/" in stream_target:
+            detail = await douyin_service.get_video_detail(id)
+            if not detail or not detail.get("direct_video_url"):
+                raise HTTPException(status_code=404, detail="ไม่พบลิงก์วิดีโอ Douyin นี้")
+            stream_target = detail["direct_video_url"]
+        referer = "https://www.douyin.com/"
+    elif plat == "bilibili":
+        bili_mp4 = await bilibili_service.get_preview_mp4_url(id)
+        if not bili_mp4:
+            raise HTTPException(status_code=404, detail="ไม่พบลิงก์วิดีโอ Bilibili นี้")
+        stream_target = bili_mp4
+        referer = f"https://www.bilibili.com/video/{id}"
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported platform")
+
+    req_headers = {
+        "User-Agent": USER_AGENT,
+        "Referer": referer,
+    }
+    tmp_path = cached_path.with_suffix(".part")
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=45.0) as client:
+            async with client.stream("GET", stream_target, headers=req_headers) as resp:
+                if resp.status_code >= 400:
+                    raise HTTPException(status_code=502, detail="ดาวน์โหลดไฟล์คลิปต้นฉบับไม่สำเร็จ")
+                with open(tmp_path, "wb") as f:
+                    async for chunk in resp.aiter_bytes(chunk_size=131072):
+                        f.write(chunk)
+        if tmp_path.exists() and tmp_path.stat().st_size > 10000:
+            tmp_path.replace(cached_path)
+    except Exception as exc:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except OSError:
+            pass
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    return FileResponse(
+        path=str(cached_path),
+        media_type="video/mp4",
+        headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600"},
+    )
 
 
 @app.post("/api/studio/convert-mp4")
