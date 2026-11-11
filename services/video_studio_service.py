@@ -28,43 +28,43 @@ GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 VOICE_CATALOG = [
     {
         "id": "Puck",
-        "name": "🎙️ Puck (Google AI • สไตล์ Podcast มีเสน่ห์ ผสมอารมณ์โฆษณา • แนะนำ)",
+        "name": "🎙️ Puck (Google AI • Podcast ชาย ชวนคุย + อารมณ์โฆษณามีพลัง • แนะนำ)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Aoede",
-        "name": "✨ Aoede (Google AI หญิง • สดใส มีพลัง เล่าเรื่องสไตล์ Reels / TikTok)",
+        "name": "🎙️ Aoede (Google AI • Podcast หญิง สดใส + อารมณ์โฆษณาป้ายยาชวนซื้อ)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Kore",
-        "name": "✨ Kore (Google AI หญิง • นุ่มนวล สุภาพ น่าเชื่อถือ)",
+        "name": "🎙️ Kore (Google AI • Podcast หญิง นุ่มนวล สุภาพ + อารมณ์โฆษณาน่าเชื่อถือ)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Fenrir",
-        "name": "⚡ Fenrir (Google AI ชาย • หนักแน่น ทรงพลัง เร้าใจโฆษณาเดือด)",
+        "name": "🎙️ Fenrir (Google AI • Podcast ชาย มั่นใจ หนักแน่น + อารมณ์โฆษณาโปรเดือด)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Charon",
-        "name": "☕ Charon (Google AI ชาย • ทุ้มลึก สุขุม พอดแคสต์พรีเมียม)",
+        "name": "🎙️ Charon (Google AI • Podcast ชาย ทุ้มลึก สุขุม + อารมณ์โฆษณาพรีเมียม)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "th-TH-NiwatNeural",
-        "name": "🎙️ คุณนิวัฒน์ (ชาย • คมชัด ฉะฉาน สไตล์ครีเอเตอร์รีวิว)",
+        "name": "📻 คุณนิวัฒน์ (ชาย • เสียงคมชัด ฉะฉาน สไตล์ครีเอเตอร์รีวิว)",
         "gender": "Male",
         "engine": "edge",
     },
     {
         "id": "th-TH-PremwadeeNeural",
-        "name": "🎙️ คุณเปรมวดี (หญิง • สดใส นุ่มนวล สไตล์ป้ายยาสินค้า)",
+        "name": "📻 คุณเปรมวดี (หญิง • เสียงสดใส นุ่มนวล สไตล์ป้ายยาสินค้า)",
         "gender": "Female",
         "engine": "edge",
     },
@@ -592,10 +592,19 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
     actual_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
     tts_models = ["gemini-2.5-flash-preview-tts"]
 
-    # Podcast + Commercial Advertising delivery direction
+    # Tailor specific podcast + commercial advertising tone for each Google AI voice
+    voice_tone_guides = {
+        "Puck": "สไตล์ผู้ดำเนินรายการ Podcast ชาย ชวนคุยอย่างเป็นกันเอง มีพลัง ผสมอารมณ์โฆษณาที่ดึงดูดใจ มีจังหวะเน้นคำสำคัญอย่างเป็นธรรมชาติ",
+        "Aoede": "สไตล์ผู้ดำเนินรายการ Podcast หญิง สดใส มีชีวิตชีวา ผสมอารมณ์โฆษณาป้ายยาสินค้าอย่างน่ารัก น่าซื้อ ชวนติดตาม",
+        "Kore": "สไตล์ผู้ดำเนินรายการ Podcast หญิง น้ำเสียงนุ่มนวล สุภาพ น่าเชื่อถือ ผสมอารมณ์โฆษณาที่จริงใจ อบอุ่น",
+        "Fenrir": "สไตล์ผู้ดำเนินรายการ Podcast ชาย มั่นใจ หนักแน่น มีความกระตือรือร้น ผสมอารมณ์โฆษณาโปรโมชันน่าตื่นเต้น",
+        "Charon": "สไตล์ผู้ดำเนินรายการ Podcast ชาย น้ำเสียงทุ้มลึก สุขุม ชวนฟัง สไตล์พรีเมียม ผสมอารมณ์โฆษณาระดับไฮเอนด์",
+    }
+    tone_guide = voice_tone_guides.get(actual_voice, voice_tone_guides["Puck"])
+
     speaking_prompt = (
-        "พูดออกเสียงภาษาไทยในสไตล์รายการ Podcast ชวนคุยอย่างเป็นกันเอง "
-        "ผสมน้ำเสียงและอารมณ์โฆษณาที่น่าฟัง มีจังหวะเน้นคำสำคัญ มีเสน่ห์ น่าติดตาม ชัดเจน ไม่พูดเร็วจนเกินไป:\n"
+        f"พูดออกเสียงภาษาไทยใน{tone_guide} "
+        "เว้นจังหวะหายใจและเน้นคำสำคัญให้น่าฟัง ชัดถ้อยชัดคำ ไม่พูดเร็วจนเกินไป:\n"
         f"{text}"
     )
 
