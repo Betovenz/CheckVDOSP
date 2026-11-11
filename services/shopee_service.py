@@ -205,29 +205,85 @@ def _clean_shopee_title(raw_title: str) -> str:
 
 def _extract_brand_model_from_title(title: str) -> str:
     """
-    Extracts prominent English brand + model phrase from the beginning of a Shopee title,
-    e.g. "[พร้อมส่ง] DJI Osmo Mobile 8P - Smartphone Stabilizer | ไม้กันสั่นมีรีโมท" -> "DJI Osmo Mobile 8P"
+    Extracts prominent Brand + Model name from a Shopee title.
+    Supports complex e-commerce title patterns:
+    1. Brand + Thai Category + Model Series + SKU codes:
+       'Adidas รองเท้าแตะ Adilette 22 IG8263 HQ4670 ...' -> 'Adidas Adilette 22'
+    2. Segmented Brand + Model:
+       '[พร้อมส่ง] DJI Osmo Mobile 8P · Smartphone Stabilizer | ไม้กันสั่น' -> 'DJI Osmo Mobile 8P'
+    3. Thai Category + Brand + Model:
+       'พัดลมพกพา Jisulife Pro1S 5000mAh' -> 'Jisulife Pro1S'
+       'หูฟังบลูทูธ Lenovo LP40 Pro ไร้สาย' -> 'Lenovo LP40 Pro'
+    4. Explicit 'รุ่น ...' / 'Model ...':
+       'ไม้กันสั่นมือถือ รุ่น 8P มีรีโมท' -> '8P'
     """
     if not title:
         return ""
+
     cleaned = re.sub(r'\[[^\]]*\]|\([^\)]*\)|【[^】]*】', ' ', title)
-    # Split by pipe or dash or slash into segments
-    segments = [s.strip() for s in re.split(r'[|｜/]+|\s+-\s+', cleaned) if s.strip()]
+    promo_tags = [
+        r'พร้อมส่ง(?:ในไทย)?', r'ส่งฟรี', r'ส่งไว', r'ของแท้\s*100%?', r'แท้/ป้ายไทย',
+        r'แท้\s*100%?', r'รับประกัน\s*\d*\s*(?:ปี|เดือน|วัน)?', r'ประกันศูนย์(?:\s*\d+\s*ปี)?',
+        r'เก็บเงินปลายทาง', r'ราคาถูก', r'โปรโมชั่น', r'ลดราคา',
+    ]
+    for p in promo_tags:
+        cleaned = re.sub(p, ' ', cleaned, flags=re.I)
+
+    # Check explicit 'รุ่น ...' or 'Model ...' first
+    m_model_explicit = re.search(
+        r'(?:รุ่น|model|type)\s*[:：]?\s*([A-Za-z0-9\-\.+]+(?:\s+[A-Za-z0-9\-\.+]+){0,2})',
+        cleaned,
+        re.I,
+    )
+    explicit_model = m_model_explicit.group(1).strip() if m_model_explicit else ""
+
+    # Split by major segment separators (dash, pipe, slash, bullet)
+    segments = [s.strip() for s in re.split(r'[|｜/·•●\t]+|\s+-\s+', cleaned) if s.strip()]
+    first_seg = segments[0] if segments else cleaned
+
     generic_en = {
         "smartphone", "stabilizer", "official", "store", "original", "authentic",
         "warranty", "free", "shipping", "ready", "stock", "new", "version", "mini",
         "pro", "max", "plus", "ultra", "lite", "usb", "type", "cable", "fast", "charge",
+        "thailand", "shopee", "wireless", "bluetooth", "portable", "smart", "genuine",
     }
-    for seg in segments[:2]:
-        # Find contiguous English/number words (at least 2 chars, starting with letter)
-        m = re.search(r'\b([A-Za-z][A-Za-z0-9]*(?:\s+[A-Za-z0-9\-\.+]+){0,4})\b', seg)
-        if m:
-            candidate = m.group(1).strip()
-            words = [w.lower() for w in candidate.split()]
-            # Must contain at least one non-generic brand/model word or alphanumeric model code
-            if len(candidate) >= 3 and any(w not in generic_en for w in words):
-                return candidate
-    return ""
+    unit_pattern = (
+        r'^\d+(?:\.\d+)?\s*(?:ชม|ชั่วโมง|cm|mm|m|g|kg|w|วัตต์|mah|l|ml|ลิตร|นิ้ว|ชิ้น|อัน|แพ็ค|กล่อง|ระดับ|เกียร์|fps|hz|k|v|a)$'
+    )
+
+    # Find all contiguous English/alphanumeric chunks (separated by Thai words or punctuation)
+    raw_chunks = re.findall(r'[A-Za-z0-9\-\.+]+(?:\s+[A-Za-z0-9\-\.+]+)*', first_seg)
+    cleaned_chunks: List[str] = []
+    for chunk in raw_chunks:
+        tokens = [t.strip(' -,.') for t in chunk.split() if t.strip(' -,.')]
+        valid_tokens: List[str] = []
+        for t in tokens:
+            if re.match(unit_pattern, t, re.I):
+                continue
+            # Filter out year numbers or arbitrary large SKU codes (> 2050)
+            if re.match(r'^\d+$', t) and int(t) > 2050:
+                continue
+            valid_tokens.append(t)
+        # Must contain at least one non-generic word or valid model code
+        if valid_tokens and any(t.lower() not in generic_en and not re.match(r'^\d+$', t) for t in valid_tokens):
+            cleaned_chunks.append(" ".join(valid_tokens))
+
+    if not cleaned_chunks:
+        return explicit_model
+
+    if len(cleaned_chunks) == 1:
+        words = cleaned_chunks[0].split()
+        cand = " ".join(words[:4])
+        if explicit_model and explicit_model.lower() not in cand.lower():
+            return f"{cand} {explicit_model}"
+        return cand
+
+    # Pattern: Multiple chunks separated by Thai text, e.g. 'Adidas' + (รองเท้าแตะ) + 'Adilette 22 IG8263 ...'
+    # Chunk 0 is Brand, Chunk 1 is Model Series
+    brand = cleaned_chunks[0].split()[0]
+    model_words = cleaned_chunks[1].split()
+    model = " ".join(model_words[:2])
+    return f"{brand} {model}"
 
 
 def extract_core_thai_keyword(title: str, description: str = "") -> str:
@@ -346,6 +402,17 @@ BRAND_EN_TO_ZH: List[Tuple[str, str]] = [
     ("baseus", "倍思"),
     ("ugreen", "绿联"),
     ("anker", "安克"),
+    ("adidas", "阿迪达斯"),
+    ("nike", "耐克"),
+    ("lenovo", "联想"),
+    ("xiaomi", "小米"),
+    ("huawei", "华为"),
+    ("apple", "Apple 苹果"),
+    ("iphone", "iPhone"),
+    ("samsung", "三星"),
+    ("sony", "索尼"),
+    ("simplus", "Simplus"),
+    ("gaabor", "Gaabor"),
 ]
 
 
@@ -478,8 +545,12 @@ async def build_chinese_search_keywords(title: str, description: str = "", custo
 
     # Build suggested search angle pills so user can switch between combined multi-keyword or individual keywords
     suggestions: List[Dict[str, str]] = [
-        {"keyword": primary_zh, "label": "วิดีโอสินค้า (รวมทุกคีย์เวิร์ด)" if len(zh_list) > 1 else "วิดีโอสินค้า"},
+        {"keyword": primary_zh, "label": "วิดีโอสินค้า (รวมทุกคำค้นหา)" if len(zh_list) > 1 else "วิดีโอสินค้า"},
     ]
+    if len(zh_list) >= 2:
+        direct_combined = f"{zh_list[0]} {zh_list[1]}".strip()
+        suggestions.append({"keyword": direct_combined, "label": "ตรงรุ่น + หมวดหมู่"})
+
     if len(phrases_th) > 1 and len(zh_list) == len(phrases_th):
         for th_p, zh_p in zip(phrases_th, zh_list):
             suggestions.append({"keyword": zh_p, "label": f"เฉพาะ: {th_p}"})

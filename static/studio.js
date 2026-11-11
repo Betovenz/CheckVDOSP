@@ -1851,7 +1851,7 @@
 
       const recorder = new MediaRecorder(combinedStream, {
         mimeType: chosenMime,
-        videoBitsPerSecond: 4_000_000,
+        videoBitsPerSecond: 2_500_000,
         audioBitsPerSecond: 192_000,
       });
 
@@ -1918,21 +1918,73 @@
         studioExportProgressText.textContent = "กำลังแปลงเป็นไฟล์ .MP4 (H.264 + AAC)...";
       }
 
-      const rawDataUrl = await blobToDataUrl(recordedBlob);
-      const b64Part = rawDataUrl.slice(rawDataUrl.lastIndexOf(",") + 1);
-      const normalizedDataUrl = `data:video/webm;base64,${b64Part}`;
+      let mp4Blob = null;
 
-      const convResp = await fetch("/api/studio/convert-mp4", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_data_url: normalizedDataUrl, fps }),
-      });
-      if (!convResp.ok) {
-        const errJson = await convResp.json().catch(() => ({}));
-        throw new Error(errJson.detail || "แปลงไฟล์ MP4 ไม่สำเร็จ");
+      // 1. Primary: Direct binary stream upload via FormData (avoids 30MB base64 memory overhead)
+      try {
+        const formData = new FormData();
+        formData.append("file", recordedBlob, "recording.webm");
+        formData.append("fps", String(fps));
+
+        const convResp = await fetch("/api/studio/convert-mp4-file", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (convResp.ok) {
+          mp4Blob = await convResp.blob();
+        } else {
+          const errText = await convResp.text().catch(() => "");
+          let errDetail = "";
+          try {
+            const parsed = JSON.parse(errText);
+            errDetail = parsed.detail || "";
+          } catch (_) {
+            errDetail = errText.slice(0, 150);
+          }
+          console.warn("[Studio] Binary convert failed, trying JSON fallback:", errDetail);
+        }
+      } catch (uploadErr) {
+        console.warn("[Studio] Binary upload error:", uploadErr);
       }
 
-      const mp4Blob = await convResp.blob();
+      // 2. Fallback: Base64 JSON POST (/api/studio/convert-mp4) if FormData didn't succeed
+      if (!mp4Blob) {
+        try {
+          const rawDataUrl = await blobToDataUrl(recordedBlob);
+          const b64Part = rawDataUrl.slice(rawDataUrl.lastIndexOf(",") + 1);
+          const normalizedDataUrl = `data:video/webm;base64,${b64Part}`;
+
+          const convResp = await fetch("/api/studio/convert-mp4", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ video_data_url: normalizedDataUrl, fps }),
+          });
+
+          if (convResp.ok) {
+            mp4Blob = await convResp.blob();
+          } else {
+            const errText = await convResp.text().catch(() => "");
+            let errDetail = "";
+            try {
+              const parsed = JSON.parse(errText);
+              errDetail = parsed.detail || "";
+            } catch (_) {
+              errDetail = errText.slice(0, 150);
+            }
+            console.warn("[Studio] Base64 convert also failed:", errDetail);
+          }
+        } catch (jsonErr) {
+          console.warn("[Studio] Base64 convert exception:", jsonErr);
+        }
+      }
+
+      // 3. Ultimate Fallback: If backend FFmpeg fails, do NOT lose user's work!
+      // Provide the recorded video blob directly so user can preview and download immediately.
+      if (!mp4Blob) {
+        mp4Blob = recordedBlob;
+        toast("ระบบบันทึกไฟล์วิดีโอต้นฉบับให้เรียบร้อย สามารถเปิดดูและดาวน์โหลดได้ทันที", false, 4500);
+      }
       if (studioState.lastExportedMp4Url) {
         URL.revokeObjectURL(studioState.lastExportedMp4Url);
       }

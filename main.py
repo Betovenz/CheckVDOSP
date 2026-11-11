@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -38,6 +40,7 @@ from services.video_studio_service import (
     CLIP_CACHE_DIR,
     VOICE_CATALOG,
     convert_video_data_url_to_mp4,
+    convert_video_file_to_mp4,
     generate_product_review_script,
     load_studio_config,
     save_studio_config,
@@ -736,6 +739,40 @@ async def api_studio_convert_mp4(payload: StudioConvertMp4Request):
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/studio/convert-mp4-file")
+async def api_studio_convert_mp4_file(
+    file: UploadFile = File(...),
+    fps: int = Form(30),
+):
+    """
+    Accepts multipart/form-data upload of recorded WebM/MP4 blob directly.
+    Streams directly to disk in chunks to avoid memory spikes, then converts via FFmpeg.
+    """
+    with tempfile.TemporaryDirectory(prefix="studio_upload_") as tmpdir:
+        in_path = os.path.join(tmpdir, "in_recording.webm")
+        out_path = os.path.join(tmpdir, "out_final.mp4")
+        try:
+            with open(in_path, "wb") as f:
+                while chunk := await file.read(1024 * 1024):
+                    f.write(chunk)
+
+            await asyncio.to_thread(convert_video_file_to_mp4, in_path, out_path, fps)
+
+            with open(out_path, "rb") as f:
+                mp4_bytes = f.read()
+
+            return Response(
+                content=mp4_bytes,
+                media_type="video/mp4",
+                headers={
+                    "Content-Disposition": 'attachment; filename="ai-review-video.mp4"',
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"แปลงไฟล์ MP4 ไม่สำเร็จ: {exc}")
 
 
 # Mount static frontend

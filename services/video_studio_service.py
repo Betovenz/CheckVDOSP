@@ -829,8 +829,60 @@ async def synthesize_voiceover_and_timings(
 
 
 # ---------------------------------------------------------------------------
-# Convert WebM/MP4 Data URL to High-Quality MP4 via FFmpeg
+# Convert WebM/MP4 to High-Quality MP4 via FFmpeg (H.264 + AAC + FastStart)
 # ---------------------------------------------------------------------------
+def convert_video_file_to_mp4(in_file: str, out_file: str, fps: int = 30) -> None:
+    """
+    Converts an input video file (e.g. WebM from MediaRecorder) to a universally compatible MP4
+    (H.264 High Profile, AAC audio, yuv420p, +faststart) using FFmpeg.
+    Includes PTS regeneration and negative timestamp normalization to prevent drift.
+    """
+    ffmpeg_bin = get_ffmpeg_binary()
+    safe_fps = 60 if str(fps) == "60" else 30
+
+    # 1. Primary command: H.264 + AAC with audio resample sync
+    cmd = [
+        ffmpeg_bin,
+        "-y",
+        "-fflags", "+genpts",
+        "-avoid_negative_ts", "make_zero",
+        "-i", in_file,
+        "-c:v", "libx264",
+        "-crf", "20",
+        "-preset", "fast",
+        "-r", str(safe_fps),
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-af", "aresample=async=1000",
+        "-movflags", "+faststart",
+        out_file,
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
+    if proc.returncode == 0 and os.path.exists(out_file) and os.path.getsize(out_file) > 0:
+        return
+
+    # 2. Fallback command: without audio filter in case input WebM has no audio track
+    cmd_fallback = [
+        ffmpeg_bin,
+        "-y",
+        "-fflags", "+genpts",
+        "-avoid_negative_ts", "make_zero",
+        "-i", in_file,
+        "-c:v", "libx264",
+        "-crf", "20",
+        "-preset", "fast",
+        "-r", str(safe_fps),
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        out_file,
+    ]
+    proc2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
+    if proc2.returncode != 0 or not os.path.exists(out_file) or os.path.getsize(out_file) == 0:
+        err_msg = (proc.stderr or proc2.stderr).decode("utf-8", errors="replace")[-400:]
+        raise RuntimeError(f"FFmpeg แปลงไฟล์ไม่สำเร็จ: {err_msg}")
+
+
 def convert_video_data_url_to_mp4(video_data_url: str, fps: int = 30) -> bytes:
     if not video_data_url or "," not in video_data_url:
         raise ValueError("ข้อมูลวิดีโอไม่ถูกต้อง")
@@ -840,42 +892,13 @@ def convert_video_data_url_to_mp4(video_data_url: str, fps: int = 30) -> bytes:
     if not video_bytes:
         raise ValueError("ไฟล์วิดีโอว่างเปล่า")
 
-    ffmpeg_bin = get_ffmpeg_binary()
-    safe_fps = 60 if str(fps) == "60" else 30
-
     with tempfile.TemporaryDirectory(prefix="studio_mp4_") as tmpdir:
         in_file = os.path.join(tmpdir, "input.webm")
         out_file = os.path.join(tmpdir, "output.mp4")
         with open(in_file, "wb") as f:
             f.write(video_bytes)
 
-        cmd = [
-            ffmpeg_bin,
-            "-y",
-            "-i",
-            in_file,
-            "-c:v",
-            "libx264",
-            "-crf",
-            "20",
-            "-preset",
-            "fast",
-            "-r",
-            str(safe_fps),
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            out_file,
-        ]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
-        if proc.returncode != 0 or not os.path.exists(out_file) or os.path.getsize(out_file) == 0:
-            err_msg = proc.stderr.decode("utf-8", errors="replace")[-400:]
-            raise RuntimeError(f"FFmpeg แปลงไฟล์ไม่สำเร็จ: {err_msg}")
+        convert_video_file_to_mp4(in_file, out_file, fps)
 
         with open(out_file, "rb") as f:
             return f.read()
