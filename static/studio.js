@@ -1256,7 +1256,10 @@
         srcW = vid.videoWidth;
         srcH = vid.videoHeight;
         // Update frame cache so if next frame seeks, we still have a crisp frame!
-        if (clipObj.lastFrameCanvas) {
+        // Throttled: copying a full-res frame every tick is expensive and causes dropped frames.
+        const nowMs = performance.now();
+        if (clipObj.lastFrameCanvas && (!clipObj.hasDecodedFrame || nowMs - (clipObj.lastCacheTs || 0) > 250)) {
+          clipObj.lastCacheTs = nowMs;
           if (clipObj.lastFrameCanvas.width !== srcW || clipObj.lastFrameCanvas.height !== srcH) {
             clipObj.lastFrameCanvas.width = srcW;
             clipObj.lastFrameCanvas.height = srcH;
@@ -1631,6 +1634,8 @@
   function syncActiveClipVideoElement(timeSec, shouldPlay) {
     const activeSeg = getActiveCutSegment(timeSec);
     const activeClipId = activeSeg ? activeSeg.clipId : studioState.clips[0]?.id;
+    const segs = studioState.cutSegments || [];
+    const nextSeg = activeSeg ? segs[segs.indexOf(activeSeg) + 1] || null : null;
 
     studioState.clips.forEach((clip) => {
       const vid = clip.videoEl;
@@ -1662,6 +1667,16 @@
         }
       } else {
         if (!vid.paused) vid.pause();
+        // Pre-seek the clip used by the next cut so the switch shows a ready frame (no freeze)
+        if (shouldPlay && nextSeg && clip.id === nextSeg.clipId && !vid.seeking) {
+          const dur = Number.isFinite(vid.duration) && vid.duration > 0 ? vid.duration : 10;
+          const nextStart = (nextSeg.trimStart || 0) % dur;
+          if (Math.abs(vid.currentTime - nextStart) > 0.15) {
+            try {
+              vid.currentTime = nextStart;
+            } catch (_) {}
+          }
+        }
       }
     });
   }
@@ -1810,8 +1825,15 @@
       offCanvas.height = height;
       const ctx = offCanvas.getContext("2d", { alpha: false });
 
-      const canvasStream = offCanvas.captureStream(fps);
-      const videoTrack = canvasStream.getVideoTracks()[0];
+      // Manual frame capture (captureStream(0) + requestFrame): one encoded frame per drawn frame,
+      // no duplicated / half-drawn frames from the auto-capture timer.
+      let canvasStream = offCanvas.captureStream(0);
+      let videoTrack = canvasStream.getVideoTracks()[0];
+      const manualFrames = !!(videoTrack && typeof videoTrack.requestFrame === "function");
+      if (!manualFrames) {
+        canvasStream = offCanvas.captureStream(fps);
+        videoTrack = canvasStream.getVideoTracks()[0];
+      }
 
       let audioCtx = null;
       let audioSource = null;
@@ -1834,9 +1856,12 @@
         }
       }
 
+      // H.264 first (usually hardware-encoded = far less CPU, fewer dropped frames); VP9 is the slowest.
       const mimeCandidates = [
-        "video/webm;codecs=vp9,opus",
+        "video/mp4;codecs=avc1.42E01F,mp4a.40.2",
+        "video/webm;codecs=h264,opus",
         "video/webm;codecs=vp8,opus",
+        "video/webm;codecs=vp9,opus",
         "video/webm",
         "video/mp4",
       ];
@@ -1855,7 +1880,7 @@
 
       const recorder = new MediaRecorder(combinedStream, {
         mimeType: chosenMime,
-        videoBitsPerSecond: 2_500_000,
+        videoBitsPerSecond: 5_000_000,
         audioBitsPerSecond: 192_000,
       });
 
@@ -1875,38 +1900,61 @@
       const scaleX = width / 1080;
       const scaleY = height / 1920;
 
-      recorder.start(100);
-      if (audioSource) audioSource.start(0);
-      const startTs = performance.now();
+      // Prime: put the first clip at its start frame before recording begins
+      syncActiveClipVideoElement(0, true);
+      await new Promise((r) => setTimeout(r, 250));
+
+      recorder.start(1000);
+      // Clock = audio clock when available, so picture and voice can't drift apart
+      const audioStartAt = audioCtx ? audioCtx.currentTime + 0.05 : 0;
+      if (audioSource) audioSource.start(audioStartAt);
+      const startTs = performance.now() + (audioCtx ? 50 : 0);
+      const clockNow = () =>
+        audioCtx ? audioCtx.currentTime - audioStartAt : (performance.now() - startTs) / 1000;
+
+      const frameInterval = 1 / fps;
+      let lastFrameT = -1;
+      let lastUiTs = 0;
 
       await new Promise((resolve) => {
-        const timer = setInterval(() => {
-          const elapsed = (performance.now() - startTs) / 1000;
+        const tick = () => {
+          const elapsed = clockNow();
           if (elapsed >= targetDur) {
-            clearInterval(timer);
             resolve();
             return;
           }
 
-          syncActiveClipVideoElement(elapsed, true);
-          ctx.save();
-          ctx.scale(scaleX, scaleY);
-          renderStudioFrameAt(ctx, 1080, 1920, elapsed);
-          ctx.restore();
-
-          if (videoTrack && typeof videoTrack.requestFrame === "function") {
-            try {
-              videoTrack.requestFrame();
-            } catch (_) {}
+          if (elapsed >= 0 && elapsed - lastFrameT >= frameInterval * 0.9) {
+            lastFrameT = elapsed;
+            syncActiveClipVideoElement(elapsed, true);
+            ctx.save();
+            ctx.scale(scaleX, scaleY);
+            renderStudioFrameAt(ctx, 1080, 1920, elapsed);
+            ctx.restore();
+            if (manualFrames) {
+              try {
+                videoTrack.requestFrame();
+              } catch (_) {}
+            }
           }
 
-          const pct = Math.min(95, Math.round((elapsed / targetDur) * 90));
-          if (studioExportProgressBar) studioExportProgressBar.style.width = `${pct}%`;
-          if (studioExportPctText) studioExportPctText.textContent = `${pct}%`;
-          if (studioExportProgressText) {
-            studioExportProgressText.textContent = `กำลังบันทึกวิดีโอ ${elapsed.toFixed(1)}s / ${targetDur.toFixed(1)}s...`;
+          const nowMs = performance.now();
+          if (nowMs - lastUiTs > 250) {
+            lastUiTs = nowMs;
+            const shown = Math.max(0, elapsed);
+            const pct = Math.min(95, Math.round((shown / targetDur) * 90));
+            if (studioExportProgressBar) studioExportProgressBar.style.width = `${pct}%`;
+            if (studioExportPctText) studioExportPctText.textContent = `${pct}%`;
+            if (studioExportProgressText) {
+              studioExportProgressText.textContent = `กำลังบันทึกวิดีโอ ${shown.toFixed(1)}s / ${targetDur.toFixed(1)}s... (อย่าสลับแท็บระหว่างเรนเดอร์)`;
+            }
           }
-        }, Math.floor(1000 / fps));
+
+          // rAF = smooth & vsync-aligned; if the tab is hidden rAF stops, so fall back to a timer
+          if (document.hidden) setTimeout(tick, 1000 / fps / 2);
+          else requestAnimationFrame(tick);
+        };
+        tick();
       });
 
       studioState.clips.forEach((c) => {

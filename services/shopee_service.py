@@ -87,6 +87,13 @@ THAI_TO_ZH_PRODUCT_DICT: List[Tuple[str, str]] = [
     ("กล้องวงจรปิด", "监控摄像头"),
     ("กล้องติดรถยนต์", "行车记录仪"),
     ("โปรเจคเตอร์", "投影仪"),
+    ("เครื่องพิมพ์ฉลาก", "标签打印机"),
+    ("เครื่องพิมพ์ใบเสร็จ", "热敏小票打印机"),
+    ("เครื่องพิมพ์", "打印机"),
+    ("เครื่องปริ้น", "打印机"),
+    ("เครื่องปริ๊น", "打印机"),
+    ("ปริ้นเตอร์", "打印机"),
+    ("ปรินเตอร์", "打印机"),
     ("แก้วเก็บความเย็น", "保温杯"),
     ("กระบอกน้ำเก็บอุณหภูมิ", "保温杯"),
     ("กระบอกน้ำ", "水杯"),
@@ -203,6 +210,32 @@ def _clean_shopee_title(raw_title: str) -> str:
     return t.strip()
 
 
+# Thai product modifiers -> Chinese prefix (e.g. เครื่องพิมพ์ + พกพา -> 便携打印机)
+THAI_MODIFIERS_ZH: List[Tuple[str, str]] = [
+    ("พกพา", "便携"),
+    ("ไร้สาย", "无线"),
+    ("บลูทูธ", "蓝牙"),
+    ("มินิ", "迷你"),
+    ("อัตโนมัติ", "自动"),
+]
+
+# Tokens that look like a "model" but are just specs (paper size, resolution, network...)
+_SPEC_TOKEN_RE = re.compile(r"^(?:[A-Ba-b]\d{1,2}|\d+[Kk]|[345]G|USB(?:-?C)?|Type-?C|PC|HD|FHD|UHD|LED)$", re.I)
+
+
+def _is_spec_token(text: str) -> bool:
+    toks = (text or "").split()
+    return bool(toks) and all(_SPEC_TOKEN_RE.match(t) for t in toks)
+
+
+def _first_thai_chunk(title: str) -> str:
+    """First Thai word-group of a title — on Shopee this is almost always the product noun."""
+    cleaned = re.sub(r'\[[^\]]*\]|\([^\)]*\)|【[^】]*】', ' ', title or "")
+    cleaned = re.sub(r'พร้อมส่ง(?:ในไทย)?|ส่งฟรี|ส่งไว|ของแท้|แท้|ราคาถูก|ลดราคา|โปรโมชั่น|ใหม่ล่าสุด|ใหม่', ' ', cleaned)
+    m = re.search(r'[฀-๿]{3,}', cleaned)
+    return m.group(0) if m else ""
+
+
 def _extract_brand_model_from_title(title: str) -> str:
     """
     Extracts prominent Brand + Model name from a Shopee title.
@@ -310,14 +343,35 @@ def extract_core_thai_keyword(title: str, description: str = "") -> str:
         if m_desc:
             desc_product_name = m_desc.group(1).strip()
 
+    # Main product noun: dictionary match, else the first Thai word-group of the title
+    main_noun = matched_thai_terms[0] if matched_thai_terms else ""
+    if not main_noun and brand_model:
+        main_noun = _first_thai_chunk(title)
+
     keywords_out: List[str] = []
-    if brand_model:
+    if brand_model and _is_spec_token(brand_model) and main_noun:
+        # "A4" alone finds paper / cars — use the product noun, and pair the spec with it
+        keywords_out.append(main_noun)
+        keywords_out.append(f"{brand_model} {main_noun}")
+    elif brand_model:
         keywords_out.append(brand_model)
     for t in matched_thai_terms[:2]:
         if t not in keywords_out:
             keywords_out.append(t)
     if not keywords_out and desc_product_name:
         keywords_out.append(desc_product_name)
+
+    # Fill up to 3 keywords with modifier variants found in the title (e.g. เครื่องพิมพ์ + พกพา)
+    if main_noun and len(keywords_out) < 3:
+        if main_noun not in keywords_out:
+            keywords_out.append(main_noun)
+        for th_mod, _ in THAI_MODIFIERS_ZH:
+            if len(keywords_out) >= 3:
+                break
+            if th_mod in title and th_mod not in main_noun:
+                variant = f"{main_noun}{th_mod}"
+                if not any(th_mod in k for k in keywords_out):
+                    keywords_out.append(variant)
 
     if keywords_out:
         return ", ".join(keywords_out[:3])
@@ -444,9 +498,13 @@ async def _translate_single_phrase_to_chinese(phrase: str) -> str:
         if q == th_term:
             return zh_term
     # Partial match if phrase starts with a curated Thai term (e.g. "ไม้กันสั่นมีรีโมท" -> "手机稳定器 云台")
+    # Keep extra spec tokens (e.g. "A4") and modifiers (e.g. "พกพา" -> 便携) around the matched term
     for th_term, zh_term in THAI_TO_ZH_PRODUCT_DICT:
         if th_term in q and len(th_term) >= 4:
-            return zh_term
+            rest = q.replace(th_term, " ")
+            ascii_part = " ".join(re.findall(r'[A-Za-z0-9\-\.+]+', rest))
+            mods = "".join(zh for th, zh in THAI_MODIFIERS_ZH if th in rest and zh not in zh_term)
+            return f"{ascii_part} {mods}{zh_term}".strip()
 
     async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
         # Provider 1: MyMemory API (autodetect)

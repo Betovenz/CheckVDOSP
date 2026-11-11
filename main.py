@@ -107,6 +107,35 @@ async def startup_event():
     asyncio.create_task(douyin_service.ensure_signing_cookies())
 
 
+MAX_KEYWORD_GROUPS = 3
+
+
+def _split_keyword_groups(keyword: str) -> List[str]:
+    """'A | B | C' -> ['A', 'B', 'C'] (max 3). Drops junk groups like '100%' that have no letters."""
+    groups: List[str] = []
+    for g in re.split(r"[|｜]+", keyword or ""):
+        g = g.strip()
+        if g and re.search(r"[A-Za-z一-鿿฀-๿]", g) and g not in groups:
+            groups.append(g)
+    return groups[:MAX_KEYWORD_GROUPS] or [(keyword or "").strip()]
+
+
+def _interleave_unique(lists: List[List[Dict[str, Any]]], limit: int) -> List[Dict[str, Any]]:
+    seen: set = set()
+    out: List[Dict[str, Any]] = []
+    for idx in range(max((len(lst) for lst in lists), default=0)):
+        for lst in lists:
+            if idx < len(lst):
+                item = lst[idx]
+                key = (item.get("platform"), item.get("id"))
+                if key not in seen:
+                    seen.add(key)
+                    out.append(item)
+                    if len(out) >= limit:
+                        return out
+    return out
+
+
 @app.get("/api/search")
 async def search_videos(
     q: str = Query(..., min_length=1, description="Keyword to search (Thai, English, or Chinese)"),
@@ -122,19 +151,25 @@ async def search_videos(
     if not search_keyword:
         search_keyword = raw_query
 
-    douyin_task = (
-        douyin_service.search_videos(search_keyword, page=page, limit=limit)
-        if platform_norm in ("all", "douyin")
-        else asyncio.sleep(0, result=[])
-    )
-    bili_task = (
-        bilibili_service.search_videos(search_keyword, page=page, limit=limit)
-        if platform_norm in ("all", "bilibili")
-        else asyncio.sleep(0, result=[])
-    )
+    # Multi-keyword ("A | B | C"): search each keyword (max 3) separately & concurrently,
+    # then interleave so every keyword gets an equal share of the results.
+    groups = _split_keyword_groups(search_keyword)
+    per_group_limit = max(4, -(-limit // len(groups)))  # ceil
+
+    async def _platform_search(service, enabled: bool) -> List[Dict[str, Any]]:
+        if not enabled:
+            return []
+        group_results = await asyncio.gather(
+            *[service.search_videos(g, page=page, limit=per_group_limit) for g in groups],
+            return_exceptions=True,
+        )
+        lists = [r for r in group_results if isinstance(r, list)]
+        return _interleave_unique(lists, limit)
 
     dy_results, bili_results = await asyncio.gather(
-        douyin_task, bili_task, return_exceptions=True
+        _platform_search(douyin_service, platform_norm in ("all", "douyin")),
+        _platform_search(bilibili_service, platform_norm in ("all", "bilibili")),
+        return_exceptions=True,
     )
 
     if isinstance(dy_results, Exception):
@@ -647,6 +682,7 @@ async def api_studio_generate_all(payload: StudioGenerateRequest):
             spoken_script=spoken_script,
             voice_name=payload.voice_name,
             speed_rate=payload.speed_rate,
+            sales_angle=payload.sales_angle,
             api_key=payload.api_key,
         )
 

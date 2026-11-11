@@ -28,31 +28,31 @@ GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 VOICE_CATALOG = [
     {
         "id": "Puck",
-        "name": "🎙️ Puck (Google AI • ชาย • Podcast Ads จังหวะกระฉับกระเฉง • แนะนำ)",
+        "name": "✨ Puck (Google AI • ชาย • สดใส มีพลัง • แนะนำ)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Aoede",
-        "name": "✨ Aoede (Google AI • หญิง • สดใส มีพลัง เล่าเรื่องป้ายยา)",
+        "name": "✨ Aoede (Google AI • หญิง • สดใส มีเสน่ห์)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Kore",
-        "name": "✨ Kore (Google AI • หญิง • นุ่มนวล ชัดเจน น่าเชื่อถือ)",
+        "name": "✨ Kore (Google AI • หญิง • นุ่มนวล ชัดเจน)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Fenrir",
-        "name": "⚡ Fenrir (Google AI • ชาย • หนักแน่น ทรงพลัง โปรโมชันเดือด)",
+        "name": "⚡ Fenrir (Google AI • ชาย • หนักแน่น ทรงพลัง)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Charon",
-        "name": "☕ Charon (Google AI • ชาย • ทุ้มลึก สุขุม พรีเมียม)",
+        "name": "☕ Charon (Google AI • ชาย • ทุ้มลึก สุขุม)",
         "gender": "Male",
         "engine": "gemini",
     },
@@ -303,6 +303,18 @@ def strip_polite_particles(text: str) -> str:
     return s
 
 
+_GREETING_OPENER_RE = re.compile(
+    r"^\s*(?:(?:สวัสดี|หวัดดี|ฮัลโหล|เฮ้|เฮ้ย|โย่ว?)\s*)?(?:ทุกคน+|ทุกท่าน|เพื่อนๆ|เพื่อน ๆ|แก๊ง)(?:\s*(?:เลย|จ้า+|จ้ะ|ค่ะ|ครับ))?(?=[\s,!.、]|$)[\s,!.、]*"
+)
+
+
+def strip_greeting_opener(text: str) -> str:
+    """Remove a leading greeting like 'ทุกคน', 'สวัสดีทุกคน', 'เพื่อนๆ' from the start of a script."""
+    if not text:
+        return ""
+    return _GREETING_OPENER_RE.sub("", text, count=1).strip()
+
+
 def clean_spoken_text(raw: str) -> str:
     if not raw:
         return ""
@@ -413,19 +425,33 @@ async def generate_product_review_script(
     simple_noun = extract_simple_product_category(product_title, product_description)
     clean_features = filter_real_product_features(product_description)
 
+    # (role, tone) per selected script style — the voice itself is chosen separately
     angle_instructions = {
         "podcast_ad": (
-            "สไตล์รายการ Podcast ชวนคุยอย่างเป็นกันเอง เล่าจุดเด่นแบบน่าสนใจ มีจังหวะทอดเสียงน่าฟัง "
-            "เปิดเรื่องชวนคุยแบบเพื่อนเล่าให้เพื่อนฟัง ไม่แข็งทื่อ ไม่โฆษณาเกินจริง"
+            "นักจัดรายการ Podcast ที่พูดสปอตโฆษณากลางรายการ",
+            "สไตล์ Podcast ผสมอารมณ์โฆษณา ชวนคุยเป็นกันเอง จังหวะเร็ว กระฉับกระเฉง "
+            "เปิดเรื่องชวนคุยแบบเพื่อนเล่าให้เพื่อนฟัง แล้วปิดด้วยการชวนไปลองแบบโฆษณา ไม่แข็งทื่อ",
         ),
-        "hard_sell": "เล่าจุดเด่นและการใช้งานจริงแบบเข้าใจง่าย ชวนให้น่าลองใช้แบบเป็นธรรมชาติ ไม่โฆษณาเกินจริง",
-        "review_real": "เล่าเหมือนเพื่อนมารีวิวของใช้จริงให้ฟัง บอกว่าใช้ทำอะไร สะดวกยังไง พูดธรรมดาเป็นธรรมชาติ",
-        "feature_focus": "อธิบายจุดเด่น การใช้งาน และความคุ้มค่าแบบตรงไปตรงมา สไตล์สาระน่ารู้ผสมความน่าสนใจ",
-        "flash_promo": "แนะนำของน่าใช้ สั้น กระชับ มีพลังสไตล์สปอตโฆษณาด่วน ชวนติดตาม",
+        "hard_sell": (
+            "ครีเอเตอร์สายป้ายยา TikTok / Shopee Video",
+            "ป้ายยาแบบหยุดนิ้ว เปิดด้วย hook แรงๆ ประโยคสั้น กระแทก ชวนให้อยากได้ทันที ปิดด้วยการชวนกดสั่ง",
+        ),
+        "review_real": (
+            "คนธรรมดาที่ใช้ของจริงแล้วมาเล่าให้เพื่อนฟัง",
+            "เล่าเหมือนเพื่อนรีวิวของใช้จริง บอกว่าใช้ทำอะไร สะดวกยังไง พูดธรรมดา เป็นธรรมชาติ ไม่ขายของ",
+        ),
+        "feature_focus": (
+            "ผู้เชี่ยวชาญที่สรุปจุดเด่นสินค้า",
+            "สรุปจุดเด่น การใช้งาน และความคุ้มค่าแบบตรงไปตรงมา เป็นข้อๆ ชัดเจน สไตล์สาระน่ารู้",
+        ),
+        "flash_promo": (
+            "ผู้ประกาศสปอตโฆษณาโปรด่วน",
+            "สั้น กระชับ เร่งเร้า มีพลังแบบสปอตโฆษณาโปรเดือด ชวนรีบไปดูก่อนหมด",
+        ),
     }
-    tone_desc = angle_instructions.get(sales_angle, angle_instructions["podcast_ad"])
+    role_desc, tone_desc = angle_instructions.get(sales_angle, angle_instructions["podcast_ad"])
 
-    prompt_text = f"""คุณคือนักจัดรายการ Podcast ที่กำลังพูดคุยรีวิวของใช้ดีๆ ในชีวิตประจำวันสำหรับคลิปสั้น
+    prompt_text = f"""คุณคือ{role_desc} กำลังรีวิวของใช้ดีๆ ในชีวิตประจำวันสำหรับคลิปสั้น
 หน้าที่ของคุณ: เขียน "บทพากย์ภาษาไทย" และ "พาดหัวด้านบนคลิป (short_headline)" ความยาวประมาณ {target_sec} วินาที
 
 ข้อมูลอ้างอิง:
@@ -435,7 +461,8 @@ async def generate_product_review_script(
 
 กฎเหล็กสำคัญที่สุด (ต้องทำตาม 100%):
 1. **ห้ามมีคำลงท้าย 'ครับ', 'นะครับ', 'ค่ะ', 'นะคะ', 'คะ' ในบทพูดแม้แต่คำเดียว (มีโทษปรับตกทันที)!**
-   - ให้ประโยคจบอย่างกระชับ เล่าแบบสนทนาเปิดใจ เช่น 'ทุกคน วันนี้มีไอเทมเด็ดมาบอกต่อ' 'ตัวนี้ตอบโจทย์มาก' 'ใครชอบความคุ้มค่าลองดูตัวนี้ได้เลย'
+   - ให้ประโยคจบอย่างกระชับ เล่าแบบสนทนาเปิดใจ เช่น 'วันนี้มีไอเทมเด็ดมาบอกต่อ' 'ตัวนี้ตอบโจทย์มาก' 'ใครชอบความคุ้มค่าลองดูตัวนี้ได้เลย'
+   - **ห้ามขึ้นต้นบทด้วยคำทักทาย เช่น 'ทุกคน', 'สวัสดีทุกคน', 'หวัดดีทุกคน', 'เพื่อนๆ' ให้เปิดด้วย hook เข้าเรื่องสินค้าทันที**
 2. **ห้ามพูดชื่อสินค้าเต็มๆ ห้ามพูดชื่อรุ่นยาวๆ และห้ามเอาคำแปลภาษาจีนแปลกๆ ในชื่อสินค้ามาพูดเด็ดขาด!**
    - ให้เรียกสินค้าสั้นๆ แค่ว่าเป็นอะไร เช่น "{simple_noun}ตัวนี้", "{simple_noun}ชิ้นนี้", หรือ "{simple_noun}รุ่นนี้" เท่านั้น!
 3. **ห้ามขายของเกินจริงเด็ดขาด!**
@@ -531,6 +558,18 @@ async def generate_product_review_script(
             )
         if not normalized_scenes and spoken_script:
             normalized_scenes = smart_split_scenes(spoken_script, target_sec=target_sec)
+        # Safety net: drop a greeting opener ("ทุกคน ...") if the model still adds one
+        spoken_script = strip_greeting_opener(spoken_script)
+        while normalized_scenes:
+            first = normalized_scenes[0]
+            narr = strip_greeting_opener(first["full_narration"])
+            if not narr:
+                normalized_scenes.pop(0)
+                continue
+            if narr != first["full_narration"]:
+                top, bot = split_verbatim_two_lines(narr)
+                normalized_scenes[0] = {"line_top": top, "line_bottom": bot, "full_narration": narr}
+            break
     else:
         # Clean, realistic, non-exaggerated fallback using only simple_noun!
         short_headline = (custom_header or f"{simple_noun} ใช้งานง่ายพกพาสะดวก").strip()
@@ -588,7 +627,40 @@ def _pcm16_to_wav_bytes(pcm_bytes: bytes, sample_rate: int = 24000) -> bytes:
     return buf.getvalue()
 
 
-async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tuple[bytes, str, str]:
+VOICE_STYLE_DIRECTIONS: Dict[str, str] = {
+    "podcast_ad": (
+        "Role: Energetic Thai Podcast Host & Commercial Announcer.\n"
+        "Style: Dynamic, conversational, punchy Podcast Ads delivery. Speak with charm and excitement at a fast, upbeat, snappy tempo like a modern podcast commercial. "
+        "Do NOT speak slowly, do NOT pause awkwardly, and do NOT sound sleepy."
+    ),
+    "hard_sell": (
+        "Role: High-Energy Thai TikTok & Shopee Video Creator.\n"
+        "Style: Exciting, scroll-stopping Hard-Sell delivery. Speak with high enthusiasm and persuasive energy at a fast, snappy tempo. "
+        "Do NOT speak slowly."
+    ),
+    "review_real": (
+        "Role: Friendly Thai Product Reviewer.\n"
+        "Style: Natural, authentic friend-to-friend recommendation. Speak warmly, clearly, and briskly at a natural upbeat conversational tempo. "
+        "Do NOT speak slowly."
+    ),
+    "feature_focus": (
+        "Role: Confident Thai Product Specialist.\n"
+        "Style: Clear, articulate, professional feature breakdown. Speak with confidence and a brisk, engaging tempo. "
+        "Do NOT speak slowly."
+    ),
+    "flash_promo": (
+        "Role: Urgent Thai Flash-Sale Commercial Announcer.\n"
+        "Style: Fast-paced, high-impact promotional delivery with excitement, energy, and urgency."
+    ),
+}
+
+
+async def _synthesize_gemini_tts(
+    text: str,
+    voice_name: str,
+    api_key: str,
+    sales_angle: str = "podcast_ad",
+) -> Tuple[bytes, str, str]:
     keys = pick_rotated_keys(api_key)
     if not keys:
         raise RuntimeError("No Gemini API key configured")
@@ -601,10 +673,9 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
         "gemini-2.5-flash-preview-tts",
     ]
 
+    style_dir = VOICE_STYLE_DIRECTIONS.get(sales_angle, VOICE_STYLE_DIRECTIONS["podcast_ad"])
     speaking_prompt = (
-        "Role: Energetic Thai Podcast & Commercial Announcer.\n"
-        "Style: Dynamic, punchy, persuasive Podcast Ads style. Speak with confidence and excitement at an upbeat, snappy tempo like a top TikTok/Shopee creator. "
-        "Do NOT speak slowly, do NOT pause awkwardly, and do NOT sound sleepy.\n"
+        f"{style_dir}\n"
         "Text to read in Thai:\n"
         f"{strip_polite_particles(text)}"
     )
@@ -770,8 +841,9 @@ def get_audio_duration_seconds(audio_bytes: bytes, mime_type: str = "audio/mpeg"
 async def synthesize_voiceover_and_timings(
     scenes: List[Dict[str, Any]],
     spoken_script: str,
-    voice_name: str = "th-TH-NiwatNeural",
+    voice_name: str = "Puck",
     speed_rate: str = "+15%",
+    sales_angle: str = "podcast_ad",
     api_key: str = "",
 ) -> Dict[str, Any]:
     clean_scenes = [s for s in scenes if (s.get("full_narration") or "").strip()]
@@ -787,31 +859,15 @@ async def synthesize_voiceover_and_timings(
     engine_label = ""
     fallback_notice = ""
 
-    # 1. Google Thai TTS if explicitly chosen
-    if voice_name == "Google-Thai":
-        try:
-            audio_bytes, mime_type, engine_label = await _synthesize_google_gtts(combined_text)
-        except Exception as e:
-            print("[Studio] gTTS error:", e)
-
-    # 2. Gemini Live / REST TTS if Gemini voice selected
-    if not audio_bytes and voice_name in GEMINI_VOICES:
-        try:
-            audio_bytes, mime_type, engine_label = await _synthesize_gemini_tts(
-                combined_text, voice_name=voice_name, api_key=api_key
-            )
-        except Exception as ge:
-            fallback_notice = f"สลับใช้เสียงพากย์ Thai Neural อัตโนมัติ ({str(ge)[:45]})"
-
-    # 3. Microsoft Edge Neural TTS (Primary for Niwat/Premwadee or Fallback)
-    if not audio_bytes:
-        try:
-            audio_bytes, mime_type, engine_label = await _synthesize_edge_tts(
-                combined_text, voice_name=voice_name, speed_rate=speed_rate
-            )
-        except Exception as ee:
-            print("[Studio] Edge TTS warning, falling back to gTTS:", ee)
-            audio_bytes, mime_type, engine_label = await _synthesize_google_gtts(combined_text)
+    # Only Google AI (Gemini) voices are enabled. Edge TTS (Niwat / Premwadee) and
+    # Google Thai (gTTS) are disabled — no explicit selection and no silent fallback.
+    gemini_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
+    try:
+        audio_bytes, mime_type, engine_label = await _synthesize_gemini_tts(
+            combined_text, voice_name=gemini_voice, api_key=api_key, sales_angle=sales_angle
+        )
+    except Exception as ge:
+        raise RuntimeError(f"เสียงพากย์ Google AI ล้มเหลว: {str(ge)[:120]}") from ge
 
     duration_sec = get_audio_duration_seconds(audio_bytes, mime_type)
 
@@ -871,7 +927,7 @@ def convert_video_file_to_mp4(in_file: str, out_file: str, fps: int = 30) -> Non
         "-i", in_file,
         "-c:v", "libx264",
         "-crf", "20",
-        "-preset", "fast",
+        "-preset", "veryfast",
         "-r", str(safe_fps),
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
@@ -893,7 +949,7 @@ def convert_video_file_to_mp4(in_file: str, out_file: str, fps: int = 30) -> Non
         "-i", in_file,
         "-c:v", "libx264",
         "-crf", "20",
-        "-preset", "fast",
+        "-preset", "veryfast",
         "-r", str(safe_fps),
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
