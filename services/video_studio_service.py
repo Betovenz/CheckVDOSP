@@ -27,52 +27,34 @@ GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 
 VOICE_CATALOG = [
     {
-        "id": "th-TH-NiwatNeural",
-        "name": "🎙️ คุณนิวัฒน์ (Podcast Host ชาย • สุขุม น่าฟัง มืออาชีพ • แนะนำ)",
-        "gender": "Male",
-        "engine": "edge",
-    },
-    {
-        "id": "th-TH-PremwadeeNeural",
-        "name": "🎙️ คุณเปรมวดี (Podcast Host หญิง • สดใส มีเสน่ห์ ป้ายยาเป็นธรรมชาติ)",
-        "gender": "Female",
-        "engine": "edge",
-    },
-    {
         "id": "Puck",
-        "name": "✨ Puck (Google AI ชาย • สดใส มีพลัง)",
+        "name": "🎙️ Puck (Google AI • ชาย • Podcast Ads จังหวะกระฉับกระเฉง • แนะนำ)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Aoede",
-        "name": "✨ Aoede (Google AI หญิง • สดใส มีพลัง เล่าเรื่อง Reels / TikTok)",
+        "name": "✨ Aoede (Google AI • หญิง • สดใส มีพลัง เล่าเรื่องป้ายยา)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Kore",
-        "name": "✨ Kore (Google AI หญิง • นุ่มนวล สุภาพ น่าเชื่อถือ)",
+        "name": "✨ Kore (Google AI • หญิง • นุ่มนวล ชัดเจน น่าเชื่อถือ)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Fenrir",
-        "name": "⚡ Fenrir (Google AI ชาย • หนักแน่น ทรงพลัง โปรโมชันเดือด)",
+        "name": "⚡ Fenrir (Google AI • ชาย • หนักแน่น ทรงพลัง โปรโมชันเดือด)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Charon",
-        "name": "☕ Charon (Google AI ชาย • ทุ้มลึก สุขุม พรีเมียม)",
+        "name": "☕ Charon (Google AI • ชาย • ทุ้มลึก สุขุม พรีเมียม)",
         "gender": "Male",
         "engine": "gemini",
-    },
-    {
-        "id": "Google-Thai",
-        "name": "🔊 Google Thai Voice (มาตรฐาน • ฟรีไร้โควตา 100%)",
-        "gender": "Female",
-        "engine": "gtts",
     },
 ]
 
@@ -144,10 +126,10 @@ def load_studio_config() -> Dict[str, Any]:
                 return data
         except Exception:
             pass
-    return {"gemini_api_keys": [], "default_voice": "th-TH-NiwatNeural"}
+    return {"gemini_api_keys": [], "default_voice": "Puck"}
 
 
-def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "th-TH-NiwatNeural") -> Dict[str, Any]:
+def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "Puck") -> Dict[str, Any]:
     if isinstance(gemini_keys_raw, str):
         raw_list = re.split(r"[\r\n,;]+", gemini_keys_raw)
     else:
@@ -612,9 +594,20 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
         raise RuntimeError("No Gemini API key configured")
 
     actual_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
-    tts_models = ["gemini-2.5-flash-preview-tts"]
+    tts_models = [
+        "gemini-3.8-flash-tts",
+        "gemini-3.8-flash-lite-tts",
+        "gemini-3.1-flash-tts-preview",
+        "gemini-2.5-flash-preview-tts",
+    ]
 
-    speaking_prompt = f"อ่านออกเสียงภาษาไทยด้วยน้ำเสียงเป็นธรรมชาติ ชัดเจน ไม่เร่งรีบจนเกินไป:\n{text}"
+    speaking_prompt = (
+        "Role: Energetic Thai Podcast & Commercial Announcer.\n"
+        "Style: Dynamic, punchy, persuasive Podcast Ads style. Speak with confidence and excitement at an upbeat, snappy tempo like a top TikTok/Shopee creator. "
+        "Do NOT speak slowly, do NOT pause awkwardly, and do NOT sound sleepy.\n"
+        "Text to read in Thai:\n"
+        f"{strip_polite_particles(text)}"
+    )
 
     last_err = ""
     for key in keys:
