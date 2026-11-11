@@ -28,43 +28,43 @@ GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 VOICE_CATALOG = [
     {
         "id": "Puck",
-        "name": "✨ Puck (Google AI ชาย • มีพลัง เสียงเริ่มต้น แนะนำ)",
+        "name": "🎙️ Puck (Google AI • สไตล์ Podcast มีเสน่ห์ ผสมอารมณ์โฆษณา • แนะนำ)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Aoede",
-        "name": "✨ Aoede (Google AI หญิง • สดใส เล่าเรื่อง Reels / TikTok)",
+        "name": "✨ Aoede (Google AI หญิง • สดใส มีพลัง เล่าเรื่องสไตล์ Reels / TikTok)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Kore",
-        "name": "✨ Kore (Google AI หญิง • สุภาพ ชัดเจน น่าเชื่อถือ)",
+        "name": "✨ Kore (Google AI หญิง • นุ่มนวล สุภาพ น่าเชื่อถือ)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Fenrir",
-        "name": "✨ Fenrir (Google AI ชาย • หนักแน่น ทรงพลัง โปรโมชันเดือด)",
+        "name": "⚡ Fenrir (Google AI ชาย • หนักแน่น ทรงพลัง เร้าใจโฆษณาเดือด)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Charon",
-        "name": "✨ Charon (Google AI ชาย • ทุ้มลึก สุขุม พรีเมียม)",
+        "name": "☕ Charon (Google AI ชาย • ทุ้มลึก สุขุม พอดแคสต์พรีเมียม)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "th-TH-NiwatNeural",
-        "name": "🎙️ คุณนิวัฒน์ (ชาย • เสียงฉะฉาน คมชัด สไตล์ครีเอเตอร์รีวิว)",
+        "name": "🎙️ คุณนิวัฒน์ (ชาย • คมชัด ฉะฉาน สไตล์ครีเอเตอร์รีวิว)",
         "gender": "Male",
         "engine": "edge",
     },
     {
         "id": "th-TH-PremwadeeNeural",
-        "name": "🎙️ คุณเปรมวดี (หญิง • เสียงนุ่มนวล สดใส ป้ายยาสินค้า)",
+        "name": "🎙️ คุณเปรมวดี (หญิง • สดใส นุ่มนวล สไตล์ป้ายยาสินค้า)",
         "gender": "Female",
         "engine": "edge",
     },
@@ -418,10 +418,10 @@ async def generate_product_review_script(
     clean_features = filter_real_product_features(product_description)
 
     angle_instructions = {
-        "hard_sell": "เล่าจุดเด่นและการใช้งานจริงแบบเข้าใจง่าย ชวนให้น่าลองใช้แบบเป็นธรรมชาติ ไม่โฆษณาเกินจริง",
-        "review_real": "เล่าเหมือนเพื่อนมารีวิวของใช้จริงให้ฟัง บอกว่าใช้ทำอะไร สะดวกยังไง พูดธรรมดาเป็นธรรมชาติ",
-        "feature_focus": "อธิบายลักษณะการใช้งาน วัสดุ และความสะดวกในการใช้ในชีวิตประจำวันแบบตรงไปตรงมา",
-        "flash_promo": "แนะนำของใช้ที่น่าสนใจ บอกจุดเด่นสั้นๆ กระชับ เข้าใจง่าย ไม่พูดเว่อร์",
+        "hard_sell": "เล่าจุดเด่นและป้ายยาในสไตล์โฆษณา Podcast ชวนคุยอย่างเป็นกันเอง มีจังหวะเน้นน่าฟัง ชวนให้สนใจ ไม่พูดเว่อร์เกินจริง",
+        "review_real": "เล่าแบบโฮสต์ Podcast เล่าของใช้จริงให้ผู้ฟังฟังอย่างเป็นกันเอง ผสมน้ำเสียงชวนซื้ออย่างมีเสน่ห์",
+        "feature_focus": "อธิบายจุดเด่น การใช้งาน และความคุ้มค่าแบบตรงไปตรงมา สไตล์ Podcast สาระน่ารู้ผสมความน่าสนใจ",
+        "flash_promo": "แนะนำของน่าใช้ สั้น กระชับ มีพลังสไตล์สปอตโฆษณา Podcast ชวนติดตาม",
     }
     tone_desc = angle_instructions.get(sales_angle, angle_instructions["review_real"])
 
@@ -592,6 +592,13 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
     actual_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
     tts_models = ["gemini-2.5-flash-preview-tts"]
 
+    # Podcast + Commercial Advertising delivery direction
+    speaking_prompt = (
+        "พูดออกเสียงภาษาไทยในสไตล์รายการ Podcast ชวนคุยอย่างเป็นกันเอง "
+        "ผสมน้ำเสียงและอารมณ์โฆษณาที่น่าฟัง มีจังหวะเน้นคำสำคัญ มีเสน่ห์ น่าติดตาม ชัดเจน ไม่พูดเร็วจนเกินไป:\n"
+        f"{text}"
+    )
+
     last_err = ""
     for key in keys:
         for model in tts_models:
@@ -601,7 +608,7 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
                     {
                         "parts": [
                             {
-                                "text": f"อ่านออกเสียงภาษาไทยด้วยน้ำเสียงเป็นธรรมชาติ ชัดเจน ไม่เร่งรีบจนเกินไป:\n{text}"
+                                "text": speaking_prompt
                             }
                         ]
                     }
