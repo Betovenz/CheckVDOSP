@@ -129,17 +129,30 @@ def load_studio_config() -> Dict[str, Any]:
     return {"gemini_api_keys": [], "default_voice": "Puck"}
 
 
-def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "Puck") -> Dict[str, Any]:
-    if isinstance(gemini_keys_raw, str):
-        raw_list = re.split(r"[\r\n,;]+", gemini_keys_raw)
-    else:
-        raw_list = [str(x) for x in gemini_keys_raw]
+_KEY_JUNK_RE = re.compile(r"[\s ​-‍⁠﻿]+")
 
-    cleaned: List[str] = []
-    for k in raw_list:
-        s = k.strip()
-        if s and not s.startswith("http") and s not in cleaned:
-            cleaned.append(s)
+
+def parse_gemini_keys(raw: str | List[str]) -> List[str]:
+    """
+    Parse pasted API keys: one per line (or , ;). Removes ALL whitespace / invisible chars
+    inside each key (accidental spaces when copying), and splits keys glued together on one
+    line at each 'AIza' prefix.
+    """
+    parts = re.split(r"[\r\n,;]+", raw) if isinstance(raw, str) else [str(x) for x in raw]
+    keys: List[str] = []
+    for part in parts:
+        compact = _KEY_JUNK_RE.sub("", part or "")
+        if not compact or compact.lower().startswith("http"):
+            continue
+        pieces = [p for p in re.split(r"(?=AIza)", compact) if p] if compact.count("AIza") > 1 else [compact]
+        for k in pieces:
+            if k not in keys:
+                keys.append(k)
+    return keys
+
+
+def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "Puck") -> Dict[str, Any]:
+    cleaned = parse_gemini_keys(gemini_keys_raw)
 
     cfg = load_studio_config()
     cfg["gemini_api_keys"] = cleaned
@@ -150,22 +163,17 @@ def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "P
 
 
 def get_all_gemini_keys(extra_key: str = "") -> List[str]:
-    keys: List[str] = []
-    if extra_key:
-        for k in re.split(r"[\r\n,;]+", extra_key):
-            ks = k.strip()
-            if ks and not ks.startswith("http") and ks not in keys:
-                keys.append(ks)
+    keys: List[str] = parse_gemini_keys(extra_key) if extra_key else []
 
+    # Also cleans keys saved earlier that may still contain spaces
     cfg = load_studio_config()
-    for k in cfg.get("gemini_api_keys") or []:
-        ks = str(k).strip()
-        if ks and ks not in keys:
-            keys.append(ks)
+    for k in parse_gemini_keys(cfg.get("gemini_api_keys") or []):
+        if k not in keys:
+            keys.append(k)
 
-    env_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if env_key and env_key not in keys:
-        keys.append(env_key)
+    for k in parse_gemini_keys(os.environ.get("GEMINI_API_KEY", "")):
+        if k not in keys:
+            keys.append(k)
 
     return keys
 
@@ -180,27 +188,63 @@ def pick_rotated_keys(extra_key: str = "") -> List[str]:
     return keys[start:] + keys[:start]
 
 
+# Text models for script writing, newest first. gemini-2.5-flash is closed to new users,
+# so it is only a last-resort fallback for older keys.
+GEMINI_TEXT_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
+    "gemini-3.5-flash",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+]
+
+
+def _gemini_error_message(resp: httpx.Response) -> str:
+    try:
+        return (resp.json().get("error") or {}).get("message") or f"HTTP {resp.status_code}"
+    except Exception:
+        return f"HTTP {resp.status_code}"
+
+
+async def _probe_key(client: httpx.AsyncClient, key: str) -> Tuple[Optional[str], str]:
+    """Return (working_model, last_error) using the same models the app uses for scripts."""
+    payload = {
+        "contents": [{"parts": [{"text": "ตอบคำว่า OK สั้นๆ"}]}],
+        "generationConfig": {"maxOutputTokens": 10, "thinkingConfig": {"thinkingBudget": 0}},
+    }
+    last_err = ""
+    for model in GEMINI_TEXT_MODELS:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+        try:
+            resp = await client.post(url, json=payload)
+        except Exception as exc:
+            last_err = str(exc)
+            continue
+        if resp.status_code == 200:
+            return model, ""
+        last_err = _gemini_error_message(resp)
+        # Bad key / no permission: other models won't help
+        if resp.status_code in (400, 401, 403) and "model" not in last_err.lower():
+            break
+    return None, last_err
+
+
 async def test_gemini_api_key(api_key: str) -> Tuple[bool, str]:
     keys = get_all_gemini_keys(api_key)
     if not keys:
         return False, "กรุณากรอก Google AI (Gemini) API Key ก่อนทดสอบ"
 
-    test_key = keys[0]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={test_key}"
-    payload = {
-        "contents": [{"parts": [{"text": "ตอบคำว่า OK สั้นๆ"}]}],
-        "generationConfig": {"maxOutputTokens": 10, "thinkingConfig": {"thinkingBudget": 0}},
-    }
-    try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 200:
-                return True, f"เชื่อมต่อ Google AI สำเร็จ! (พร้อมใช้งาน {len(keys)} คีย์)"
-            err_data = resp.json() if resp.content else {}
-            msg = (err_data.get("error") or {}).get("message") or f"HTTP {resp.status_code}"
-            return False, f"API Key ไม่ถูกต้องหรือติดจำกัดโควตา: {msg}"
-    except Exception as exc:
-        return False, f"เชื่อมต่อไม่สำเร็จ: {exc}"
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        results = await asyncio.gather(*[_probe_key(client, k) for k in keys])
+
+    ok_models = [m for m, _ in results if m]
+    if ok_models:
+        bad = len(keys) - len(ok_models)
+        extra = f" • ใช้ไม่ได้ {bad} คีย์" if bad else ""
+        return True, f"เชื่อมต่อ Google AI สำเร็จ! ใช้งานได้ {len(ok_models)}/{len(keys)} คีย์ (โมเดล {ok_models[0]}){extra}"
+    last_err = next((e for _, e in results if e), "ไม่ทราบสาเหตุ")
+    return False, f"API Key ไม่ถูกต้องหรือติดจำกัดโควตา: {last_err[:200]}"
 
 
 # ---------------------------------------------------------------------------
@@ -494,7 +538,7 @@ async def generate_product_review_script(
 }}"""
 
     keys = pick_rotated_keys(api_key)
-    models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    models = GEMINI_TEXT_MODELS
     parsed_result: Optional[Dict[str, Any]] = None
     model_used: Optional[str] = None
 
@@ -505,8 +549,8 @@ async def generate_product_review_script(
                 "responseMimeType": "application/json",
                 "temperature": 0.65,
             }
-            if "2.5" in m:
-                gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
+            # Thinking off: faster, and the whole output budget goes to the JSON script
+            gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
 
             payload = {
                 "contents": [{"parts": [{"text": prompt_text}]}],

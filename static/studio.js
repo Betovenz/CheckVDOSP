@@ -391,7 +391,7 @@
   // 2. GOOGLE AI API KEY MANAGER
   // ---------------------------------------------------------------------------
   async function loadStudioConfigFromServer() {
-    const localKeys = localStorage.getItem("studio_gemini_api_keys") || "";
+    const localKeys = normalizeApiKeysText(localStorage.getItem("studio_gemini_api_keys") || "");
     if (localKeys) {
       studioState.geminiKeysText = localKeys;
       if (geminiApiKeysInput) geminiApiKeysInput.value = localKeys;
@@ -401,7 +401,7 @@
       const resp = await fetch("/api/studio/config");
       if (!resp.ok) return;
       const data = await resp.json();
-      const serverKeys = (data.gemini_api_keys_text || "").trim();
+      const serverKeys = normalizeApiKeysText(data.gemini_api_keys_text || "");
       if (serverKeys) {
         studioState.geminiKeysText = serverKeys;
         if (geminiApiKeysInput) geminiApiKeysInput.value = serverKeys;
@@ -432,8 +432,35 @@
     if (apiKeyModal) apiKeyModal.classList.add("hidden");
   }
 
+  // One key per line; strip every space / invisible char inside a key (accidental spaces when
+  // copying), and split keys glued on one line at each "AIza" prefix.
+  function normalizeApiKeysText(text) {
+    const keys = [];
+    String(text || "")
+      .split(/[\r\n,;]+/)
+      .forEach((part) => {
+        const compact = part.replace(/[\s ​-‍⁠﻿]+/g, "");
+        if (!compact || /^http/i.test(compact)) return;
+        const pieces = (compact.match(/AIza/g) || []).length > 1 ? compact.split(/(?=AIza)/) : [compact];
+        pieces.forEach((k) => {
+          if (k && !keys.includes(k)) keys.push(k);
+        });
+      });
+    return keys.join("\n");
+  }
+
+  function cleanApiKeysInput() {
+    if (!geminiApiKeysInput) return "";
+    const cleaned = normalizeApiKeysText(geminiApiKeysInput.value);
+    if (geminiApiKeysInput.value !== cleaned) geminiApiKeysInput.value = cleaned;
+    return cleaned;
+  }
+
+  geminiApiKeysInput?.addEventListener("paste", () => setTimeout(cleanApiKeysInput, 0));
+  geminiApiKeysInput?.addEventListener("blur", cleanApiKeysInput);
+
   async function saveApiKeys() {
-    const raw = (geminiApiKeysInput?.value || "").trim();
+    const raw = cleanApiKeysInput();
     studioState.geminiKeysText = raw;
     localStorage.setItem("studio_gemini_api_keys", raw);
     updateApiKeyDot(raw);
@@ -459,7 +486,7 @@
   }
 
   async function testApiKeys() {
-    const raw = (geminiApiKeysInput?.value || "").trim();
+    const raw = cleanApiKeysInput();
     showApiKeyNotice("กำลังทดสอบการเชื่อมต่อกับ Google Gemini AI...", true);
     try {
       const resp = await fetch("/api/studio/test-key", {
@@ -526,13 +553,16 @@
     clip.videoEl = vid;
 
     const captureFirstFrame = () => {
+      if (studioState.isExporting) return; // export loop keeps the cache itself
       if (vid.readyState >= 2 && vid.videoWidth > 0) {
-        clip.lastFrameCanvas.width = vid.videoWidth;
-        clip.lastFrameCanvas.height = vid.videoHeight;
+        const cacheW = Math.min(vid.videoWidth, 480);
+        const cacheH = Math.round((vid.videoHeight / vid.videoWidth) * cacheW);
+        clip.lastFrameCanvas.width = cacheW;
+        clip.lastFrameCanvas.height = cacheH;
         const fctx = clip.lastFrameCanvas.getContext("2d");
         if (fctx) {
           try {
-            fctx.drawImage(vid, 0, 0, vid.videoWidth, vid.videoHeight);
+            fctx.drawImage(vid, 0, 0, cacheW, cacheH);
             clip.hasDecodedFrame = true;
           } catch (_) {}
         }
@@ -1251,23 +1281,23 @@
 
     if (clipObj) {
       const vid = clipObj.videoEl;
-      if (vid && vid.readyState >= 2 && vid.videoWidth > 0) {
+      if (vid && vid.readyState >= 2 && !vid.seeking && vid.videoWidth > 0) {
         drawableSource = vid;
         srcW = vid.videoWidth;
         srcH = vid.videoHeight;
-        // Update frame cache so if next frame seeks, we still have a crisp frame!
-        // Throttled: copying a full-res frame every tick is expensive and causes dropped frames.
-        const nowMs = performance.now();
-        if (clipObj.lastFrameCanvas && (!clipObj.hasDecodedFrame || nowMs - (clipObj.lastCacheTs || 0) > 250)) {
-          clipObj.lastCacheTs = nowMs;
-          if (clipObj.lastFrameCanvas.width !== srcW || clipObj.lastFrameCanvas.height !== srcH) {
-            clipObj.lastFrameCanvas.width = srcW;
-            clipObj.lastFrameCanvas.height = srcH;
+        // Keep the fallback frame always current (so a seek shows the last frame, never an old one),
+        // but at reduced size so the copy stays cheap.
+        if (clipObj.lastFrameCanvas) {
+          const cacheW = Math.min(srcW, 480);
+          const cacheH = Math.round((srcH / srcW) * cacheW);
+          if (clipObj.lastFrameCanvas.width !== cacheW || clipObj.lastFrameCanvas.height !== cacheH) {
+            clipObj.lastFrameCanvas.width = cacheW;
+            clipObj.lastFrameCanvas.height = cacheH;
           }
           const fctx = clipObj.lastFrameCanvas.getContext("2d");
           if (fctx) {
             try {
-              fctx.drawImage(vid, 0, 0, srcW, srcH);
+              fctx.drawImage(vid, 0, 0, cacheW, cacheH);
               clipObj.hasDecodedFrame = true;
             } catch (_) {}
           }
@@ -1476,64 +1506,112 @@
    * - STRICTLY NO rectangular background box behind the Header
    * - Word-safe wrapping via Intl.Segmenter('th') + auto font-scaling so words NEVER break in half!
    */
+  // Text sprites: wrapping, font-fitting, stroke + shadowBlur are expensive. They only change
+  // when the text/style changes, so render each once to an offscreen canvas and reuse it.
+  const textSpriteCache = new Map();
+  function getTextSprite(key, build) {
+    const fullKey = `${key}|fonts:${document.fonts ? document.fonts.status : "x"}`;
+    let sprite = textSpriteCache.get(fullKey);
+    if (!sprite) {
+      sprite = build();
+      if (textSpriteCache.size > 60) textSpriteCache.clear();
+      textSpriteCache.set(fullKey, sprite);
+    }
+    return sprite;
+  }
+
+  function buildStrokedTextSprite(lines, font, lineHeight, strokeWidth, strokeColor, shadow, fillFor, box) {
+    const measureCtx = document.createElement("canvas").getContext("2d");
+    measureCtx.font = font;
+    const maxLineW = Math.max(1, ...lines.map((l) => measureCtx.measureText(l).width));
+    const pad = Math.ceil(strokeWidth + shadow.blur * 2 + Math.abs(shadow.offsetY) + 40);
+    const boxW = box ? maxLineW + 64 : 0;
+    const boxH = box ? lines.length * lineHeight + 36 : 0;
+    const cw = Math.ceil(Math.max(maxLineW, boxW) + pad * 2);
+    const ch = Math.ceil(Math.max(lines.length * lineHeight, boxH) + pad * 2);
+    const canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    const c = canvas.getContext("2d");
+    c.translate(cw / 2, ch / 2);
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = font;
+    if (box) {
+      c.fillStyle = box.fill;
+      c.strokeStyle = box.stroke;
+      c.lineWidth = 3;
+      c.beginPath();
+      c.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, 24);
+      c.fill();
+      c.stroke();
+    }
+    lines.forEach((line, idx) => {
+      const ly = (idx - (lines.length - 1) / 2) * lineHeight;
+      if (strokeWidth > 0) {
+        c.save();
+        c.strokeStyle = strokeColor;
+        c.lineWidth = strokeWidth;
+        c.lineJoin = "round";
+        c.lineCap = "round";
+        c.miterLimit = 2;
+        c.shadowColor = shadow.color;
+        c.shadowBlur = shadow.blur;
+        c.shadowOffsetY = shadow.offsetY;
+        c.strokeText(line, 0, ly);
+        c.restore();
+      }
+      c.fillStyle = fillFor(idx);
+      c.fillText(line, 0, ly);
+    });
+    return canvas;
+  }
+
+  function fitWrappedLines(text, weight, startSize, minSize, maxW) {
+    const c = document.createElement("canvas").getContext("2d");
+    let fontSize = startSize;
+    const fontOf = (sz) => `${weight} ${sz}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
+    c.font = fontOf(fontSize);
+    let lines = wrapThaiTextByWords(c, text, maxW, 2);
+    while (fontSize > minSize && lines.some((line) => c.measureText(line).width > maxW)) {
+      fontSize -= 2;
+      c.font = fontOf(fontSize);
+      lines = wrapThaiTextByWords(c, text, maxW, 2);
+    }
+    return { lines, fontSize, font: fontOf(fontSize) };
+  }
+
   function drawProminentStrokedHeader(ctx, w, h, timeSec) {
     const rawHeader = (studioState.headerText || "").trim();
     if (!rawHeader) return;
 
-    let fontSize = Number(studioState.headerFontSize) || 80;
+    const baseFont = Number(studioState.headerFontSize) || 80;
     const strokeWidth = Number(studioState.headerStrokeWidth) || 20;
     const fillColor = studioState.headerColor || "#fde047";
     const strokeColor = studioState.headerStrokeColor || "#000000";
 
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    const maxW = w * 0.88;
-    ctx.font = `900 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
-
-    // Wrap ONLY on complete Thai word boundaries
-    let lines = wrapThaiTextByWords(ctx, rawHeader, maxW, 2);
-
-    // Auto-scale font size down slightly if any line still exceeds maxW
-    while (
-      fontSize > 42 &&
-      lines.some((line) => ctx.measureText(line).width > maxW)
-    ) {
-      fontSize -= 2;
-      ctx.font = `900 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
-      lines = wrapThaiTextByWords(ctx, rawHeader, maxW, 2);
-    }
+    const sprite = getTextSprite(
+      `hdr|${rawHeader}|${baseFont}|${strokeWidth}|${fillColor}|${strokeColor}|${w}`,
+      () => {
+        const fit = fitWrappedLines(rawHeader, 900, baseFont, 42, w * 0.88);
+        return buildStrokedTextSprite(
+          fit.lines,
+          fit.font,
+          fit.fontSize * 1.22,
+          strokeWidth,
+          strokeColor,
+          { color: "rgba(0, 0, 0, 0.85)", blur: 18, offsetY: 6 },
+          () => fillColor,
+          null
+        );
+      }
+    );
 
     const popScale = 1 + Math.sin(timeSec * 3.5) * 0.015;
-    const centerX = w / 2;
-    const centerY = h * 0.135;
-    const lineHeight = fontSize * 1.22;
-
-    ctx.translate(centerX, centerY);
+    ctx.save();
+    ctx.translate(w / 2, h * 0.135);
     ctx.scale(popScale, popScale);
-
-    lines.forEach((line, idx) => {
-      const ly = (idx - (lines.length - 1) / 2) * lineHeight;
-
-      if (strokeWidth > 0) {
-        ctx.save();
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = strokeWidth;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        ctx.miterLimit = 2;
-        ctx.shadowColor = "rgba(0, 0, 0, 0.85)";
-        ctx.shadowBlur = 18;
-        ctx.shadowOffsetY = 6;
-        ctx.strokeText(line, 0, ly);
-        ctx.restore();
-      }
-
-      ctx.fillStyle = fillColor;
-      ctx.fillText(line, 0, ly);
-    });
-
+    ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
     ctx.restore();
   }
 
@@ -1544,82 +1622,42 @@
     const activeScene = getActiveSubtitleScene(timeSec);
     if (!activeScene) return;
 
-    let fontSize = Number(studioState.subFontSize) || 54;
-    const strokeWidth = Number(studioState.subStrokeWidth) || 14;
-    const showBg = Boolean(studioState.subShowBg);
-    const maxW = w * 0.88;
-
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = `800 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
-
-    // Prefer full_narration wrapped cleanly by whole Thai words so words never break across lines
     const fullText = (
       activeScene.full_narration ||
       `${activeScene.line_top || ""} ${activeScene.line_bottom || ""}`
     ).trim();
-    if (!fullText) {
-      ctx.restore();
-      return;
-    }
+    if (!fullText) return;
 
-    let lines = wrapThaiTextByWords(ctx, fullText, maxW, 2);
+    const baseFont = Number(studioState.subFontSize) || 54;
+    const strokeWidth = Number(studioState.subStrokeWidth) || 14;
+    const showBg = Boolean(studioState.subShowBg);
+    const accent = tpl.accentColor || "#fde047";
 
-    while (
-      fontSize > 34 &&
-      lines.some((line) => ctx.measureText(line).width > maxW)
-    ) {
-      fontSize -= 2;
-      ctx.font = `800 ${fontSize}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
-      lines = wrapThaiTextByWords(ctx, fullText, maxW, 2);
-    }
+    const sprite = getTextSprite(
+      `sub|${fullText}|${baseFont}|${strokeWidth}|${showBg}|${accent}|${w}`,
+      () => {
+        const fit = fitWrappedLines(fullText, 800, baseFont, 34, w * 0.88);
+        return buildStrokedTextSprite(
+          fit.lines,
+          fit.font,
+          fit.fontSize * 1.28,
+          strokeWidth,
+          "#000000",
+          { color: "rgba(0,0,0,0.75)", blur: 12, offsetY: 4 },
+          (idx) => (idx === 0 ? "#ffffff" : accent),
+          showBg ? { fill: "rgba(9, 13, 22, 0.82)", stroke: accent } : null
+        );
+      }
+    );
 
     const localT = Math.max(0, timeSec - (activeScene.start || 0));
     const entryP = Math.min(1, localT / 0.14);
     const scale = 0.9 + 0.1 * entryP;
 
-    const centerX = w / 2;
-    const centerY = h * 0.77;
-    const lineHeight = fontSize * 1.28;
-
-    ctx.translate(centerX, centerY);
+    ctx.save();
+    ctx.translate(w / 2, h * 0.77);
     ctx.scale(scale, scale);
-
-    if (showBg) {
-      const maxLineW = Math.max(...lines.map((l) => ctx.measureText(l).width));
-      const boxW = maxLineW + 64;
-      const boxH = lines.length * lineHeight + 36;
-      ctx.fillStyle = "rgba(9, 13, 22, 0.82)";
-      ctx.strokeStyle = tpl.accentColor || "#fde047";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, 24);
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    lines.forEach((line, idx) => {
-      const ly = (idx - (lines.length - 1) / 2) * lineHeight;
-
-      if (strokeWidth > 0) {
-        ctx.save();
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = strokeWidth;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        ctx.miterLimit = 2;
-        ctx.shadowColor = "rgba(0,0,0,0.75)";
-        ctx.shadowBlur = 12;
-        ctx.shadowOffsetY = 4;
-        ctx.strokeText(line, 0, ly);
-        ctx.restore();
-      }
-
-      ctx.fillStyle = idx === 0 ? "#ffffff" : tpl.accentColor || "#fde047";
-      ctx.fillText(line, 0, ly);
-    });
-
+    ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
     ctx.restore();
   }
 
@@ -1649,10 +1687,19 @@
         const targetTime = ((activeSeg.trimStart || 0) + Math.max(0, timeSec - activeSeg.start)) % dur;
 
         if (shouldPlay) {
-          if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.7) {
-            try {
-              vid.currentTime = targetTime;
-            } catch (_) {}
+          const drift = targetTime - vid.currentTime;
+          if (!vid.seeking) {
+            if (Math.abs(drift) > 1.0) {
+              // Real jump (new cut / clip loop): hard seek
+              try {
+                vid.currentTime = targetTime;
+              } catch (_) {}
+              vid.playbackRate = 1;
+            } else {
+              // Small drift: nudge speed instead of seeking (seeks = frozen/flickering frames)
+              const rate = Math.abs(drift) > 0.06 ? Math.max(0.85, Math.min(1.15, 1 + drift * 0.8)) : 1;
+              if (Math.abs(vid.playbackRate - rate) > 0.01) vid.playbackRate = rate;
+            }
           }
           if (vid.paused && vid.readyState >= 2) {
             vid.play().catch(() => {});
@@ -1683,6 +1730,10 @@
 
   function renderCurrentStudioFrame() {
     if (!studioPreviewCanvas) return;
+    // While exporting, the export loop owns the clip <video> elements. Preview redraws
+    // (fired by video timeupdate/seeked events) would pause & seek them back to the
+    // preview time -> frozen video that flickers between two positions in the export.
+    if (studioState.isExporting) return;
     const ctx = studioPreviewCanvas.getContext("2d");
     if (!ctx) return;
 
@@ -1856,10 +1907,9 @@
         }
       }
 
-      // H.264 first (usually hardware-encoded = far less CPU, fewer dropped frames); VP9 is the slowest.
+      // VP8 first: software encoder, reliable, light enough at 720p. The browser's hardware H.264
+      // path can emit green/corrupt frames on some GPUs; the server re-encodes to H.264 anyway.
       const mimeCandidates = [
-        "video/mp4;codecs=avc1.42E01F,mp4a.40.2",
-        "video/webm;codecs=h264,opus",
         "video/webm;codecs=vp8,opus",
         "video/webm;codecs=vp9,opus",
         "video/webm",
@@ -1905,12 +1955,52 @@
       await new Promise((r) => setTimeout(r, 250));
 
       recorder.start(1000);
-      // Clock = audio clock when available, so picture and voice can't drift apart
+      // Clock = audio clock when available, so picture and voice can't drift apart.
+      // Both clocks stop while the export is paused (tab in background).
       const audioStartAt = audioCtx ? audioCtx.currentTime + 0.05 : 0;
       if (audioSource) audioSource.start(audioStartAt);
       const startTs = performance.now() + (audioCtx ? 50 : 0);
+      let pausedMs = 0;
+      let pausedAt = 0;
+      let isPaused = false;
       const clockNow = () =>
-        audioCtx ? audioCtx.currentTime - audioStartAt : (performance.now() - startTs) / 1000;
+        audioCtx
+          ? audioCtx.currentTime - audioStartAt
+          : (performance.now() - startTs - pausedMs) / 1000;
+
+      // A background tab gets no canvas frames and paused videos while the voice keeps going
+      // -> frozen picture. So pause recording + voice + clips together, resume on return.
+      const pauseExport = () => {
+        if (isPaused) return;
+        isPaused = true;
+        pausedAt = performance.now();
+        try {
+          if (recorder.state === "recording") recorder.pause();
+        } catch (_) {}
+        if (audioCtx) audioCtx.suspend().catch(() => {});
+        studioState.clips.forEach((c) => {
+          if (c.videoEl && !c.videoEl.paused) c.videoEl.pause();
+        });
+        if (studioExportProgressText) {
+          studioExportProgressText.textContent = "⏸ หยุดเรนเดอร์ชั่วคราว — กลับมาที่แท็บนี้เพื่อเรนเดอร์ต่อ";
+        }
+      };
+      const resumeExport = async () => {
+        if (!isPaused) return;
+        if (audioCtx) await audioCtx.resume().catch(() => {});
+        pausedMs += performance.now() - pausedAt;
+        lastFrameT = -1;
+        try {
+          if (recorder.state === "paused") recorder.resume();
+        } catch (_) {}
+        isPaused = false;
+      };
+      const onVisibility = () => {
+        if (document.hidden) pauseExport();
+        else resumeExport();
+      };
+      document.addEventListener("visibilitychange", onVisibility);
+      if (document.hidden) pauseExport();
 
       const frameInterval = 1 / fps;
       let lastFrameT = -1;
@@ -1918,6 +2008,10 @@
 
       await new Promise((resolve) => {
         const tick = () => {
+          if (isPaused) {
+            setTimeout(tick, 200);
+            return;
+          }
           const elapsed = clockNow();
           if (elapsed >= targetDur) {
             resolve();
@@ -1925,8 +2019,17 @@
           }
 
           if (elapsed >= 0 && elapsed - lastFrameT >= frameInterval * 0.9) {
-            lastFrameT = elapsed;
             syncActiveClipVideoElement(elapsed, true);
+            // If the active clip is mid-seek, hold the previous output frame (max 0.4s)
+            // instead of drawing a stale cached picture -> no flicker.
+            const seg = getActiveCutSegment(elapsed);
+            const activeVid = seg ? studioState.clips.find((c) => c.id === seg.clipId)?.videoEl : null;
+            const notReady = activeVid && (activeVid.seeking || activeVid.readyState < 2);
+            if (notReady && lastFrameT >= 0 && elapsed - lastFrameT < 0.4) {
+              scheduleNext();
+              return;
+            }
+            lastFrameT = elapsed;
             ctx.save();
             ctx.scale(scaleX, scaleY);
             renderStudioFrameAt(ctx, 1080, 1920, elapsed);
@@ -1946,16 +2049,18 @@
             if (studioExportProgressBar) studioExportProgressBar.style.width = `${pct}%`;
             if (studioExportPctText) studioExportPctText.textContent = `${pct}%`;
             if (studioExportProgressText) {
-              studioExportProgressText.textContent = `กำลังบันทึกวิดีโอ ${shown.toFixed(1)}s / ${targetDur.toFixed(1)}s... (อย่าสลับแท็บระหว่างเรนเดอร์)`;
+              studioExportProgressText.textContent = `กำลังบันทึกวิดีโอ ${shown.toFixed(1)}s / ${targetDur.toFixed(1)}s... (เปิดแท็บนี้ค้างไว้จนเสร็จ)`;
             }
           }
 
-          // rAF = smooth & vsync-aligned; if the tab is hidden rAF stops, so fall back to a timer
-          if (document.hidden) setTimeout(tick, 1000 / fps / 2);
-          else requestAnimationFrame(tick);
+          scheduleNext();
         };
+        // Timer-driven (not requestAnimationFrame): rAF stops when the window is covered or
+        // minimized even if the page still reports "visible", which stalled the render.
+        const scheduleNext = () => setTimeout(tick, 4);
         tick();
       });
+      document.removeEventListener("visibilitychange", onVisibility);
 
       studioState.clips.forEach((c) => {
         if (c.videoEl && !c.videoEl.paused) c.videoEl.pause();
@@ -1971,6 +2076,7 @@
       }
 
       let mp4Blob = null;
+      let convertError = "";
 
       // 1. Primary: Direct binary stream upload via FormData (avoids 30MB base64 memory overhead)
       try {
@@ -1994,9 +2100,11 @@
           } catch (_) {
             errDetail = errText.slice(0, 150);
           }
+          convertError = errDetail || `HTTP ${convResp.status}`;
           console.warn("[Studio] Binary convert failed, trying JSON fallback:", errDetail);
         }
       } catch (uploadErr) {
+        convertError = String(uploadErr?.message || uploadErr);
         console.warn("[Studio] Binary upload error:", uploadErr);
       }
 
@@ -2024,6 +2132,7 @@
             } catch (_) {
               errDetail = errText.slice(0, 150);
             }
+            convertError = errDetail || convertError;
             console.warn("[Studio] Base64 convert also failed:", errDetail);
           }
         } catch (jsonErr) {
@@ -2035,7 +2144,7 @@
       // Provide the recorded video blob directly so user can preview and download immediately.
       if (!mp4Blob) {
         mp4Blob = recordedBlob;
-        toast("ระบบบันทึกไฟล์วิดีโอต้นฉบับให้เรียบร้อย สามารถเปิดดูและดาวน์โหลดได้ทันที", false, 4500);
+        toast(`แปลงเป็น MP4 ไม่สำเร็จ (${(convertError || "ไม่ทราบสาเหตุ").slice(0, 120)}) — ให้ไฟล์ต้นฉบับ .webm แทน`, false, 8000);
       }
       if (studioState.lastExportedMp4Url) {
         URL.revokeObjectURL(studioState.lastExportedMp4Url);
@@ -2062,7 +2171,11 @@
       toast(`เรนเดอร์วิดีโอไม่สำเร็จ: ${err.message}`, false, 4500);
     } finally {
       studioState.isExporting = false;
+      studioState.clips.forEach((c) => {
+        if (c.videoEl) c.videoEl.playbackRate = 1;
+      });
       if (studioExportMp4Btn) studioExportMp4Btn.disabled = false;
+      renderCurrentStudioFrame();
     }
   }
 
@@ -2074,7 +2187,8 @@
       .replace(/[\\/:*?"<>|]+/g, "")
       .trim()
       .slice(0, 40);
-    a.download = `${cleanName || "ai-review-video"}.mp4`;
+    const ext = (studioState.lastExportedMp4Blob?.type || "").includes("webm") ? "webm" : "mp4";
+    a.download = `${cleanName || "ai-review-video"}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
