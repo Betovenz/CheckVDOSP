@@ -28,43 +28,43 @@ GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 VOICE_CATALOG = [
     {
         "id": "Puck",
-        "name": "🎙️ Puck (Google AI • Podcast ชาย ชวนคุย + อารมณ์โฆษณามีพลัง • แนะนำ)",
+        "name": "✨ Puck (Google AI ชาย • มีพลัง • แนะนำ)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Aoede",
-        "name": "🎙️ Aoede (Google AI • Podcast หญิง สดใส + อารมณ์โฆษณาป้ายยาชวนซื้อ)",
+        "name": "✨ Aoede (Google AI หญิง • สดใส มีพลัง เล่าเรื่อง Reels / TikTok)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Kore",
-        "name": "🎙️ Kore (Google AI • Podcast หญิง นุ่มนวล สุภาพ + อารมณ์โฆษณาน่าเชื่อถือ)",
+        "name": "✨ Kore (Google AI หญิง • นุ่มนวล สุภาพ น่าเชื่อถือ)",
         "gender": "Female",
         "engine": "gemini",
     },
     {
         "id": "Fenrir",
-        "name": "🎙️ Fenrir (Google AI • Podcast ชาย มั่นใจ หนักแน่น + อารมณ์โฆษณาโปรเดือด)",
+        "name": "⚡ Fenrir (Google AI ชาย • หนักแน่น ทรงพลัง โปรโมชันเดือด)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "Charon",
-        "name": "🎙️ Charon (Google AI • Podcast ชาย ทุ้มลึก สุขุม + อารมณ์โฆษณาพรีเมียม)",
+        "name": "☕ Charon (Google AI ชาย • ทุ้มลึก สุขุม พรีเมียม)",
         "gender": "Male",
         "engine": "gemini",
     },
     {
         "id": "th-TH-NiwatNeural",
-        "name": "📻 คุณนิวัฒน์ (ชาย • เสียงคมชัด ฉะฉาน สไตล์ครีเอเตอร์รีวิว)",
+        "name": "🎙️ คุณนิวัฒน์ (ชาย • คมชัด ฉะฉาน สไตล์ครีเอเตอร์รีวิว)",
         "gender": "Male",
         "engine": "edge",
     },
     {
         "id": "th-TH-PremwadeeNeural",
-        "name": "📻 คุณเปรมวดี (หญิง • เสียงสดใส นุ่มนวล สไตล์ป้ายยาสินค้า)",
+        "name": "🎙️ คุณเปรมวดี (หญิง • สดใส นุ่มนวล สไตล์ป้ายยาสินค้า)",
         "gender": "Female",
         "engine": "edge",
     },
@@ -405,8 +405,9 @@ async def generate_product_review_script(
     product_title: str,
     product_description: str,
     target_duration: int = 20,
-    sales_angle: str = "hard_sell",
+    sales_angle: str = "podcast_ad",
     custom_header: str = "",
+    voice_gender: str = "Male",
     api_key: str = "",
 ) -> Dict[str, Any]:
     target_sec = max(10, min(90, int(target_duration or 20)))
@@ -417,13 +418,30 @@ async def generate_product_review_script(
     simple_noun = extract_simple_product_category(product_title, product_description)
     clean_features = filter_real_product_features(product_description)
 
+    # Gender pronoun & polite ending rules
+    is_male = str(voice_gender).lower() in ("male", "ชาย", "m")
+    if is_male:
+        pronoun_rule = (
+            "ผู้พากย์เป็น 'ผู้ชาย' (Male): หากมีคำลงท้ายต้องใช้ 'ครับ' หรือ 'นะครับ' เท่านั้น! "
+            "ห้ามใช้ 'ค่ะ', 'นะคะ' หรือ 'คะ' โดยเด็ดขาด!"
+        )
+    else:
+        pronoun_rule = (
+            "ผู้พากย์เป็น 'ผู้หญิง' (Female): หากมีคำลงท้ายต้องใช้ 'ค่ะ' หรือ 'นะคะ' เท่านั้น! "
+            "ห้ามใช้ 'ครับ' หรือ 'นะครับ' โดยเด็ดขาด!"
+        )
+
     angle_instructions = {
-        "hard_sell": "เล่าจุดเด่นและป้ายยาในสไตล์โฆษณา Podcast ชวนคุยอย่างเป็นกันเอง มีจังหวะเน้นน่าฟัง ชวนให้สนใจ ไม่พูดเว่อร์เกินจริง",
-        "review_real": "เล่าแบบโฮสต์ Podcast เล่าของใช้จริงให้ผู้ฟังฟังอย่างเป็นกันเอง ผสมน้ำเสียงชวนซื้ออย่างมีเสน่ห์",
-        "feature_focus": "อธิบายจุดเด่น การใช้งาน และความคุ้มค่าแบบตรงไปตรงมา สไตล์ Podcast สาระน่ารู้ผสมความน่าสนใจ",
-        "flash_promo": "แนะนำของน่าใช้ สั้น กระชับ มีพลังสไตล์สปอตโฆษณา Podcast ชวนติดตาม",
+        "podcast_ad": (
+            "สไตล์รายการ Podcast ชวนคุยอย่างเป็นกันเอง ผสมอารมณ์โฆษณาป้ายยาที่มีเสน่ห์น่าฟัง "
+            "เปิดเรื่องชวนคุย เล่าจุดเด่นของสินค้าอย่างน่าสนใจ มีจังหวะเน้นคำให้น่าติดตาม"
+        ),
+        "hard_sell": "เล่าจุดเด่นและการใช้งานจริงแบบเข้าใจง่าย ชวนให้น่าลองใช้แบบเป็นธรรมชาติ ไม่โฆษณาเกินจริง",
+        "review_real": "เล่าเหมือนเพื่อนมารีวิวของใช้จริงให้ฟัง บอกว่าใช้ทำอะไร สะดวกยังไง พูดธรรมดาเป็นธรรมชาติ",
+        "feature_focus": "อธิบายจุดเด่น การใช้งาน และความคุ้มค่าแบบตรงไปตรงมา สไตล์สาระน่ารู้ผสมความน่าสนใจ",
+        "flash_promo": "แนะนำของน่าใช้ สั้น กระชับ มีพลังสไตล์สปอตโฆษณาด่วน ชวนติดตาม",
     }
-    tone_desc = angle_instructions.get(sales_angle, angle_instructions["review_real"])
+    tone_desc = angle_instructions.get(sales_angle, angle_instructions["podcast_ad"])
 
     prompt_text = f"""คุณคือคนรีวิวของใช้จริงในชีวิตประจำวันสำหรับคลิปสั้น (TikTok / Shopee Video)
 หน้าที่ของคุณ: เขียน "บทพากย์ภาษาไทย" และ "พาดหัวด้านบนคลิป (short_headline)" ความยาวประมาณ {target_sec} วินาที
@@ -431,19 +449,22 @@ async def generate_product_review_script(
 ข้อมูลอ้างอิง:
 - ประเภทสินค้าที่ต้องใช้เรียกในคลิป: "{simple_noun}"
 - ข้อมูลเสริมจากร้านค้า (ใช้ดูเฉพาะลักษณะสินค้า ห้ามลอกคำแปลกๆ มาพูด): {product_title[:120]} | {clean_features[:800]}
-- โทนการพูด: {tone_desc}
+- สไตล์และโทนการพูด: {tone_desc}
+- กฎเพศของผู้พากย์: {pronoun_rule}
 
 กฎเหล็กสำคัญมาก (ต้องทำตาม 100%):
-1. **ห้ามพูดชื่อสินค้าเต็มๆ ห้ามพูดชื่อรุ่นยาวๆ และห้ามเอาคำแปลภาษาจีนแปลกๆ ในชื่อสินค้ามาพูดเด็ดขาด!**
+1. **เรื่องคำลงท้ายตามเพศเสียง (สำคัญที่สุด)**:
+   - {pronoun_rule}
+2. **ห้ามพูดชื่อสินค้าเต็มๆ ห้ามพูดชื่อรุ่นยาวๆ และห้ามเอาคำแปลภาษาจีนแปลกๆ ในชื่อสินค้ามาพูดเด็ดขาด!**
    - ให้เรียกสินค้าสั้นๆ แค่ว่าเป็นอะไร เช่น "{simple_noun}ตัวนี้", "{simple_noun}ชิ้นนี้", หรือ "{simple_noun}รุ่นนี้" เท่านั้น!
-2. **ห้ามขายของเกินจริงเด็ดขาด!**
+3. **ห้ามขายของเกินจริงเด็ดขาด!**
    - ห้ามใช้คำเว่อร์ๆ เช่น ดีที่สุดในโลก, วิเศษ, เทพสุดๆ, เปลี่ยนชีวิต
    - ห้ามเอาข้อความเงื่อนไขการรับประกัน การจัดส่ง หรือการเคลมสินค้าของร้านค้ามาพูดเด็ดขาด
    - ให้พูดรีวิวแบบคนทั่วไปใช้งานจริง เช่น ใช้ทำอะไรได้บ้าง หยิบใช้ง่ายยังไง พกพาสะดวกไหม
-3. **"short_headline" (Header ด้านบนคลิป)**:
+4. **"short_headline" (Header ด้านบนคลิป)**:
    - ต้องเป็นคำไทยสั้นๆ ที่อ่านเข้าใจทันที บอกแค่ว่าคืออะไร เช่น "{simple_noun} หยิบใช้ง่ายพกพาสะดวก" หรือ "{simple_noun} เก็บทรงสวยใช้งานง่าย"
    - ความยาวไม่เกิน 18 ตัวอักษร และเว้นวรรคระหว่างวลีให้ชัดเจน **ห้ามตัดคำกลางคันเด็ดขาด**
-4. **การแบ่งท่อนซับไตเติ้ล ("scenes") จำนวนประมาณ {target_scenes} ท่อน**:
+5. **การแบ่งท่อนซับไตเติ้ล ("scenes") จำนวนประมาณ {target_scenes} ท่อน**:
    - แต่ละท่อนมี "line_top" (บรรทัดบน) และ "line_bottom" (บรรทัดล่าง)
    - "line_top" และ "line_bottom" ต้องเป็นคำเต็มๆ ที่อ่านรู้เรื่องทันที **ห้ามฉีกคำเดียวกันแยกคนละบรรทัดเด็ดขาด!** (บรรทัดละไม่เกิน 15 ตัวอักษร)
    - "full_narration" คือคำพูดของท่อนนั้น (มีเว้นวรรคระหว่างคำพูดอย่างเป็นธรรมชาติ)
@@ -592,21 +613,7 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
     actual_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
     tts_models = ["gemini-2.5-flash-preview-tts"]
 
-    # Tailor specific podcast + commercial advertising tone for each Google AI voice
-    voice_tone_guides = {
-        "Puck": "สไตล์ผู้ดำเนินรายการ Podcast ชาย ชวนคุยอย่างเป็นกันเอง มีพลัง ผสมอารมณ์โฆษณาที่ดึงดูดใจ มีจังหวะเน้นคำสำคัญอย่างเป็นธรรมชาติ",
-        "Aoede": "สไตล์ผู้ดำเนินรายการ Podcast หญิง สดใส มีชีวิตชีวา ผสมอารมณ์โฆษณาป้ายยาสินค้าอย่างน่ารัก น่าซื้อ ชวนติดตาม",
-        "Kore": "สไตล์ผู้ดำเนินรายการ Podcast หญิง น้ำเสียงนุ่มนวล สุภาพ น่าเชื่อถือ ผสมอารมณ์โฆษณาที่จริงใจ อบอุ่น",
-        "Fenrir": "สไตล์ผู้ดำเนินรายการ Podcast ชาย มั่นใจ หนักแน่น มีความกระตือรือร้น ผสมอารมณ์โฆษณาโปรโมชันน่าตื่นเต้น",
-        "Charon": "สไตล์ผู้ดำเนินรายการ Podcast ชาย น้ำเสียงทุ้มลึก สุขุม ชวนฟัง สไตล์พรีเมียม ผสมอารมณ์โฆษณาระดับไฮเอนด์",
-    }
-    tone_guide = voice_tone_guides.get(actual_voice, voice_tone_guides["Puck"])
-
-    speaking_prompt = (
-        f"พูดออกเสียงภาษาไทยใน{tone_guide} "
-        "เว้นจังหวะหายใจและเน้นคำสำคัญให้น่าฟัง ชัดถ้อยชัดคำ ไม่พูดเร็วจนเกินไป:\n"
-        f"{text}"
-    )
+    speaking_prompt = f"อ่านออกเสียงภาษาไทยด้วยน้ำเสียงเป็นธรรมชาติ ชัดเจน ไม่เร่งรีบจนเกินไป:\n{text}"
 
     last_err = ""
     for key in keys:

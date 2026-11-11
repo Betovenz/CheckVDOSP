@@ -1057,6 +1057,9 @@
     toast("กำลังสร้างบทพากย์ เสียงพากย์ไทย และซับไตเติ้ล...", true, 0);
 
     try {
+      const selectedOpt = studioVoiceSelect?.selectedOptions?.[0];
+      const voiceGender = selectedOpt?.getAttribute("data-gender") || "Male";
+
       const resp = await fetch("/api/studio/generate-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1064,10 +1067,11 @@
           product_title: title,
           product_description: desc,
           target_duration: Number(studioTargetDuration?.value || 20),
-          sales_angle: studioSalesAngle?.value || "review_real",
+          sales_angle: studioSalesAngle?.value || "podcast_ad",
           custom_header: rewriteScript ? "" : studioHeaderInput?.value || "",
           custom_script: rewriteScript ? "" : customScript,
           voice_name: studioVoiceSelect?.value || "Puck",
+          voice_gender: voiceGender,
           speed_rate: studioVoiceSpeed?.value || "+15%",
           api_key: studioState.geminiKeysText || "",
           rewrite_script: rewriteScript,

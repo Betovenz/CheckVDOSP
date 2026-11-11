@@ -543,10 +543,11 @@ class StudioGenerateRequest(BaseModel):
     product_title: str = ""
     product_description: str = ""
     target_duration: int = 20
-    sales_angle: str = "hard_sell"
+    sales_angle: str = "podcast_ad"
     custom_header: str = ""
     custom_script: str = ""
     voice_name: str = "Puck"
+    voice_gender: str = "Male"
     speed_rate: str = "+15%"
     api_key: str = ""
     rewrite_script: bool = True
@@ -614,6 +615,13 @@ async def api_studio_shopee_info(payload: StudioShopeeInfoRequest):
 @app.post("/api/studio/generate-all")
 async def api_studio_generate_all(payload: StudioGenerateRequest):
     try:
+        # Resolve voice gender from catalog if not specified or to ensure exact match
+        v_gender = payload.voice_gender
+        for v in VOICE_CATALOG:
+            if v["id"] == payload.voice_name:
+                v_gender = v.get("gender", v_gender)
+                break
+
         if payload.rewrite_script or not (payload.custom_script or "").strip():
             script_res = await generate_product_review_script(
                 product_title=payload.product_title,
@@ -621,6 +629,7 @@ async def api_studio_generate_all(payload: StudioGenerateRequest):
                 target_duration=payload.target_duration,
                 sales_angle=payload.sales_angle,
                 custom_header=payload.custom_header,
+                voice_gender=v_gender,
                 api_key=payload.api_key,
             )
             short_headline = script_res["short_headline"]
