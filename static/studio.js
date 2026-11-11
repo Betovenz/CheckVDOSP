@@ -408,6 +408,9 @@
         localStorage.setItem("studio_gemini_api_keys", serverKeys);
         updateApiKeyDot(serverKeys);
       }
+      if (data.default_voice && studioVoiceSelect) {
+        studioVoiceSelect.value = data.default_voice;
+      }
     } catch (_) {}
   }
 
@@ -441,7 +444,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gemini_api_keys: raw,
-          default_voice: studioVoiceSelect?.value || "th-TH-NiwatNeural",
+          default_voice: studioVoiceSelect?.value || "Puck",
         }),
       });
       const data = await resp.json();
@@ -1064,7 +1067,7 @@
           sales_angle: studioSalesAngle?.value || "review_real",
           custom_header: rewriteScript ? "" : studioHeaderInput?.value || "",
           custom_script: rewriteScript ? "" : customScript,
-          voice_name: studioVoiceSelect?.value || "th-TH-NiwatNeural",
+          voice_name: studioVoiceSelect?.value || "Puck",
           speed_rate: studioVoiceSpeed?.value || "+15%",
           api_key: studioState.geminiKeysText || "",
           rewrite_script: rewriteScript,

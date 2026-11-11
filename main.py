@@ -525,7 +525,7 @@ async def refresh_guest_session():
 # ============================================================================
 class StudioConfigSaveRequest(BaseModel):
     gemini_api_keys: str | List[str] = ""
-    default_voice: str = "th-TH-NiwatNeural"
+    default_voice: str = "Puck"
 
 
 class StudioTestKeyRequest(BaseModel):
@@ -543,7 +543,7 @@ class StudioGenerateRequest(BaseModel):
     sales_angle: str = "hard_sell"
     custom_header: str = ""
     custom_script: str = ""
-    voice_name: str = "th-TH-NiwatNeural"
+    voice_name: str = "Puck"
     speed_rate: str = "+15%"
     api_key: str = ""
     rewrite_script: bool = True
@@ -563,7 +563,7 @@ async def api_get_studio_config():
         "gemini_api_keys": keys,
         "gemini_api_keys_text": "\n".join(keys),
         "key_count": len(keys),
-        "default_voice": cfg.get("default_voice", "th-TH-NiwatNeural"),
+        "default_voice": cfg.get("default_voice", "Puck"),
         "voices": VOICE_CATALOG,
     }
 
@@ -580,7 +580,7 @@ async def api_save_studio_config(payload: StudioConfigSaveRequest):
         "gemini_api_keys": keys,
         "gemini_api_keys_text": "\n".join(keys),
         "key_count": len(keys),
-        "default_voice": cfg.get("default_voice", "th-TH-NiwatNeural"),
+        "default_voice": cfg.get("default_voice", "Puck"),
     }
 
 

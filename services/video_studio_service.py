@@ -27,20 +27,8 @@ GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 
 VOICE_CATALOG = [
     {
-        "id": "th-TH-NiwatNeural",
-        "name": "🎙️ คุณนิวัฒน์ (ชาย • เสียงฉะฉาน คมชัด สไตล์ครีเอเตอร์รีวิว • แนะนำ)",
-        "gender": "Male",
-        "engine": "edge",
-    },
-    {
-        "id": "th-TH-PremwadeeNeural",
-        "name": "🎙️ คุณเปรมวดี (หญิง • เสียงนุ่มนวล สดใส ป้ายยาสินค้า • แนะนำ)",
-        "gender": "Female",
-        "engine": "edge",
-    },
-    {
         "id": "Puck",
-        "name": "✨ Puck (Google AI ชาย • กระฉับกระเฉง มีพลัง สายเทค/แกดเจ็ต)",
+        "name": "✨ Puck (Google AI ชาย • มีพลัง เสียงเริ่มต้น แนะนำ)",
         "gender": "Male",
         "engine": "gemini",
     },
@@ -67,6 +55,18 @@ VOICE_CATALOG = [
         "name": "✨ Charon (Google AI ชาย • ทุ้มลึก สุขุม พรีเมียม)",
         "gender": "Male",
         "engine": "gemini",
+    },
+    {
+        "id": "th-TH-NiwatNeural",
+        "name": "🎙️ คุณนิวัฒน์ (ชาย • เสียงฉะฉาน คมชัด สไตล์ครีเอเตอร์รีวิว)",
+        "gender": "Male",
+        "engine": "edge",
+    },
+    {
+        "id": "th-TH-PremwadeeNeural",
+        "name": "🎙️ คุณเปรมวดี (หญิง • เสียงนุ่มนวล สดใส ป้ายยาสินค้า)",
+        "gender": "Female",
+        "engine": "edge",
     },
     {
         "id": "Google-Thai",
@@ -144,10 +144,10 @@ def load_studio_config() -> Dict[str, Any]:
                 return data
         except Exception:
             pass
-    return {"gemini_api_keys": [], "default_voice": "th-TH-NiwatNeural"}
+    return {"gemini_api_keys": [], "default_voice": "Puck"}
 
 
-def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "th-TH-NiwatNeural") -> Dict[str, Any]:
+def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "Puck") -> Dict[str, Any]:
     if isinstance(gemini_keys_raw, str):
         raw_list = re.split(r"[\r\n,;]+", gemini_keys_raw)
     else:
