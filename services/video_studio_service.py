@@ -27,8 +27,20 @@ GEMINI_VOICES = {"Aoede", "Kore", "Puck", "Fenrir", "Charon"}
 
 VOICE_CATALOG = [
     {
+        "id": "th-TH-NiwatNeural",
+        "name": "🎙️ คุณนิวัฒน์ (Podcast Host ชาย • สุขุม น่าฟัง มืออาชีพ • แนะนำ)",
+        "gender": "Male",
+        "engine": "edge",
+    },
+    {
+        "id": "th-TH-PremwadeeNeural",
+        "name": "🎙️ คุณเปรมวดี (Podcast Host หญิง • สดใส มีเสน่ห์ ป้ายยาเป็นธรรมชาติ)",
+        "gender": "Female",
+        "engine": "edge",
+    },
+    {
         "id": "Puck",
-        "name": "✨ Puck (Google AI ชาย • มีพลัง • แนะนำ)",
+        "name": "✨ Puck (Google AI ชาย • สดใส มีพลัง)",
         "gender": "Male",
         "engine": "gemini",
     },
@@ -55,18 +67,6 @@ VOICE_CATALOG = [
         "name": "☕ Charon (Google AI ชาย • ทุ้มลึก สุขุม พรีเมียม)",
         "gender": "Male",
         "engine": "gemini",
-    },
-    {
-        "id": "th-TH-NiwatNeural",
-        "name": "🎙️ คุณนิวัฒน์ (ชาย • คมชัด ฉะฉาน สไตล์ครีเอเตอร์รีวิว)",
-        "gender": "Male",
-        "engine": "edge",
-    },
-    {
-        "id": "th-TH-PremwadeeNeural",
-        "name": "🎙️ คุณเปรมวดี (หญิง • สดใส นุ่มนวล สไตล์ป้ายยาสินค้า)",
-        "gender": "Female",
-        "engine": "edge",
     },
     {
         "id": "Google-Thai",
@@ -144,10 +144,10 @@ def load_studio_config() -> Dict[str, Any]:
                 return data
         except Exception:
             pass
-    return {"gemini_api_keys": [], "default_voice": "Puck"}
+    return {"gemini_api_keys": [], "default_voice": "th-TH-NiwatNeural"}
 
 
-def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "Puck") -> Dict[str, Any]:
+def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "th-TH-NiwatNeural") -> Dict[str, Any]:
     if isinstance(gemini_keys_raw, str):
         raw_list = re.split(r"[\r\n,;]+", gemini_keys_raw)
     else:
@@ -309,12 +309,25 @@ SAFE_THAI_BREAK_PREFIXES = (
 )
 
 
+def strip_polite_particles(text: str) -> str:
+    """
+    Strips Thai polite particles (ครับ, ค่ะ, นะคะ, นะครับ, คะ) from script so sentences are natural and direct.
+    """
+    if not text:
+        return ""
+    # Strip polite particles with optional leading 'นะ'
+    s = re.sub(r'(?:นะ)?(?:ครับ|ค่ะ|คะ)', '', text)
+    s = re.sub(r'\s{2,}', ' ', s).strip()
+    return s
+
+
 def clean_spoken_text(raw: str) -> str:
     if not raw:
         return ""
     s = re.sub(r"#[^\s#]+", "", str(raw))
     s = re.sub(r"https?://\S+", "", s)
     s = re.sub(r"[*_~`>|•●◆▪▸►☆★]+", " ", s)
+    s = strip_polite_particles(s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -420,8 +433,8 @@ async def generate_product_review_script(
 
     angle_instructions = {
         "podcast_ad": (
-            "สไตล์รายการ Podcast ชวนคุยอย่างเป็นกันเอง ผสมอารมณ์โฆษณาป้ายยาที่มีเสน่ห์น่าฟัง "
-            "เปิดเรื่องชวนคุย เล่าจุดเด่นของสินค้าอย่างน่าสนใจ มีจังหวะเน้นคำให้น่าติดตาม"
+            "สไตล์รายการ Podcast ชวนคุยอย่างเป็นกันเอง เล่าจุดเด่นแบบน่าสนใจ มีจังหวะทอดเสียงน่าฟัง "
+            "เปิดเรื่องชวนคุยแบบเพื่อนเล่าให้เพื่อนฟัง ไม่แข็งทื่อ ไม่โฆษณาเกินจริง"
         ),
         "hard_sell": "เล่าจุดเด่นและการใช้งานจริงแบบเข้าใจง่าย ชวนให้น่าลองใช้แบบเป็นธรรมชาติ ไม่โฆษณาเกินจริง",
         "review_real": "เล่าเหมือนเพื่อนมารีวิวของใช้จริงให้ฟัง บอกว่าใช้ทำอะไร สะดวกยังไง พูดธรรมดาเป็นธรรมชาติ",
@@ -430,7 +443,7 @@ async def generate_product_review_script(
     }
     tone_desc = angle_instructions.get(sales_angle, angle_instructions["podcast_ad"])
 
-    prompt_text = f"""คุณคือคนรีวิวของใช้จริงในชีวิตประจำวันสำหรับคลิปสั้น (TikTok / Shopee Video)
+    prompt_text = f"""คุณคือนักจัดรายการ Podcast ที่กำลังพูดคุยรีวิวของใช้ดีๆ ในชีวิตประจำวันสำหรับคลิปสั้น
 หน้าที่ของคุณ: เขียน "บทพากย์ภาษาไทย" และ "พาดหัวด้านบนคลิป (short_headline)" ความยาวประมาณ {target_sec} วินาที
 
 ข้อมูลอ้างอิง:
@@ -438,9 +451,9 @@ async def generate_product_review_script(
 - ข้อมูลเสริมจากร้านค้า (ใช้ดูเฉพาะลักษณะสินค้า ห้ามลอกคำแปลกๆ มาพูด): {product_title[:120]} | {clean_features[:800]}
 - สไตล์และโทนการพูด: {tone_desc}
 
-กฎเหล็กสำคัญมาก (ต้องทำตาม 100%):
-1. **ห้ามมีคำลงท้าย 'ครับ', 'นะครับ', 'ค่ะ', 'นะคะ', 'คะ' โดยเด็ดขาด!**
-   - ไม่ต้องใส่คำลงท้ายครับ/ค่ะใดๆ ทั้งสิ้น ให้พูดประโยคกระชับ เป็นธรรมชาติ เล่าจบในตัวประโยคเหมือนเล่าให้เพื่อนฟังโดยตรง
+กฎเหล็กสำคัญที่สุด (ต้องทำตาม 100%):
+1. **ห้ามมีคำลงท้าย 'ครับ', 'นะครับ', 'ค่ะ', 'นะคะ', 'คะ' ในบทพูดแม้แต่คำเดียว (มีโทษปรับตกทันที)!**
+   - ให้ประโยคจบอย่างกระชับ เล่าแบบสนทนาเปิดใจ เช่น 'ทุกคน วันนี้มีไอเทมเด็ดมาบอกต่อ' 'ตัวนี้ตอบโจทย์มาก' 'ใครชอบความคุ้มค่าลองดูตัวนี้ได้เลย'
 2. **ห้ามพูดชื่อสินค้าเต็มๆ ห้ามพูดชื่อรุ่นยาวๆ และห้ามเอาคำแปลภาษาจีนแปลกๆ ในชื่อสินค้ามาพูดเด็ดขาด!**
    - ให้เรียกสินค้าสั้นๆ แค่ว่าเป็นอะไร เช่น "{simple_noun}ตัวนี้", "{simple_noun}ชิ้นนี้", หรือ "{simple_noun}รุ่นนี้" เท่านั้น!
 3. **ห้ามขายของเกินจริงเด็ดขาด!**
@@ -454,6 +467,7 @@ async def generate_product_review_script(
    - แต่ละท่อนมี "line_top" (บรรทัดบน) และ "line_bottom" (บรรทัดล่าง)
    - "line_top" และ "line_bottom" ต้องเป็นคำเต็มๆ ที่อ่านรู้เรื่องทันที **ห้ามฉีกคำเดียวกันแยกคนละบรรทัดเด็ดขาด!** (บรรทัดละไม่เกิน 15 ตัวอักษร)
    - "full_narration" คือคำพูดของท่อนนั้น (มีเว้นวรรคระหว่างคำพูดอย่างเป็นธรรมชาติ)
+   - ความยาวบทพูดรวมทั้งหมดประมาณ {target_chars} ตัวอักษร (ไม่ต่ำกว่า {min_chars} ตัวอักษร)
    - ความยาวบทพูดรวมทั้งหมดประมาณ {target_chars} ตัวอักษร (ไม่ต่ำกว่า {min_chars} ตัวอักษร)
    - ความยาวบทพูดรวมทั้งหมดประมาณ {target_chars} ตัวอักษร (ไม่ต่ำกว่า {min_chars} ตัวอักษร)
 
@@ -561,8 +575,8 @@ async def generate_product_review_script(
             },
             {
                 "line_top": "ใครสนใจกดดูรายละเอียด",
-                "line_bottom": "ที่พิกัดตะกร้าได้เลยครับ",
-                "full_narration": "ใครสนใจกดดูรายละเอียด ที่พิกัดตะกร้าได้เลยครับ",
+                "line_bottom": "ที่พิกัดตะกร้าได้เลย",
+                "full_narration": "ใครสนใจกดดูรายละเอียด ที่พิกัดตะกร้าได้เลย",
             },
         ]
 
@@ -656,7 +670,7 @@ async def _synthesize_gemini_tts(text: str, voice_name: str, api_key: str) -> Tu
     raise RuntimeError(f"Gemini TTS unavailable: {last_err}")
 
 
-async def _synthesize_edge_tts(text: str, voice_name: str, speed_rate: str = "+15%") -> Tuple[bytes, str, str]:
+async def _synthesize_edge_tts(text: str, voice_name: str, speed_rate: str = "+10%") -> Tuple[bytes, str, str]:
     import edge_tts
 
     edge_voice = voice_name
@@ -667,7 +681,11 @@ async def _synthesize_edge_tts(text: str, voice_name: str, speed_rate: str = "+1
             else "th-TH-NiwatNeural"
         )
 
-    communicate = edge_tts.Communicate(text=text, voice=edge_voice, rate=speed_rate)
+    # Podcast warmth & calm delivery: pitch -2Hz for Niwat, gentle +10% rate for natural conversational storytelling
+    pitch = "-2Hz" if edge_voice == "th-TH-NiwatNeural" else "+0Hz"
+    clean_text = strip_polite_particles(text)
+
+    communicate = edge_tts.Communicate(text=clean_text, voice=edge_voice, rate=speed_rate, pitch=pitch)
     audio_chunks = bytearray()
     async for chunk in communicate.stream():
         if chunk.get("type") == "audio" and chunk.get("data"):
@@ -675,7 +693,8 @@ async def _synthesize_edge_tts(text: str, voice_name: str, speed_rate: str = "+1
 
     if not audio_chunks:
         raise RuntimeError("Edge TTS returned empty audio")
-    return bytes(audio_chunks), "audio/mpeg", f"Thai Neural Studio ({edge_voice})"
+    label_prefix = "Podcast Host ชาย (คุณนิวัฒน์)" if edge_voice == "th-TH-NiwatNeural" else "Podcast Host หญิง (คุณเปรมวดี)"
+    return bytes(audio_chunks), "audio/mpeg", label_prefix
 
 
 async def _synthesize_google_gtts(text: str) -> Tuple[bytes, str, str]:

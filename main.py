@@ -546,7 +546,7 @@ class StudioGenerateRequest(BaseModel):
     sales_angle: str = "podcast_ad"
     custom_header: str = ""
     custom_script: str = ""
-    voice_name: str = "Puck"
+    voice_name: str = "th-TH-NiwatNeural"
     voice_gender: str = "Male"
     speed_rate: str = "+15%"
     api_key: str = ""
