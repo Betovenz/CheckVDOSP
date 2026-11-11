@@ -418,6 +418,18 @@ async def generate_product_review_script(
     simple_noun = extract_simple_product_category(product_title, product_description)
     clean_features = filter_real_product_features(product_description)
 
+    angle_instructions = {
+        "podcast_ad": (
+            "สไตล์รายการ Podcast ชวนคุยอย่างเป็นกันเอง ผสมอารมณ์โฆษณาป้ายยาที่มีเสน่ห์น่าฟัง "
+            "เปิดเรื่องชวนคุย เล่าจุดเด่นของสินค้าอย่างน่าสนใจ มีจังหวะเน้นคำให้น่าติดตาม"
+        ),
+        "hard_sell": "เล่าจุดเด่นและการใช้งานจริงแบบเข้าใจง่าย ชวนให้น่าลองใช้แบบเป็นธรรมชาติ ไม่โฆษณาเกินจริง",
+        "review_real": "เล่าเหมือนเพื่อนมารีวิวของใช้จริงให้ฟัง บอกว่าใช้ทำอะไร สะดวกยังไง พูดธรรมดาเป็นธรรมชาติ",
+        "feature_focus": "อธิบายจุดเด่น การใช้งาน และความคุ้มค่าแบบตรงไปตรงมา สไตล์สาระน่ารู้ผสมความน่าสนใจ",
+        "flash_promo": "แนะนำของน่าใช้ สั้น กระชับ มีพลังสไตล์สปอตโฆษณาด่วน ชวนติดตาม",
+    }
+    tone_desc = angle_instructions.get(sales_angle, angle_instructions["podcast_ad"])
+
     prompt_text = f"""คุณคือคนรีวิวของใช้จริงในชีวิตประจำวันสำหรับคลิปสั้น (TikTok / Shopee Video)
 หน้าที่ของคุณ: เขียน "บทพากย์ภาษาไทย" และ "พาดหัวด้านบนคลิป (short_headline)" ความยาวประมาณ {target_sec} วินาที
 
