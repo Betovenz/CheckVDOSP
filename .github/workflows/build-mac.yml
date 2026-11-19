@@ -41,3 +41,11 @@ jobs:
           name: DouyinBilibiliHub-mac-${{ runner.arch }}-${{ env.BUILD_KIND }}
           path: dist/*.dmg
           retention-days: 14
+
+      - name: Upload Chrome extension
+        if: matrix.runner == 'macos-15'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Extension_RedNote_Cookie
+          path: dist/Extension_RedNote_Cookie.zip
+          retention-days: 14

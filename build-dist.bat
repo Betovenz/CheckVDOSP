@@ -51,7 +51,7 @@ if exist "rednote-cookie-extension" (
   echo.
   echo [*] Copying rednote-cookie-extension to dist\...
   xcopy /e /i /y "rednote-cookie-extension" "dist\rednote-cookie-extension" >nul
-  powershell -NoProfile -Command "Compress-Archive -Path 'rednote-cookie-extension\*' -DestinationPath 'dist\Extension_RedNote_Downloader.zip' -Force" >nul 2>&1
+  powershell -NoProfile -Command "Compress-Archive -Path 'rednote-cookie-extension\*' -DestinationPath 'dist\Extension_RedNote_Cookie.zip' -Force" >nul 2>&1
 )
 
 echo.

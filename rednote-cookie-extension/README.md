@@ -1,39 +1,16 @@
-# 📕 RedNote Helper & Video Downloader (Chrome / Edge Extension)
+# 📕 RedNote Cookie Copier (Chrome / Edge Extension)
 
-ส่วนขยาย (Extension) สำหรับ Google Chrome และ Microsoft Edge เพื่อ:
-1. **ดาวน์โหลดวิดีโอ (MP4) และรูปภาพได้โดยตรงบนหน้าเว็บ RedNote / Xiaohongshu** (มีปุ่มและ Pop-up ดาวน์โหลดติดที่การ์ดวิดีโอทุกคลิป)
-2. **คัดลอก Cookie จาก RedNote (小红书)** ได้ในคลิกเดียว สำหรับ Douyin & Bilibili Hub
+คัดลอก Cookie จาก RedNote (小红书) ในคลิกเดียว เพื่อนำไปวางในปุ่ม "📕 ใส่ Cookie RedNote" ของ Douyin & Bilibili Hub
 
----
+## วิธีติดตั้ง
+1. แตกไฟล์ `Extension_RedNote_Cookie.zip` (หรือใช้โฟลเดอร์ `rednote-cookie-extension`)
+2. เปิด Chrome / Edge แล้วไปที่ `chrome://extensions` (Edge: `edge://extensions`)
+3. เปิดสวิตช์ **Developer mode** มุมขวาบน
+4. กด **Load unpacked** แล้วเลือกโฟลเดอร์ที่แตกไว้
+5. ปักหมุด 📌 ไอคอนบนแถบเบราว์เซอร์
+   (เคยติดตั้งเวอร์ชันเก่าไว้: กดรีโหลด 🔄 ที่การ์ด หรือลบแล้วติดตั้งใหม่)
 
-## 🚀 วิธีติดตั้ง / อัปเดต Extension (ใช้เวลา 30 วินาที)
-
-1. เปิดเบราว์เซอร์ **Google Chrome** (หรือ Microsoft Edge)
-2. พิมพ์ที่ช่อง URL: `chrome://extensions` แล้วกด Enter
-3. เปิดสวิตช์ **"Developer mode" (โหมดนักพัฒนา)** ที่มุมขวาบน
-4. **หากเคยติดตั้งไว้แล้ว:**
-   - มองหาการ์ด **RedNote Helper & Video Downloader** (หรือ RedNote Cookie Copier)
-   - กดปุ่ม **รีโหลด 🔄** ที่มุมล่างขวาของการ์ดเพื่ออัปเดตเวอร์ชันใหม่ทันที
-5. **หากยังไม่เคยติดตั้ง:**
-   - กดปุ่ม **"Load unpacked" (โหลดส่วนขยายที่แตกไฟล์แล้ว)** ที่มุมซ้ายบน
-   - เลือกโฟลเดอร์:
-     `c:\Users\Betovenz\.gemini\antigravity\scratch\douyin-bilibili-hub\rednote-cookie-extension`
-6. ปักหมุด 📌 ไอคอน RedNote บนแถบเบราว์เซอร์เพื่อให้เรียกใช้งานง่าย
-
----
-
-## 🎬 ฟังก์ชันใหม่: ดาวน์โหลดคลิปในหน้าเว็บ (In-Page Video Downloader)
-
-เมื่อเปิดหน้าค้นหาหรือหน้าฟีดในเว็บ **[rednote.com](https://www.rednote.com/)** หรือ **[xiaohongshu.com](https://www.xiaohongshu.com/)**:
-
-1. **ปุ่มดาวน์โหลดที่การ์ดวิดีโอ (Card Video Badge):**
-   - ที่มุมขวาบนของการ์ดวิดีโอทุกคลิป จะมีปุ่ม **`[ ⬇️ โหลดคลิป ▾ ]`** ปรากฏขึ้นอัตโนมัติ
-   - **คลิกที่ปุ่ม:** ระบบจะดึงไฟล์ MP4 คุณภาพสูงระดับ HD และดาวน์โหลดลงเครื่องผ่านเบราว์เซอร์ทันที
-   - **คลิกที่ลูกศร `▾` (หรือ Hover):** จะมีเมนู Pop-up ปรากฏขึ้นมา:
-     - ⬇️ **ดาวน์โหลดวิดีโอ (MP4)**
-     - 🚀 **ส่งเข้า Hub Studio** (ส่งเข้าโปรแกรม AI Studio ที่รันบนเครื่อง)
-     - 📋 **คัดลอกลิงก์ตรง (MP4 CDN URL)**
-     - 🔗 **คัดลอกลิงก์โพสต์**
-2. **แถบดาวน์โหลดเมื่อเปิดคลิปดู (Video Player Modal Bar):**
-   - เมื่อคลิกเปิดดูคลิปวิดีโอแบบเต็มจอ จะมีแถบเครื่องมือลอยอยู่มุมขวาบนของวิดีโอ
-   - กดปุ่ม **"⬇️ ดาวน์โหลดคลิปนี้ (MP4)"** ได้ทันทีขณะกำลังเล่นวิดีโอ
+## วิธีใช้
+1. กดไอคอน → **🌐 เปิดเว็บ RedNote / Xiaohongshu** แล้วล็อกอิน
+2. กดไอคอนอีกครั้ง → **📋 คัดลอก Cookie RedNote**
+3. ไปที่ Hub กด **📕 ใส่ Cookie RedNote** แล้ววาง

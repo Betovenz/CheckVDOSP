@@ -83,6 +83,9 @@ cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 if [[ -d "rednote-cookie-extension" ]]; then
   cp -R "rednote-cookie-extension" "$STAGE/rednote-cookie-extension"
+  rm -f dist/Extension_RedNote_Cookie.zip
+  (cd rednote-cookie-extension && zip -qr -X ../dist/Extension_RedNote_Cookie.zip . -x ".*")
+  cp dist/Extension_RedNote_Cookie.zip "$STAGE/"
 fi
 cat > "$STAGE/อ่านก่อนเปิด - READ ME.txt" <<'TXT'
 วิธีติดตั้ง
@@ -99,6 +102,7 @@ cat > "$STAGE/อ่านก่อนเปิด - READ ME.txt" <<'TXT'
 - ข้อมูล/คีย์ API/คุกกี้ เก็บที่ ~/Library/Application Support/DouyinBilibiliHub
 - คลิกที่เรนเดอร์เสร็จ เซฟที่ ~/Movies/AI Clips (เปลี่ยนได้ในแอป)
 - ฟีเจอร์ RedNote / Douyin บางส่วนต้องมี Google Chrome หรือ Microsoft Edge ในเครื่อง
+- Extension คัดลอก Cookie RedNote: แตก Extension_RedNote_Cookie.zip แล้วติดตั้งตาม README.md ข้างใน
 TXT
 
 rm -f "$DMG"

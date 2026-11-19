@@ -1,57 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "RedNote Helper & Video Downloader",
-  "version": "1.3.0",
-  "description": "คัดลอก Cookie และดาวน์โหลดวิดีโอ RedNote (小红书) ในคลิกเดียว สำหรับ Douyin & Bilibili Hub",
+  "name": "RedNote Cookie Copier",
+  "version": "2.0.0",
+  "description": "คัดลอก Cookie RedNote (小红书) ในคลิกเดียว สำหรับ Douyin & Bilibili Hub",
   "permissions": [
     "cookies",
     "activeTab",
-    "clipboardWrite",
-    "downloads",
-    "storage"
+    "clipboardWrite"
   ],
   "host_permissions": [
     "*://*.xiaohongshu.com/*",
-    "*://*.rednote.com/*",
-    "*://*.xhslink.com/*",
-    "*://*.xhscdn.com/*",
-    "*://*.xhscdn.net/*",
-    "*://*.rednotecdn.com/*",
-    "http://localhost:8000/*",
-    "http://127.0.0.1:8000/*"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "*://*.xiaohongshu.com/*",
-        "*://*.rednote.com/*"
-      ],
-      "js": ["injected.js"],
-      "world": "MAIN",
-      "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "*://*.xiaohongshu.com/*",
-        "*://*.rednote.com/*"
-      ],
-      "js": ["content.js"],
-      "css": ["content.css"],
-      "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["injected.js"],
-      "matches": ["*://*.xiaohongshu.com/*", "*://*.rednote.com/*"]
-    }
+    "*://*.rednote.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "RedNote Helper & Video Downloader",
+    "default_title": "RedNote Cookie Copier",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
