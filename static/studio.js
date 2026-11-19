@@ -430,6 +430,16 @@
   const studioFinalVideoPlayer = document.getElementById("studioFinalVideoPlayer");
   const studioDownloadFinalMp4Btn = document.getElementById("studioDownloadFinalMp4Btn");
 
+  // Page 3 borrows this engine: a project's clips/script/voice are swapped into studioState
+  // ("batch" context) and the preview draws on the page-3 canvas instead of page 2's.
+  let engineCtx = "page2"; // "page2" | "batch"
+  let previewCanvasEl = studioPreviewCanvas;
+  function isEngineVisible() {
+    return engineCtx === "batch"
+      ? studioState.activePage === "batch"
+      : studioState.activePage === "studio";
+  }
+
   function toast(msg, loading = false, dur = 3500) {
     if (typeof window.showToast === "function") {
       window.showToast(msg, loading, dur);
@@ -450,20 +460,36 @@
   // 1. PAGE SWITCHER (Page 1: Search <-> Page 2: AI Video Studio)
   // ---------------------------------------------------------------------------
   function switchAppPage(targetPage) {
-    studioState.activePage = targetPage === "studio" ? "studio" : "search";
-    const isStudio = studioState.activePage === "studio";
+    const target = targetPage === "studio" || targetPage === "batch" ? targetPage : "search";
+    const prev = studioState.activePage;
+    // Page 3 owns the engine while it renders a batch / shows a project preview
+    if (prev === "batch" && target !== "batch" && window.BatchApp && typeof window.BatchApp.beforeLeave === "function") {
+      if (window.BatchApp.beforeLeave() === false) return;
+    }
+    studioState.activePage = target;
+    const isStudio = target === "studio";
+    const isBatch = target === "batch";
 
-    if (pageSearchView) pageSearchView.classList.toggle("hidden", isStudio);
+    if (pageSearchView) pageSearchView.classList.toggle("hidden", target !== "search");
     if (pageStudioView) pageStudioView.classList.toggle("hidden", !isStudio);
+    const pageBatchView = document.getElementById("pageBatchView");
+    if (pageBatchView) pageBatchView.classList.toggle("hidden", !isBatch);
 
     const activeCls =
-      "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white shadow-md";
+      "px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white shadow-md";
     const inactiveCls =
-      "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 text-slate-300 hover:text-white";
+      "px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 whitespace-nowrap text-slate-300 hover:text-white";
 
-    if (navPage1Btn) navPage1Btn.className = isStudio ? inactiveCls : activeCls;
+    if (navPage1Btn) navPage1Btn.className = target === "search" ? activeCls : inactiveCls;
     if (navPage2Btn) navPage2Btn.className = isStudio ? activeCls : inactiveCls;
+    const navPage3Btn = document.getElementById("navPage3Btn");
+    if (navPage3Btn) navPage3Btn.className = isBatch ? activeCls : inactiveCls;
 
+    if (isBatch) {
+      pauseStudioPreview();
+      if (window.BatchApp && typeof window.BatchApp.onShow === "function") window.BatchApp.onShow();
+      return;
+    }
     if (!isStudio) {
       pauseStudioPreview();
     } else {
@@ -808,7 +834,7 @@
     vid.addEventListener("loadedmetadata", () => {
       if (Number.isFinite(vid.duration) && vid.duration > 1) {
         clip.duration = vid.duration;
-        buildRandomCutPlan();
+        if (!clip.noAutoPlan) buildRandomCutPlan();
         renderCurrentStudioFrame();
       }
     });
@@ -903,7 +929,7 @@
             vid.src = localBlobUrl;
             vid.load();
             vid.currentTime = curT;
-            if (studioState.isPlaying && studioState.activePage === "studio") {
+            if (studioState.isPlaying && isEngineVisible()) {
               vid.play().catch(() => {});
             }
             updateClipsUI();
@@ -1185,7 +1211,7 @@
 
     syncActiveClipVideoElement(
       studioState.currentTime,
-      studioState.isPlaying && studioState.activePage === "studio" && !studioState.isExporting
+      studioState.isPlaying && isEngineVisible() && !studioState.isExporting
     );
   }
 
@@ -1273,6 +1299,7 @@
   }
 
   function updateClipsUI() {
+    if (engineCtx !== "page2") return;
     const count = studioState.clips.length;
     if (studioClipCountBadge) studioClipCountBadge.textContent = `${count} คลิป`;
     if (studioQueueCountText) studioQueueCountText.textContent = String(count);
@@ -1523,7 +1550,7 @@
   }
 
   function renderCutPreviewStrip() {
-    if (!studioCutPreviewStrip) return;
+    if (!studioCutPreviewStrip || engineCtx !== "page2") return;
     const segs = studioState.cutSegments || [];
     if (studioCutSummaryText) {
       studioCutSummaryText.textContent = `${segs.length} ฉากตัดสลับ (${studioState.totalDuration.toFixed(1)}s)`;
@@ -1575,8 +1602,24 @@
       .join("\n");
   }
 
+  function setProductImage(url) {
+    const img = document.getElementById("studioProductImage");
+    const ph = document.getElementById("studioProductImagePh");
+    if (!img) return;
+    if (url) {
+      img.src = /^(\/api\/|data:|blob:)/.test(url) ? url : `/api/proxy-image?url=${encodeURIComponent(url)}`;
+      img.classList.remove("hidden");
+      ph?.classList.add("hidden");
+    } else {
+      img.removeAttribute("src");
+      img.classList.add("hidden");
+      ph?.classList.remove("hidden");
+    }
+  }
+
   function syncShopeeProduct(product, silent = false) {
     if (!product) return;
+    setProductImage(product.image || "");
     if (studioShopeeUrlInput) {
       studioShopeeUrlInput.value = product.input_url || product.canonical_url || "";
     }
@@ -2461,6 +2504,7 @@
   }
 
   function renderCurrentStudioFrame() {
+    const studioPreviewCanvas = previewCanvasEl;
     if (!studioPreviewCanvas) return;
     // While exporting, the export loop owns the clip <video> elements. Preview redraws
     // (fired by video timeupdate/seeked events) would pause & seek them back to the
@@ -2471,7 +2515,7 @@
 
     syncActiveClipVideoElement(
       studioState.currentTime,
-      studioState.isPlaying && studioState.activePage === "studio" && !studioState.isExporting
+      studioState.isPlaying && isEngineVisible() && !studioState.isExporting
     );
 
     renderStudioFrameAt(
@@ -2554,7 +2598,7 @@
     const dt = (now - lastTickTs) / 1000;
     lastTickTs = now;
 
-    if (studioState.activePage === "studio" && !studioState.isExporting && studioState.isPlaying) {
+    if (isEngineVisible() && !studioState.isExporting && studioState.isPlaying) {
       if (studioState.voiceAudio && !studioState.voiceAudio.paused) {
         studioState.currentTime = studioState.voiceAudio.currentTime;
       } else {
@@ -2586,35 +2630,29 @@
     });
   }
 
-  async function exportStudioVideoToMp4() {
-    if (studioState.isExporting) return;
+  // Shared by page 2 export and page 3 batch render.
+  // Plays the CURRENT timeline (whatever project is loaded into studioState) in real time into an
+  // offscreen canvas + MediaRecorder and returns the recorded WebM blob.
+  async function recordTimelineToBlob(resMode, onProgress) {
+    const fps = 30;
+    let width = 720;
+    let height = 1280;
+    let targetBitrate = 9_000_000; // 9 Mbps high bitrate for crystal-clear 720p
+    if (resMode === "1080p") {
+      width = 1080;
+      height = 1920;
+      targetBitrate = 18_000_000; // 18 Mbps for ultra-sharp Full HD
+    } else if (resMode === "480p") {
+      width = 480;
+      height = 854;
+      targetBitrate = 4_000_000;
+    }
+    const targetDur = Math.max(3, Number(studioState.totalDuration) || 20);
+
     pauseStudioPreview();
     studioState.isExporting = true;
-
-    if (studioExportMp4Btn) studioExportMp4Btn.disabled = true;
-    if (studioExportProgressWrap) studioExportProgressWrap.classList.remove("hidden");
-    if (studioExportProgressBar) studioExportProgressBar.style.width = "0%";
-    if (studioExportPctText) studioExportPctText.textContent = "0%";
-    if (studioExportProgressText) studioExportProgressText.textContent = "กำลังเรนเดอร์ภาพและเสียงพากย์...";
-
+    let workerTicker = null;
     try {
-      const fps = 30;
-      const resMode = studioResolutionSelect?.value || studioState.exportResolution || "720p";
-      let width = 720;
-      let height = 1280;
-      let targetBitrate = 9_000_000; // 9 Mbps high bitrate for crystal-clear 720p
-
-      if (resMode === "1080p") {
-        width = 1080;
-        height = 1920;
-        targetBitrate = 18_000_000; // 18 Mbps for ultra-sharp Full HD
-      } else if (resMode === "480p") {
-        width = 480;
-        height = 854;
-        targetBitrate = 4_000_000;
-      }
-      const targetDur = Math.max(3, Number(studioState.totalDuration) || 20);
-
       const offCanvas = document.createElement("canvas");
       offCanvas.width = width;
       offCanvas.height = height;
@@ -2714,7 +2752,6 @@
       // Browsers throttle setTimeout to 1000ms in background tabs/minimized windows,
       // but Web Workers are NEVER throttled! This allows video rendering to continue smoothly
       // even when the user switches tabs, minimizes the browser, or works in other apps!
-      let workerTicker = null;
       try {
         const workerCode = `
           let timer = null;
@@ -2789,11 +2826,10 @@
           if (nowMs - lastUiTs > 250) {
             lastUiTs = nowMs;
             const shown = Math.max(0, elapsed);
-            const pct = Math.min(95, Math.round((shown / targetDur) * 90));
-            if (studioExportProgressBar) studioExportProgressBar.style.width = `${pct}%`;
-            if (studioExportPctText) studioExportPctText.textContent = `${pct}%`;
-            if (studioExportProgressText) {
-              studioExportProgressText.textContent = `กำลังเรนเดอร์วิดีโอ ${shown.toFixed(1)}s / ${targetDur.toFixed(1)}s (สลับแท็บ/พับจอทำงานอื่นได้ ระบบจะโหลดไฟล์ให้เองอัตโนมัติ)...`;
+            if (typeof onProgress === "function") {
+              try {
+                onProgress(Math.min(95, Math.round((shown / targetDur) * 90)), shown, targetDur);
+              } catch (_) {}
             }
           }
         };
@@ -2811,6 +2847,7 @@
       });
 
       if (workerTicker) workerTicker.stop();
+      workerTicker = null;
 
       studioState.clips.forEach((c) => {
         if (c.videoEl && !c.videoEl.paused) c.videoEl.pause();
@@ -2818,25 +2855,79 @@
 
       recorder.stop();
       const recordedBlob = await stopPromise;
+      return { blob: recordedBlob, fps };
+    } finally {
+      if (workerTicker) workerTicker.stop();
+      studioState.isExporting = false;
+      studioState.clips.forEach((c) => {
+        if (c.videoEl) c.videoEl.playbackRate = 1;
+      });
+    }
+  }
 
-      if (studioExportProgressBar) studioExportProgressBar.style.width = "95%";
-      if (studioExportPctText) studioExportPctText.textContent = "95%";
-      if (studioExportProgressText) {
-        studioExportProgressText.textContent = "กำลังแปลงเป็นไฟล์ .MP4 (H.264 + AAC)...";
+  // Upload the recording -> server converts to H.264 MP4. With saveName the server also writes the
+  // MP4 into the chosen output folder. returnBody=false answers with the saved path only.
+  async function convertRecordingToMp4(recordedBlob, fps, { saveName = "", returnBody = true } = {}) {
+    let mp4Blob = null;
+    let savedPath = "";
+    let saveError = "";
+    let convertError = "";
+
+    // 1. Primary: Direct binary stream upload via FormData (avoids 30MB base64 memory overhead)
+    try {
+      const formData = new FormData();
+      formData.append("file", recordedBlob, "recording.webm");
+      formData.append("fps", String(fps));
+      if (saveName) formData.append("save_name", saveName);
+      formData.append("return_body", returnBody ? "true" : "false");
+
+      const convResp = await fetch("/api/studio/convert-mp4-file", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (convResp.ok) {
+        if (returnBody) {
+          mp4Blob = await convResp.blob();
+          savedPath = decodeURIComponent(convResp.headers.get("X-Saved-Path") || "");
+          saveError = decodeURIComponent(convResp.headers.get("X-Save-Error") || "");
+        } else {
+          const data = await convResp.json().catch(() => ({}));
+          savedPath = data.saved_path || "";
+          return { mp4Blob: null, savedPath, saveError: "", convertError: "" };
+        }
+      } else {
+        const errText = await convResp.text().catch(() => "");
+        let errDetail = "";
+        try {
+          const parsed = JSON.parse(errText);
+          errDetail = parsed.detail || "";
+        } catch (_) {
+          errDetail = errText.slice(0, 150);
+        }
+        convertError = errDetail || `HTTP ${convResp.status}`;
+        console.warn("[Studio] Binary convert failed:", errDetail);
       }
+    } catch (uploadErr) {
+      convertError = String(uploadErr?.message || uploadErr);
+      console.warn("[Studio] Binary upload error:", uploadErr);
+    }
 
-      let mp4Blob = null;
-      let convertError = "";
+    if (!returnBody) {
+      throw new Error(convertError || "แปลงไฟล์ MP4 ไม่สำเร็จ");
+    }
 
-      // 1. Primary: Direct binary stream upload via FormData (avoids 30MB base64 memory overhead)
+    // 2. Fallback: Base64 JSON POST (/api/studio/convert-mp4) if FormData didn't succeed
+    if (!mp4Blob) {
       try {
-        const formData = new FormData();
-        formData.append("file", recordedBlob, "recording.webm");
-        formData.append("fps", String(fps));
+        const rawDataUrl = await blobToDataUrl(recordedBlob);
+        const b64Part = rawDataUrl.slice(rawDataUrl.lastIndexOf(",") + 1);
+        const normalizedDataUrl = `data:video/webm;base64,${b64Part}`;
 
-        const convResp = await fetch("/api/studio/convert-mp4-file", {
+        const convResp = await fetch("/api/studio/convert-mp4", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_data_url: normalizedDataUrl, fps }),
         });
 
         if (convResp.ok) {
@@ -2850,47 +2941,52 @@
           } catch (_) {
             errDetail = errText.slice(0, 150);
           }
-          convertError = errDetail || `HTTP ${convResp.status}`;
-          console.warn("[Studio] Binary convert failed, trying JSON fallback:", errDetail);
+          convertError = errDetail || convertError;
+          console.warn("[Studio] Base64 convert also failed:", errDetail);
         }
-      } catch (uploadErr) {
-        convertError = String(uploadErr?.message || uploadErr);
-        console.warn("[Studio] Binary upload error:", uploadErr);
+      } catch (jsonErr) {
+        console.warn("[Studio] Base64 convert exception:", jsonErr);
+      }
+    }
+    return { mp4Blob, savedPath, saveError, convertError };
+  }
+
+  function exportFileStem() {
+    return (studioState.headerText || "ai-review-video").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 40) || "ai-review-video";
+  }
+
+  async function exportStudioVideoToMp4() {
+    if (studioState.isExporting || studioState.isExportBusy) return;
+    studioState.isExportBusy = true;
+
+    if (studioExportMp4Btn) studioExportMp4Btn.disabled = true;
+    if (studioExportProgressWrap) studioExportProgressWrap.classList.remove("hidden");
+    if (studioExportProgressBar) studioExportProgressBar.style.width = "0%";
+    if (studioExportPctText) studioExportPctText.textContent = "0%";
+    if (studioExportProgressText) studioExportProgressText.textContent = "กำลังเรนเดอร์ภาพและเสียงพากย์...";
+
+    try {
+      const resMode = studioResolutionSelect?.value || studioState.exportResolution || "720p";
+      const { blob: recordedBlob, fps } = await recordTimelineToBlob(resMode, (pct, shown, total) => {
+        if (studioExportProgressBar) studioExportProgressBar.style.width = `${pct}%`;
+        if (studioExportPctText) studioExportPctText.textContent = `${pct}%`;
+        if (studioExportProgressText) {
+          studioExportProgressText.textContent = `กำลังเรนเดอร์วิดีโอ ${shown.toFixed(1)}s / ${total.toFixed(1)}s (สลับแท็บ/พับจอทำงานอื่นได้ ระบบจะเซฟไฟล์ให้เองอัตโนมัติ)...`;
+        }
+      });
+
+      if (studioExportProgressBar) studioExportProgressBar.style.width = "95%";
+      if (studioExportPctText) studioExportPctText.textContent = "95%";
+      if (studioExportProgressText) {
+        studioExportProgressText.textContent = "กำลังแปลงเป็นไฟล์ .MP4 (H.264 + AAC) และเซฟลงโฟลเดอร์...";
       }
 
-      // 2. Fallback: Base64 JSON POST (/api/studio/convert-mp4) if FormData didn't succeed
-      if (!mp4Blob) {
-        try {
-          const rawDataUrl = await blobToDataUrl(recordedBlob);
-          const b64Part = rawDataUrl.slice(rawDataUrl.lastIndexOf(",") + 1);
-          const normalizedDataUrl = `data:video/webm;base64,${b64Part}`;
+      let { mp4Blob, savedPath, saveError, convertError } = await convertRecordingToMp4(recordedBlob, fps, {
+        saveName: exportFileStem(),
+        returnBody: true,
+      });
 
-          const convResp = await fetch("/api/studio/convert-mp4", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ video_data_url: normalizedDataUrl, fps }),
-          });
-
-          if (convResp.ok) {
-            mp4Blob = await convResp.blob();
-          } else {
-            const errText = await convResp.text().catch(() => "");
-            let errDetail = "";
-            try {
-              const parsed = JSON.parse(errText);
-              errDetail = parsed.detail || "";
-            } catch (_) {
-              errDetail = errText.slice(0, 150);
-            }
-            convertError = errDetail || convertError;
-            console.warn("[Studio] Base64 convert also failed:", errDetail);
-          }
-        } catch (jsonErr) {
-          console.warn("[Studio] Base64 convert exception:", jsonErr);
-        }
-      }
-
-      // 3. Ultimate Fallback: If backend FFmpeg fails, do NOT lose user's work!
+      // Ultimate Fallback: If backend FFmpeg fails, do NOT lose user's work!
       // Provide the recorded video blob directly so user can preview and download immediately.
       if (!mp4Blob) {
         mp4Blob = recordedBlob;
@@ -2902,11 +2998,12 @@
       const mp4Url = URL.createObjectURL(mp4Blob);
       studioState.lastExportedMp4Blob = mp4Blob;
       studioState.lastExportedMp4Url = mp4Url;
+      studioState.lastSavedPath = savedPath || "";
 
       if (studioExportProgressBar) studioExportProgressBar.style.width = "100%";
       if (studioExportPctText) studioExportPctText.textContent = "100%";
       if (studioExportProgressText) {
-        studioExportProgressText.textContent = "เรนเดอร์ไฟล์ .MP4 เสร็จสมบูรณ์!";
+        studioExportProgressText.textContent = savedPath ? `เซฟแล้ว: ${savedPath}` : "เรนเดอร์ไฟล์ .MP4 เสร็จสมบูรณ์!";
       }
 
       if (studioFinalMp4Card) studioFinalMp4Card.classList.remove("hidden");
@@ -2917,20 +3014,27 @@
       }
       studioFinalMp4Card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
-      // Automatically download to computer immediately!
-      try {
-        downloadExportedMp4();
-      } catch (dlErr) {
-        console.warn("[Studio] Auto download warning:", dlErr);
+      if (savedPath) {
+        toast(`🎬 เรนเดอร์เสร็จ เซฟลงโฟลเดอร์แล้ว: ${savedPath}`, false, 6000);
+      } else {
+        // Folder save failed (or conversion fell back to .webm): download through the browser instead
+        try {
+          downloadExportedMp4();
+        } catch (dlErr) {
+          console.warn("[Studio] Auto download warning:", dlErr);
+        }
+        toast(
+          saveError
+            ? `เซฟลงโฟลเดอร์ไม่สำเร็จ (${saveError.slice(0, 100)}) — ดาวน์โหลดผ่านเบราว์เซอร์แทน`
+            : "🎬 เรนเดอร์วิดีโอสำเร็จและดาวน์โหลดลงเครื่องแล้ว!",
+          false,
+          6000
+        );
       }
-      toast("🎬 เรนเดอร์วิดีโอ .MP4 สำเร็จและดาวน์โหลดลงเครื่องอัตโนมัติแล้ว!", false, 5000);
     } catch (err) {
       toast(`เรนเดอร์วิดีโอไม่สำเร็จ: ${err.message}`, false, 4500);
     } finally {
-      studioState.isExporting = false;
-      studioState.clips.forEach((c) => {
-        if (c.videoEl) c.videoEl.playbackRate = 1;
-      });
+      studioState.isExportBusy = false;
       if (studioExportMp4Btn) studioExportMp4Btn.disabled = false;
       renderCurrentStudioFrame();
     }
@@ -2940,16 +3044,103 @@
     if (!studioState.lastExportedMp4Url) return;
     const a = document.createElement("a");
     a.href = studioState.lastExportedMp4Url;
-    const cleanName = (studioState.headerText || "ai-review-video")
-      .replace(/[\\/:*?"<>|]+/g, "")
-      .trim()
-      .slice(0, 40);
     const ext = (studioState.lastExportedMp4Blob?.type || "").includes("webm") ? "webm" : "mp4";
-    a.download = `${cleanName || "ai-review-video"}.${ext}`;
+    a.download = `${exportFileStem()}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   }
+
+  // ---------------------------------------------------------------------------
+  // 8b. OUTPUT FOLDER (shared by page 2 export and page 3 batch render)
+  // ---------------------------------------------------------------------------
+  const outputDirState = { path: "", loaded: false };
+
+  function renderOutputDirLabels() {
+    document.querySelectorAll("[data-output-dir-label]").forEach((el) => {
+      el.textContent = outputDirState.path || "…";
+      el.title = outputDirState.path || "";
+    });
+    window.dispatchEvent(new CustomEvent("studio:output-dir", { detail: { path: outputDirState.path } }));
+  }
+
+  async function loadOutputDir() {
+    try {
+      const r = await fetch("/api/studio/output-dir");
+      const d = await r.json();
+      if (r.ok) outputDirState.path = d.path || "";
+    } catch (_) {}
+    outputDirState.loaded = true;
+    renderOutputDirLabels();
+    return outputDirState.path;
+  }
+
+  async function pickOutputDir() {
+    toast("📁 เลือกโฟลเดอร์ในหน้าต่างที่เด้งขึ้นมา (อาจอยู่หลังหน้าต่างนี้)", true, 0);
+    try {
+      const r = await fetch("/api/studio/pick-output-dir", { method: "POST" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+      if (d.status === "cancelled") {
+        toast("ยกเลิกการเลือกโฟลเดอร์");
+        return outputDirState.path;
+      }
+      outputDirState.path = d.path || outputDirState.path;
+      renderOutputDirLabels();
+      toast(`📁 เซฟคลิปไปที่: ${outputDirState.path}`, false, 4000);
+    } catch (err) {
+      // No native dialog (non-Windows) -> type the path instead
+      const typed = window.prompt(`${err.message || "เปิดหน้าต่างเลือกโฟลเดอร์ไม่ได้"}\n\nพิมพ์ตำแหน่งโฟลเดอร์สำหรับเซฟคลิป:`, outputDirState.path);
+      if (typed && typed.trim()) await setOutputDir(typed.trim());
+    }
+    return outputDirState.path;
+  }
+
+  async function setOutputDir(path) {
+    try {
+      const r = await fetch("/api/studio/output-dir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+      outputDirState.path = d.path;
+      renderOutputDirLabels();
+      toast(`📁 เซฟคลิปไปที่: ${outputDirState.path}`, false, 4000);
+    } catch (err) {
+      toast(err.message || "ตั้งโฟลเดอร์ไม่สำเร็จ", false, 4500);
+    }
+  }
+
+  async function openOutputDir(filePath = "") {
+    try {
+      const r = await fetch("/api/studio/open-output", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: filePath || "" }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+    } catch (err) {
+      toast(err.message || "เปิดโฟลเดอร์ไม่สำเร็จ", false, 4000);
+    }
+  }
+
+  // Buttons anywhere on the page: data-output-dir-pick / data-output-dir-open
+  document.addEventListener("click", (e) => {
+    const pickBtn = e.target.closest("[data-output-dir-pick]");
+    if (pickBtn) {
+      e.preventDefault();
+      pickOutputDir();
+      return;
+    }
+    const openBtn = e.target.closest("[data-output-dir-open]");
+    if (openBtn) {
+      e.preventDefault();
+      openOutputDir(openBtn.getAttribute("data-output-dir-open") || "");
+    }
+  });
 
   // ---------------------------------------------------------------------------
   // 9. EVENT LISTENERS & INITIALIZATION
@@ -2957,6 +3148,7 @@
   function initStudioEvents() {
     navPage1Btn?.addEventListener("click", () => switchAppPage("search"));
     navPage2Btn?.addEventListener("click", () => switchAppPage("studio"));
+    document.getElementById("navPage3Btn")?.addEventListener("click", () => switchAppPage("batch"));
     studioBackToSearchBtn?.addEventListener("click", () => switchAppPage("search"));
     studioGoSearchClipsBtn?.addEventListener("click", () => switchAppPage("search"));
 
@@ -3146,7 +3338,7 @@
         try {
           vid.currentTime = curT;
         } catch (_) {}
-        if (studioState.isPlaying && studioState.activePage === "studio") {
+        if (studioState.isPlaying && isEngineVisible()) {
           vid.play().catch(() => {});
         }
       }
@@ -3292,6 +3484,263 @@
     studioExportMp4Btn?.addEventListener("click", exportStudioVideoToMp4);
     studioDownloadFinalMp4Btn?.addEventListener("click", downloadExportedMp4);
   }
+
+  // ---------------------------------------------------------------------------
+  // 10. ENGINE API FOR PAGE 3 (ทำหลายคลิป)
+  // A project is "entered" by swapping its clips / script / voice / layout into studioState;
+  // page 2's own values are kept aside and put back on leave. Preview, export and the
+  // renderer are therefore the exact same code for page 2 and page 3.
+  // ---------------------------------------------------------------------------
+  const CTX_KEYS = [
+    "clips",
+    "cutSegments",
+    "scenes",
+    "spokenScript",
+    "headerText",
+    "showHeader",
+    "showSubtitles",
+    "headerPosY",
+    "subPosY",
+    "totalDuration",
+    "voiceAudio",
+    "voiceAudioDataUrl",
+    "selectedTemplateId",
+    "currentTime",
+    "isPlaying",
+    "voiceEngineLabel",
+  ];
+  let page2Snapshot = null;
+
+  function enterBatchContext(ctx, canvas) {
+    pauseStudioPreview();
+    if (engineCtx === "page2") {
+      page2Snapshot = {};
+      CTX_KEYS.forEach((k) => {
+        page2Snapshot[k] = studioState[k];
+      });
+    }
+    engineCtx = "batch";
+    CTX_KEYS.forEach((k) => {
+      if (k in ctx) studioState[k] = ctx[k];
+    });
+    studioState.isPlaying = false;
+    studioState.currentTime = 0;
+    previewCanvasEl = canvas || null;
+    renderCurrentStudioFrame();
+  }
+
+  function leaveBatchContext() {
+    if (engineCtx !== "batch") return;
+    pauseStudioPreview();
+    engineCtx = "page2";
+    if (page2Snapshot) {
+      CTX_KEYS.forEach((k) => {
+        studioState[k] = page2Snapshot[k];
+      });
+    }
+    page2Snapshot = null;
+    studioState.isPlaying = false;
+    previewCanvasEl = studioPreviewCanvas;
+    updateClipsUI();
+    renderCutPreviewStrip();
+    renderCurrentStudioFrame();
+  }
+
+  const SOURCE_LABELS = { douyin: "🎵 Douyin", xhs: "📕 RedNote", bilibili: "📺 Bilibili", pc: "💻 PC Upload" };
+
+  // data: { key, platform, itemId, title, url, thumb, duration }
+  function createRuntimeClip(data) {
+    const clip = {
+      id: data.key,
+      title: data.title || "คลิป",
+      platform: data.platform,
+      sourceLabel: SOURCE_LABELS[data.platform] || data.platform,
+      url: data.url,
+      blobUrl: "",
+      thumb: data.thumb || "",
+      thumbImg: null,
+      duration: Number(data.duration) || 12.0,
+      rawItem: data.platform !== "pc" && data.itemId ? { id: data.itemId, platform: data.platform } : null,
+      videoEl: null,
+      lastFrameCanvas: null,
+      hasDecodedFrame: false,
+      isCaching: false,
+      cacheProgress: 0,
+      cacheLoadedMB: 0,
+      cacheTotalMB: 0,
+      cacheError: "",
+      noAutoPlan: true,
+    };
+    setupClipVideoAndFrameBuffer(clip);
+    return clip;
+  }
+
+  // Resolves once every clip is fully in RAM and decodable (or failed / timed out)
+  function whenClipsReady(clips, timeoutMs = 120000) {
+    const t0 = performance.now();
+    return new Promise((resolve) => {
+      const check = () => {
+        const pending = clips.filter(
+          (c) => !c.cacheError && (c.isCaching || !c.videoEl || c.videoEl.readyState < 2)
+        );
+        if (!pending.length || performance.now() - t0 > timeoutMs) {
+          resolve(clips.filter((c) => c.cacheError).map((c) => `${c.title}: ${c.cacheError}`));
+          return;
+        }
+        setTimeout(check, 200);
+      };
+      check();
+    });
+  }
+
+  function disposeRuntimeClips(clips) {
+    (clips || []).forEach((c) => {
+      c.isCaching = false;
+      if (c.videoEl) {
+        try {
+          c.videoEl.pause();
+          c.videoEl.removeAttribute("src");
+          c.videoEl.load();
+        } catch (_) {}
+        c.videoEl.remove();
+        c.videoEl = null;
+      }
+      if (c.blobUrl) URL.revokeObjectURL(c.blobUrl);
+      c.blobUrl = "";
+    });
+  }
+
+  function getVoiceOptions() {
+    if (!studioVoiceSelect) return [];
+    return Array.from(studioVoiceSelect.options).map((o) => ({
+      value: o.value,
+      label: o.textContent.trim(),
+      gender: o.getAttribute("data-gender") || "Male",
+      disabled: o.disabled,
+    }));
+  }
+
+  function selectOptions(sel) {
+    return sel ? Array.from(sel.options).map((o) => ({ value: o.value, label: o.textContent.trim() })) : [];
+  }
+
+  function getPage2ClipData() {
+    const clips = engineCtx === "page2" ? studioState.clips : (page2Snapshot?.clips || []);
+    return clips.map((c) => ({
+      platform: c.platform,
+      itemId: c.platform === "pc" ? "" : c.rawItem?.id || "",
+      directUrl: c.rawItem?.direct_video_url || (c.platform === "xhs" ? c.rawItem?.url || "" : ""),
+      title: c.title,
+      thumb: c.thumb || "",
+      rawFile: c.rawFile || null,
+    }));
+  }
+
+  // "เปิดแก้ละเอียดในหน้า 2": copy a page-3 project into page 2 (replaces page 2's current work)
+  function loadProjectIntoPage2(p) {
+    if (engineCtx !== "page2") leaveBatchContext();
+    clearAllStudioClips();
+    (p.clips || []).forEach((c) => {
+      const clip = createRuntimeClip({
+        key: c.key,
+        platform: c.platform,
+        itemId: c.itemId,
+        title: c.title,
+        url: p.censorOn && c.censoredUrl ? c.censoredUrl : c.url,
+        thumb: c.thumb,
+      });
+      clip.noAutoPlan = false;
+      clip.isCensored = Boolean(p.censorOn && c.censoredUrl);
+      if (clip.rawItem) clip.rawItem.direct_video_url = c.directUrl || "";
+      studioState.clips.push(clip);
+    });
+    if (studioShopeeUrlInput) studioShopeeUrlInput.value = p.shopeeUrl || "";
+    if (studioProductTitle) studioProductTitle.value = p.productTitle || "";
+    if (studioProductDesc) studioProductDesc.value = p.productDesc || "";
+    setProductImage(p.productImage || "");
+    if (studioTargetDuration && p.duration) studioTargetDuration.value = String(p.duration);
+    if (studioSalesAngle && p.angle) studioSalesAngle.value = p.angle;
+    if (studioVoiceSelect && p.voice) studioVoiceSelect.value = p.voice;
+    if (studioVoiceSpeed && p.speed) studioVoiceSpeed.value = p.speed;
+    studioState.headerText = p.header || studioState.headerText;
+    if (studioHeaderInput) studioHeaderInput.value = studioState.headerText;
+    studioState.spokenScript = p.script || "";
+    if (studioScriptTextarea) studioScriptTextarea.value = studioState.spokenScript;
+    if (Array.isArray(p.scenes) && p.scenes.length) studioState.scenes = p.scenes;
+    if (p.audioDuration) studioState.totalDuration = Math.max(4, Number(p.audioDuration));
+    if (studioState.voiceAudio) studioState.voiceAudio.pause();
+    if (p.audioUrl) {
+      studioState.voiceAudioDataUrl = p.audioUrl;
+      const aud = new Audio(p.audioUrl);
+      aud.preload = "auto";
+      studioState.voiceAudio = aud;
+    }
+    if (p.template && STUDIO_TEMPLATES.some((t) => t.id === p.template)) {
+      studioState.selectedTemplateId = p.template;
+      renderTemplateSelectorGrid();
+    }
+    updateClipsUI();
+    buildRandomCutPlan();
+    switchAppPage("studio");
+    seekStudioPreview(0);
+    toast("🛠️ คัดลอกโปรเจคมาหน้า 2 แล้ว — แก้ที่นี่ไม่ย้อนกลับไปหน้า 3 (เรนเดอร์จากหน้า 2 ได้เลย)", false, 6000);
+  }
+
+  window.StudioEngine = {
+    templates: STUDIO_TEMPLATES.map((t) => ({ id: t.id, name: t.name })),
+    enter: enterBatchContext,
+    leave: leaveBatchContext,
+    isInBatch: () => engineCtx === "batch",
+    set(key, value) {
+      studioState[key] = value;
+      if (key === "totalDuration") updateStudioPlayerHud();
+      renderCurrentStudioFrame();
+    },
+    get: (key) => studioState[key],
+    createRuntimeClip,
+    whenClipsReady,
+    disposeRuntimeClips,
+    buildCutPlan(force = false) {
+      buildRandomCutPlan(force);
+      return studioState.cutSegments.map((s) => ({ ...s }));
+    },
+    play: startStudioPreview,
+    pause: pauseStudioPreview,
+    toggle: toggleStudioPreview,
+    seek: seekStudioPreview,
+    redraw: renderCurrentStudioFrame,
+    playback: () => ({
+      currentTime: studioState.currentTime,
+      totalDuration: studioState.totalDuration,
+      isPlaying: studioState.isPlaying,
+    }),
+    recordTimelineToBlob,
+    convertRecordingToMp4,
+    resolution: () => studioResolutionSelect?.value || studioState.exportResolution || "720p",
+    keys: () => ({ gemini: studioState.geminiKeysText || "", openrouter: studioState.openrouterKeysText || "" }),
+    voiceOptions: getVoiceOptions,
+    speedOptions: () => selectOptions(studioVoiceSpeed),
+    durationOptions: () => selectOptions(studioTargetDuration),
+    angleOptions: () => selectOptions(studioSalesAngle),
+    page2Defaults: () => ({
+      voice: studioVoiceSelect?.value || "Puck",
+      speed: studioVoiceSpeed?.value || "+15%",
+      duration: Number(studioTargetDuration?.value || 20),
+      angle: studioSalesAngle?.value || "podcast_ad",
+      template: studioState.selectedTemplateId || "clean-no-anim",
+    }),
+    isBusy: () => Boolean(studioState.isExporting || studioState.isExportBusy || studioState.isCensoring),
+    filterStorePolicyFromDesc,
+    STORE_POLICY_WORDS,
+    getPage2ClipData,
+    loadProjectIntoPage2,
+    outputDir: () => outputDirState.path,
+    loadOutputDir,
+    pickOutputDir,
+    openOutputDir,
+    toast,
+    escapeHtml,
+  };
 
   // Expose Studio API to Page 1
   window.StudioApp = {
@@ -3633,7 +4082,9 @@
   updateClipsUI();
   buildRandomCutPlan();
   initStudioEvents();
-  loadStudioConfigFromServer();
+  const studioConfigReady = loadStudioConfigFromServer().catch(() => {});
+  window.StudioEngine.configReady = studioConfigReady;
+  loadOutputDir();
   renderCurrentStudioFrame();
   requestAnimationFrame(runStudioPreviewLoop);
 })();

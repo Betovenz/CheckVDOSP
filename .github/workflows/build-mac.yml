@@ -1,0 +1,43 @@
+name: Build macOS DMG
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, feature/page3-batch]
+    paths-ignore: ["mockups/**", "**.md"]
+
+jobs:
+  dmg:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15        # Apple Silicon (M1/M2/M3/M4)
+          - runner: macos-15-intel  # Intel Macs
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build obfuscated DMG (falls back to plain build)
+        env:
+          PYTHON: python
+        run: |
+          if bash build-mac-dist.sh; then
+            echo "BUILD_KIND=obfuscated" >> "$GITHUB_ENV"
+          else
+            echo "::warning::PyArmor build failed, building plain DMG instead"
+            bash build-mac-dist.sh --plain
+            echo "BUILD_KIND=plain" >> "$GITHUB_ENV"
+          fi
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: DouyinBilibiliHub-mac-${{ runner.arch }}-${{ env.BUILD_KIND }}
+          path: dist/*.dmg
+          retention-days: 14

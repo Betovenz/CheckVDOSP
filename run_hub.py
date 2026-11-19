@@ -73,8 +73,40 @@ def _enable_utf8_console() -> None:
             pass
 
 
+def _hub_already_running(port: int) -> bool:
+    """True when our own hub already answers on this port (e.g. the Mac app was opened twice)."""
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen(f"http://{HOST}:{port}/", timeout=1.5) as r:
+            return b"Douyin & Bilibili Hub" in r.read(4096)
+    except Exception:
+        return False
+
+
+def _redirect_output_without_console() -> None:
+    """A windowed macOS .app has no console: sys.stdout/stderr are None, which
+    breaks uvicorn's logging. Send everything to a log file in the data folder."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    try:
+        from services.paths import DATA_ROOT
+
+        log = open(DATA_ROOT / "hub.log", "a", encoding="utf-8", buffering=1)
+    except Exception:
+        import os
+
+        log = open(os.devnull, "w", encoding="utf-8")
+    sys.stdout = sys.stdout or log
+    sys.stderr = sys.stderr or log
+
+
 def main() -> None:
+    _redirect_output_without_console()
     _enable_utf8_console()
+    if sys.platform == "darwin" and _hub_already_running(PREFERRED_PORT):
+        webbrowser.open(f"http://{HOST}:{PREFERRED_PORT}")
+        return
     port = _pick_port()
     url = f"http://{HOST}:{port}"
 
@@ -114,7 +146,7 @@ def main() -> None:
         pass
     except Exception as exc:  # keep the console open so the user can read the error
         print(f"\nServer stopped unexpectedly: {exc}")
-        if getattr(sys, "frozen", False):
+        if getattr(sys, "frozen", False) and sys.platform == "win32":
             input("\nPress Enter to close...")
 
 

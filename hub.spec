@@ -23,6 +23,7 @@ hiddenimports = [
     "services.shopee_service",
     "services.video_studio_service",
     "services.censor_service",
+    "services.batch_service",
 ]
 
 # Packages that load things dynamically and need to be pulled in whole.

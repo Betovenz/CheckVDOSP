@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Kanit:wght@600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=20" />
+  <link rel="stylesheet" href="/styles.css?v=21" />
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-rose-500 selection:text-white">
 
@@ -23,19 +23,19 @@
 
   <!-- Top Navbar with Page Switcher (Page 1 & Page 2) + API Key Manager Button -->
   <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/80">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px] shadow-lg shadow-rose-500/20">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center justify-between min-w-0">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px] shadow-lg shadow-rose-500/20">
             <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold text-lg tracking-tighter">
               <span class="text-rose-400">D</span><span class="text-sky-400">B</span>
             </div>
           </div>
           <div>
-            <h1 class="font-bold text-lg sm:text-xl tracking-tight">
+            <h1 class="font-bold text-lg sm:text-xl tracking-tight whitespace-nowrap">
               <span>Douyin & Bilibili</span>
             </h1>
-            <p class="text-xs text-slate-400">ค้นหาโหลดคลิปไร้ลายน้ำ & สตูดิโอตัดต่อทำคลิปรีวิว AI</p>
+            <p class="text-xs text-slate-400 whitespace-nowrap md:hidden 2xl:block">ค้นหาโหลดคลิปไร้ลายน้ำ & สตูดิโอตัดต่อทำคลิปรีวิว AI</p>
           </div>
         </div>
 
@@ -58,29 +58,38 @@
       </div>
 
       <!-- Page Navigation Tabs + API Key Manager -->
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-2 flex-wrap md:flex-nowrap md:shrink-0">
         <div class="inline-flex p-1 rounded-2xl bg-slate-900 border border-slate-800">
           <button
             type="button"
             id="navPage1Btn"
-            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white shadow-md"
+            class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white shadow-md"
           >
-            <span>🔍 หน้าที่ 1: ค้นหาและโหลดคลิป</span>
+            <span>🔍 1. ค้นหาคลิป</span>
           </button>
           <button
             type="button"
             id="navPage2Btn"
-            class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 text-slate-300 hover:text-white"
+            class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 whitespace-nowrap text-slate-300 hover:text-white"
           >
-            <span>🎬 หน้าที่ 2: ทำคลิป AI</span>
+            <span>🎬 2. ทำคลิป AI</span>
             <span id="studioClipCountBadge" class="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[11px] font-extrabold">0 คลิป</span>
+          </button>
+          <button
+            type="button"
+            id="navPage3Btn"
+            class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 whitespace-nowrap text-slate-300 hover:text-white"
+          >
+            <span>🏭 3. ทำหลายคลิป</span>
+            <span id="navPage3Count" class="px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[11px] font-extrabold">0</span>
           </button>
         </div>
 
         <button
           type="button"
           id="openApiKeyModalBtn"
-          class="hidden md:flex px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold transition items-center gap-1.5 shadow-sm"
+          class="hidden md:flex px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold transition items-center gap-1.5 shadow-sm whitespace-nowrap"
+          title="ตั้งค่า API (OpenRouter & Google AI)"
         >
           <span>🔑 ตั้งค่า API</span>
           <span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
@@ -88,9 +97,10 @@
         <button
           type="button"
           id="openXhsCookieBtn"
-          class="hidden md:flex px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold transition items-center gap-1.5 shadow-sm"
+          class="hidden md:flex px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold transition items-center gap-1.5 shadow-sm whitespace-nowrap"
+          title="ตั้งค่า Cookie RedNote"
         >
-          <span>📕 ตั้งค่า Cookie RedNote</span>
+          <span>📕 ใส่ Cookie RedNote</span>
           <span class="xhs-cookie-dot w-2 h-2 rounded-full bg-slate-500"></span>
         </button>
       </div>
@@ -342,9 +352,15 @@
             </div>
 
             <div class="grid grid-cols-1 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1">ชื่อสินค้า (ส่งให้ AI คิดบท):</label>
-                <input id="studioProductTitle" type="text" placeholder="เช่น DJI Osmo Mobile 8P ไม้กันสั่นมือถืออัจฉริยะ..." class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700/90 text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500" />
+              <div class="flex items-end gap-3">
+                <div class="w-14 h-14 rounded-xl bg-white border border-slate-700 overflow-hidden shrink-0 flex items-center justify-center" title="รูปสินค้าจาก Shopee">
+                  <img id="studioProductImage" class="hidden w-full h-full object-cover" alt="" onerror="this.classList.add('hidden');document.getElementById('studioProductImagePh')?.classList.remove('hidden');" />
+                  <span id="studioProductImagePh" class="text-xl">🛒</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">ชื่อสินค้า (ส่งให้ AI คิดบท • รายละเอียดสินค้าดึงมาเก็บไว้ใช้คิดบทด้วย):</label>
+                  <input id="studioProductTitle" type="text" placeholder="เช่น DJI Osmo Mobile 8P ไม้กันสั่นมือถืออัจฉริยะ..." class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700/90 text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500" />
+                </div>
               </div>
               <div>
                 <div class="flex items-center justify-between flex-wrap gap-2 mb-1.5">
@@ -590,8 +606,14 @@
               <option value="480p">480p SD (480×854) • ประหยัดพื้นที่ ส่งแชทเร็ว</option>
             </select>
           </div>
+          <div class="flex items-center gap-2 text-[11px] text-slate-400 min-w-0">
+            <span class="shrink-0">📁 เซฟไปที่</span>
+            <code data-output-dir-label class="flex-1 min-w-0 truncate px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-emerald-300">…</code>
+            <button type="button" data-output-dir-pick class="shrink-0 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold">เปลี่ยน…</button>
+            <button type="button" data-output-dir-open="" class="shrink-0 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200" title="เปิดโฟลเดอร์">📂</button>
+          </div>
           <button type="button" id="studioExportMp4Btn" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait">
-            <span>💾 เรนเดอร์และสร้างไฟล์วิดีโอ (.MP4)</span>
+            <span>💾 เรนเดอร์และเซฟไฟล์วิดีโอ (.MP4)</span>
           </button>
           <div id="studioExportProgressWrap" class="hidden p-3 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-1.5">
             <div class="flex items-center justify-between text-xs">
@@ -652,6 +674,99 @@
       </div>
     </div>
   </main>
+
+  <!-- ====================================================================== -->
+  <!-- PAGE 3: BATCH STUDIO (ทำหลายคลิปในครั้งเดียว) — rendered by batch.js       -->
+  <!-- ====================================================================== -->
+  <main id="pageBatchView" class="hidden max-w-[1400px] mx-auto px-4 sm:px-6 py-5 space-y-4">
+    <section id="batchDefaultsBar" class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3"></section>
+    <section id="batchActionBar" class="rounded-2xl bg-slate-900/90 border border-orange-500/30 p-3 flex flex-wrap items-center gap-2"></section>
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
+      <div id="batchGrid" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3"></div>
+      <div class="xl:sticky xl:top-20 space-y-3">
+        <section id="batchQueuePanel" class="rounded-2xl bg-slate-900/90 border border-emerald-500/30 p-3 space-y-2"></section>
+        <section class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3 space-y-2 text-[11px] text-slate-400">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="shrink-0">📁 เซฟไฟล์ไปที่</span>
+            <code data-output-dir-label class="flex-1 min-w-0 truncate px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-emerald-300">…</code>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" data-output-dir-pick class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold">เปลี่ยนโฟลเดอร์…</button>
+            <button type="button" data-output-dir-open="" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200">📂 เปิดโฟลเดอร์</button>
+            <span class="ml-auto">ความละเอียด</span>
+            <select id="batchResolutionSelect" class="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-white">
+              <option value="720p">720p</option>
+              <option value="1080p">1080p</option>
+              <option value="480p">480p</option>
+            </select>
+          </div>
+          <div class="text-slate-500">ชื่อไฟล์: <code>01_ชื่อสินค้า.mp4</code> · ใช้โฟลเดอร์เดียวกับหน้า 2</div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Page 3: project preview popup -->
+  <div id="batchPvModal" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4 w-full max-w-4xl max-h-[95vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-[320px_minmax(0,1fr)] gap-4 items-start">
+      <div class="sm:sticky sm:top-0 space-y-2">
+        <div class="relative w-full aspect-[9/16] rounded-2xl overflow-hidden bg-slate-950 border border-slate-700">
+          <canvas id="batchPvCanvas" width="1080" height="1920" class="w-full h-full block cursor-ns-resize touch-none"></canvas>
+          <div id="batchPvOverlay" class="hidden absolute inset-0 bg-black/65 flex flex-col items-center justify-center gap-2 text-center px-4"></div>
+        </div>
+        <input id="batchPvScrub" type="range" min="0" max="20" step="0.05" value="0" class="w-full accent-rose-500 cursor-pointer" />
+        <div class="flex items-center gap-2">
+          <button type="button" id="batchPvPlayBtn" class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold">▶ เล่น</button>
+          <button type="button" id="batchPvRestartBtn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs">↺</button>
+          <span class="text-[10px] text-slate-500 flex-1 text-center">ลาก Header / ซับบนจอขึ้น-ลงได้</span>
+          <span id="batchPvTime" class="text-xs font-mono text-slate-300">0.0s / 0.0s</span>
+        </div>
+      </div>
+      <div class="space-y-3 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0"><div class="text-[11px] text-slate-400">พรีวิวโปรเจค</div><div id="batchPvTitle" class="font-bold truncate"></div></div>
+          <button type="button" id="batchPvCloseBtn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0">✕</button>
+        </div>
+        <div id="batchPvBody" class="space-y-3"></div>
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="batchPvPrevBtn" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold">◀ โปรเจคก่อนหน้า</button>
+          <button type="button" id="batchPvNextBtn" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold">โปรเจคถัดไป ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 3: save scope popup -->
+  <div id="batchSaveModal" class="hidden fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-sky-600 flex items-center justify-center text-2xl">💾</div>
+        <div class="font-bold text-white">บันทึกการตั้งค่านี้</div>
+        <div class="text-[11px] text-slate-400">ตำแหน่ง และการเปิด/ปิด Header · Subtitle</div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" data-save-scope="one" class="rounded-xl border border-slate-700 hover:border-sky-400 bg-slate-950 hover:bg-sky-500/10 p-3 text-left space-y-1 transition">
+          <div class="text-xl">📄</div><div class="text-sm font-bold text-white">ใช้แค่โปรเจคนี้</div><div class="text-[10px] text-slate-400">โปรเจคอื่นไม่เปลี่ยน</div>
+        </button>
+        <button type="button" data-save-scope="all" class="rounded-xl border border-emerald-500/50 hover:border-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 p-3 text-left space-y-1 transition">
+          <div class="text-xl">📚</div><div class="text-sm font-bold text-white">ใช้กับทุกโปรเจค</div><div id="batchSaveAllHint" class="text-[10px] text-slate-400">ทุกโปรเจค + โปรเจคที่สร้างใหม่</div>
+        </button>
+      </div>
+      <button type="button" data-save-scope="cancel" class="w-full text-[11px] text-slate-400 hover:text-white">ยกเลิก</button>
+    </div>
+  </div>
+
+  <!-- Page 3: add projects from Shopee links -->
+  <div id="batchAddModal" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-xl space-y-3">
+      <div class="flex items-center justify-between"><div class="font-bold text-white">➕ สร้างโปรเจคจากลิงก์ Shopee</div><button type="button" id="batchAddCloseBtn" class="text-slate-400 hover:text-white text-xl">×</button></div>
+      <p class="text-xs text-slate-400">วางลิงก์สินค้า Shopee บรรทัดละ 1 ลิงก์ → ได้ 1 โปรเจคต่อลิงก์ ดึงรูป ชื่อ และรายละเอียดสินค้าให้อัตโนมัติ (เว้นว่าง = สร้างโปรเจคเปล่า 1 อัน)</p>
+      <textarea id="batchAddLinks" rows="7" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-orange-500" placeholder="https://s.shopee.co.th/...&#10;https://s.shopee.co.th/..."></textarea>
+      <div class="flex items-center justify-end">
+        <button type="button" id="batchAddCreateBtn" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold">📥 สร้างโปรเจค</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ====================================================================== -->
   <!-- GOOGLE AI API KEY MANAGER MODAL (หน้าจัดเก็บ API Google AI)              -->
@@ -815,6 +930,12 @@
           <button id="modalSendToStudioBtn" class="px-4 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold transition flex items-center gap-1.5">
             <span>🎬 ส่งไปทำคลิป (หน้า 2)</span>
           </button>
+          <div id="modalSendToBatchWrap" class="relative">
+            <button id="modalSendToBatchBtn" type="button" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center gap-1.5">
+              <span>🏭 ส่งไปหน้า 3</span><span class="text-[10px]">▾</span>
+            </button>
+            <div id="modalSendToBatchMenu" class="hidden absolute left-0 bottom-full mb-2 z-10 w-72 max-h-72 overflow-y-auto rounded-xl bg-slate-900 border border-orange-500/40 shadow-2xl p-1.5 text-xs"></div>
+          </div>
           <button id="modalDownloadMp4Btn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
             <span>⬇ โหลดวิดีโอ (.MP4 ไร้ลายน้ำ)</span>
           </button>
@@ -832,7 +953,8 @@
     <span id="toastText"></span>
   </div>
 
-  <script src="/app.js?v=27"></script>
-  <script src="/studio.js?v=31"></script>
+  <script src="/app.js?v=28"></script>
+  <script src="/studio.js?v=33"></script>
+  <script src="/batch.js?v=2"></script>
 </body>
 </html>

@@ -207,3 +207,15 @@ body {
 }
 #studioPosPopup [data-pos-target="header"] .pos-range { accent-color: #fde047; }
 #studioPosPopup [data-pos-target="sub"] .pos-range { accent-color: #38bdf8; }
+
+/* ===== Page 3: batch studio ===== */
+.bsw { width: 34px; height: 19px; border-radius: 999px; background: #334155; position: relative; transition: background .2s; flex-shrink: 0; cursor: pointer; }
+.bsw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 999px; background: #fff; transition: left .2s; }
+.bsw.on { background: #e11d48; }
+.bsw.on::after { left: 17px; }
+.bsw:disabled { opacity: .4; cursor: not-allowed; }
+.b-shimmer { background: linear-gradient(90deg, rgba(99,102,241,.15), rgba(244,63,94,.35), rgba(99,102,241,.15)); background-size: 200% 100%; animation: bShimmer 1.4s linear infinite; }
+@keyframes bShimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+.b-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.b-menu { display: none; }
+.b-menu-wrap.open .b-menu { display: block; }

@@ -31,6 +31,7 @@ from services.shopee_service import (
     update_channel_label,
 )
 from services.net_guard import guarded_client
+from services import batch_service
 from services import xhs_service
 from services.xhs_browser import xhs_browser
 from services.downloader import (
@@ -96,7 +97,7 @@ async def same_origin_guard(request: Request, call_next):
 @app.middleware("http")
 async def disable_static_cache(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path in ("/", "/index.html", "/app.js", "/studio.js", "/styles.css"):
+    if request.url.path in ("/", "/index.html", "/app.js", "/studio.js", "/batch.js", "/styles.css"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
 
@@ -1202,10 +1203,15 @@ async def api_studio_convert_mp4(payload: StudioConvertMp4Request):
 async def api_studio_convert_mp4_file(
     file: UploadFile = File(...),
     fps: int = Form(30),
+    save_name: str = Form(""),
+    return_body: bool = Form(True),
 ):
     """
     Accepts multipart/form-data upload of recorded WebM/MP4 blob directly.
     Streams directly to disk in chunks to avoid memory spikes, then converts via FFmpeg.
+
+    save_name: also copy the MP4 into the chosen output folder (X-Saved-Path header, URL-encoded).
+    return_body=false: answer with JSON {saved_path} only (page 3 batch render).
     """
     with tempfile.TemporaryDirectory(prefix="studio_upload_") as tmpdir:
         in_path = os.path.join(tmpdir, "in_recording.webm")
@@ -1217,18 +1223,174 @@ async def api_studio_convert_mp4_file(
 
             await asyncio.to_thread(convert_video_file_to_mp4, in_path, out_path, fps)
 
+            saved_path = ""
+            save_error = ""
+            if save_name.strip():
+                try:
+                    saved_path = str(await asyncio.to_thread(batch_service.save_to_output, out_path, save_name, "mp4"))
+                except Exception as save_exc:
+                    save_error = str(save_exc)
+                    if not return_body:
+                        raise HTTPException(status_code=500, detail=f"บันทึกไฟล์ลงโฟลเดอร์ไม่สำเร็จ: {save_exc}")
+
+            if not return_body:
+                return {"status": "ok", "saved_path": saved_path}
+
             with open(out_path, "rb") as f:
                 mp4_bytes = f.read()
 
-            return Response(
-                content=mp4_bytes,
-                media_type="video/mp4",
-                headers={
-                    "Content-Disposition": 'attachment; filename="ai-review-video.mp4"',
-                },
-            )
+            headers = {"Content-Disposition": 'attachment; filename="ai-review-video.mp4"'}
+            if saved_path:
+                headers["X-Saved-Path"] = quote(saved_path)
+            if save_error:
+                headers["X-Save-Error"] = quote(save_error[:300])
+            return Response(content=mp4_bytes, media_type="video/mp4", headers=headers)
+        except HTTPException:
+            raise
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"แปลงไฟล์ MP4 ไม่สำเร็จ: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Output folder (shared by page 2 & page 3)
+# ---------------------------------------------------------------------------
+class OutputDirRequest(BaseModel):
+    path: str = ""
+
+
+@app.get("/api/studio/output-dir")
+async def api_get_output_dir():
+    p = batch_service.get_output_dir()
+    return {"status": "ok", "path": str(p), "exists": p.exists()}
+
+
+@app.post("/api/studio/output-dir")
+async def api_set_output_dir(payload: OutputDirRequest):
+    try:
+        p = await asyncio.to_thread(batch_service.set_output_dir, payload.path)
+        return {"status": "ok", "path": str(p), "exists": True}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"ใช้โฟลเดอร์นี้ไม่ได้: {exc}")
+
+
+@app.post("/api/studio/pick-output-dir")
+async def api_pick_output_dir():
+    current = str(batch_service.get_output_dir())
+    try:
+        chosen = await asyncio.to_thread(batch_service.pick_folder_dialog, current)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not chosen:
+        return {"status": "cancelled", "path": current}
+    p = await asyncio.to_thread(batch_service.set_output_dir, chosen)
+    return {"status": "ok", "path": str(p), "exists": True}
+
+
+@app.post("/api/studio/open-output")
+async def api_open_output(payload: OutputDirRequest):
+    target = Path(payload.path) if payload.path.strip() else batch_service.get_output_dir()
+    out_dir = batch_service.get_output_dir().resolve()
+    try:
+        resolved = target.resolve()
+        # only ever open the output folder itself or a file inside it
+        if resolved != out_dir and out_dir not in resolved.parents:
+            resolved = out_dir
+        await asyncio.to_thread(batch_service.open_in_explorer, resolved)
+        return {"status": "ok"}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"เปิดโฟลเดอร์ไม่สำเร็จ: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Page 3: batch projects (ทำหลายคลิป)
+# ---------------------------------------------------------------------------
+class BatchSaveRequest(BaseModel):
+    projects: List[Dict[str, Any]] = []
+    defaults: Dict[str, Any] = {}
+
+
+class BatchAudioRequest(BaseModel):
+    mime: str = "audio/mpeg"
+    audio_base64: str
+
+
+class ClipPrefetchRequest(BaseModel):
+    platform: str
+    id: str
+    direct_url: str = ""
+
+
+@app.get("/api/batch/projects")
+async def api_batch_get_projects():
+    return {"status": "ok", **batch_service.load_projects()}
+
+
+@app.put("/api/batch/projects")
+async def api_batch_save_projects(payload: BatchSaveRequest):
+    await asyncio.to_thread(batch_service.save_projects, payload.projects, payload.defaults)
+    return {"status": "ok"}
+
+
+@app.put("/api/batch/audio/{project_id}")
+async def api_batch_save_audio(project_id: str, payload: BatchAudioRequest):
+    try:
+        await asyncio.to_thread(batch_service.save_audio, project_id, payload.mime, payload.audio_base64)
+        return {"status": "ok"}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
+@app.get("/api/batch/audio/{project_id}")
+async def api_batch_get_audio(project_id: str):
+    p = batch_service.audio_path(project_id)
+    if not p or not p.exists():
+        raise HTTPException(status_code=404, detail="ยังไม่มีเสียงพากย์")
+    mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg", "webm": "audio/webm",
+            "aac": "audio/aac", "m4a": "audio/mp4"}.get(p.suffix.lstrip("."), "audio/mpeg")
+    return FileResponse(path=str(p), media_type=mime, headers={"Cache-Control": "no-store"})
+
+
+_PREFETCH_TASKS: Dict[str, asyncio.Task] = {}
+
+
+@app.post("/api/studio/clip-prefetch")
+async def api_studio_clip_prefetch(payload: ClipPrefetchRequest):
+    """Start downloading a source clip into the local cache in the background (page 3 cards)."""
+    lock_key, cached_path = _clip_cache_key_and_path(payload.platform, payload.id)
+    if cached_path.exists() and cached_path.stat().st_size > 10000:
+        return {"status": "done"}
+    task = _PREFETCH_TASKS.get(lock_key)
+    if task and not task.done():
+        return {"status": "downloading"}
+
+    async def _run():
+        try:
+            await api_studio_clip_file(platform=payload.platform, id=payload.id, direct_url=payload.direct_url)
+        except Exception as exc:  # progress endpoint already reports the error
+            print(f"[Batch] prefetch {lock_key} failed: {exc!r}")
+
+    _PREFETCH_TASKS[lock_key] = asyncio.create_task(_run())
+    return {"status": "downloading"}
+
+
+@app.post("/api/studio/upload-clip")
+async def api_studio_upload_clip(file: UploadFile = File(...)):
+    """Store a clip uploaded from the PC in the clip cache so it works like a downloaded one."""
+    import uuid
+
+    clip_id = uuid.uuid4().hex[:16]
+    _, cached_path = _clip_cache_key_and_path("pc", clip_id)
+    tmp_path = cached_path.with_suffix(".part")
+    with open(tmp_path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
+    if tmp_path.stat().st_size <= 10000:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="ไฟล์วิดีโอเล็กเกินไปหรือเสียหาย")
+    tmp_path.replace(cached_path)
+    return {"status": "ok", "platform": "pc", "id": clip_id, "title": file.filename or "คลิปจากเครื่อง"}
 
 
 # Mount static frontend

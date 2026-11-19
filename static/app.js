@@ -1074,6 +1074,7 @@ function renderResolvedCard(item) {
 
 // Open Video Preview Modal
 function openPreviewModal(item) {
+  closeSendToBatchMenu();
   state.currentModalItem = item;
   const meta = getPlatformMeta(item.platform);
 
@@ -1090,6 +1091,7 @@ function openPreviewModal(item) {
 }
 
 function closePreviewModal() {
+  closeSendToBatchMenu();
   modalVideo.pause();
   modalVideo.removeAttribute("src");
   modalVideo.load();
@@ -1261,6 +1263,62 @@ if (modalSendToStudioBtn) {
     }
   });
 }
+
+// ---- Send the clip in the popup to page 3: a new project, or one of the existing projects ----
+const modalSendToBatchBtn = document.getElementById("modalSendToBatchBtn");
+const modalSendToBatchMenu = document.getElementById("modalSendToBatchMenu");
+
+function closeSendToBatchMenu() {
+  document.getElementById("modalSendToBatchMenu")?.classList.add("hidden");
+}
+
+async function openSendToBatchMenu() {
+  if (!modalSendToBatchMenu || !window.BatchApp) return;
+  modalSendToBatchMenu.innerHTML = `<div class="px-2 py-2 text-slate-400">กำลังโหลดรายการโปรเจค...</div>`;
+  modalSendToBatchMenu.classList.remove("hidden");
+  const projects = await window.BatchApp.listProjects();
+  const item = state.currentModalItem;
+  const key = item ? `${item.platform}:${item.id}` : "";
+  const esc = (t) =>
+    String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const product = state.lastShopeeProduct;
+  modalSendToBatchMenu.innerHTML = `
+    <button type="button" data-batch-target="new" class="w-full text-left px-2.5 py-2 rounded-lg hover:bg-orange-500/15 text-orange-200 font-bold">
+      ➕ สร้างโปรเจคใหม่
+      ${product?.title ? `<div class="text-[10px] font-normal text-slate-400 truncate">พร้อมสินค้า Shopee ที่ค้นอยู่: ${esc(product.title)}</div>` : ""}
+    </button>
+    ${projects.length ? `<div class="px-2.5 pt-2 pb-1 text-[10px] text-slate-500">หรือส่งเข้าโปรเจคที่มีอยู่</div>` : ""}
+    ${projects
+      .map(
+        (p) => `<button type="button" data-batch-target="${esc(p.id)}" ${p.clipKeys.includes(key) ? "disabled" : ""} class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+          <span class="text-[10px] text-slate-500 font-mono shrink-0">#${String(p.index).padStart(2, "0")}</span>
+          <span class="flex-1 truncate">${esc(p.label)}</span>
+          <span class="text-[10px] text-slate-400 shrink-0">${p.clipKeys.includes(key) ? "มีคลิปนี้แล้ว" : `${p.clipCount} คลิป`}</span>
+        </button>`
+      )
+      .join("")}`;
+}
+
+modalSendToBatchBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (modalSendToBatchMenu.classList.contains("hidden")) openSendToBatchMenu();
+  else closeSendToBatchMenu();
+});
+
+modalSendToBatchMenu?.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  const btn = e.target.closest("[data-batch-target]");
+  if (!btn || btn.disabled || !state.currentModalItem || !window.BatchApp) return;
+  const target = btn.dataset.batchTarget;
+  closeSendToBatchMenu();
+  await window.BatchApp.sendClip(state.currentModalItem, target === "new" ? null : target, {
+    product: target === "new" ? state.lastShopeeProduct : null,
+  });
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#modalSendToBatchWrap")) closeSendToBatchMenu();
+});
 
 // Expose helpers for Studio (Page 2)
 window.showToast = showToast;

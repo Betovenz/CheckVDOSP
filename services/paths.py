@@ -23,7 +23,13 @@ if _FROZEN:
     # PyInstaller one-file: resources are unpacked to _MEIPASS; the .exe
     # itself lives in a stable, writable folder next to the user's data.
     BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
-    DATA_ROOT = Path(sys.executable).resolve().parent
+    if sys.platform == "darwin":
+        # macOS .app: the bundle is read-only (and may run from a translocated
+        # copy), so user data lives in ~/Library/Application Support instead.
+        DATA_ROOT = Path.home() / "Library" / "Application Support" / "DouyinBilibiliHub"
+        DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    else:
+        DATA_ROOT = Path(sys.executable).resolve().parent
 else:
     _PROJECT_ROOT = Path(__file__).resolve().parent.parent
     BUNDLE_DIR = _PROJECT_ROOT

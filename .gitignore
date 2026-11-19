@@ -4,6 +4,7 @@ __pycache__/
 *.log
 .env
 .venv
+.venv-macbuild/
 env/
 venv/
 shopee_chrome_profile/
@@ -23,3 +24,6 @@ shopee_channels.json
 pyarmor_runtime*
 .pyarmor/
 *.patched.spec
+
+# Page 3 batch projects + voice files (user data)
+data/batch/
