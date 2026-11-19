@@ -24,6 +24,10 @@ def get_referer_for_url(url: str) -> str:
         return "https://www.bilibili.com/"
     if any(k in lower for k in ["toutiao", "byteimg.com", "pstatp.com"]):
         return "https://so.toutiao.com/"
+    if any(k in lower for k in ["rednotecdn.com", "rednote.com"]):
+        return "https://www.rednote.com/"
+    if any(k in lower for k in ["xhscdn.com", "xhscdn.net", "xiaohongshu.com"]):
+        return "https://www.xiaohongshu.com/"
     if any(k in lower for k in ["susercontent.com", "shopee"]):
         return "https://shopee.co.th/"
     return "https://www.douyin.com/"
@@ -81,6 +85,49 @@ async def download_with_ytdlp(
     cmd.append(url)
 
     def _run():
+        # 1. Try in-process yt_dlp Python API first (works seamlessly inside bundled PyInstaller .exe)
+        try:
+            import yt_dlp
+            ffmpeg_bin = shutil.which("ffmpeg")
+            if not ffmpeg_bin:
+                try:
+                    import imageio_ffmpeg
+                    ffmpeg_bin = imageio_ffmpeg.get_ffmpeg_exe()
+                except Exception:
+                    pass
+
+            ydl_opts: Dict[str, Any] = {
+                "outtmpl": output_template,
+                "quiet": True,
+                "no_warnings": True,
+                "user_agent": USER_AGENT,
+                "referer": get_referer_for_url(url),
+                "noplaylist": True,
+            }
+            if ffmpeg_bin:
+                ydl_opts["ffmpeg_location"] = ffmpeg_bin
+
+            if audio_only:
+                ydl_opts["format"] = "bestaudio/best"
+                ydl_opts["postprocessors"] = [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }]
+            else:
+                ydl_opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                ydl_opts["merge_output_format"] = "mp4"
+
+            if cookie_str and ("douyin" in url.lower()):
+                ydl_opts["http_headers"] = {"Cookie": cookie_str}
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            return None
+        except Exception as api_err:
+            pass
+
+        # 2. Fallback to CLI subprocess if Python API threw an unexpected error
         return subprocess.run(
             cmd,
             capture_output=True,
@@ -100,7 +147,12 @@ async def download_with_ytdlp(
         if matches:
             return matches[0], None
 
-        err = (proc.stderr or proc.stdout or "yt-dlp failed").strip()
+        err = ""
+        if proc is not None:
+            err = (proc.stderr or proc.stdout or "yt-dlp failed").strip()
+        else:
+            err = "yt-dlp download failed"
+        return None, err
         return None, err
     except Exception as exc:
         return None, str(exc)

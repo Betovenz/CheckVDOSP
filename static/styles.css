@@ -17,6 +17,57 @@ body {
   box-shadow: 0 2px 10px rgba(14, 165, 233, 0.3);
 }
 
+.badge-xhs {
+  background: linear-gradient(135deg, #ff2442 0%, #e11d48 100%);
+  color: #ffffff;
+  border: 1px solid rgba(254, 205, 211, 0.5);
+  box-shadow: 0 2px 10px rgba(255, 36, 66, 0.3);
+}
+
+/* RedNote "no cookie" popup entrance */
+@keyframes xhs-pop-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+#xhsMissingModal:not(.hidden) .xhs-pop {
+  animation: xhs-pop-in 0.22s ease-out;
+}
+
+/* Video source on/off toggles */
+.source-toggle {
+  border: 1px dashed rgba(71, 85, 105, 0.6);
+  background-color: rgba(15, 23, 42, 0.6);
+  color: #64748b;
+  text-decoration: line-through;
+  opacity: 0.55;
+  transition: all 0.2s ease-in-out;
+}
+.source-toggle:hover {
+  opacity: 0.85;
+}
+.source-toggle[aria-pressed="true"] {
+  text-decoration: none;
+  color: #ffffff;
+  opacity: 1;
+  border-style: solid;
+  border-width: 1.5px;
+}
+.source-toggle[data-source="douyin"][aria-pressed="true"] {
+  background-color: rgba(244, 63, 94, 0.22);
+  border-color: #fb7185;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.35);
+}
+.source-toggle[data-source="bilibili"][aria-pressed="true"] {
+  background-color: rgba(14, 165, 233, 0.22);
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+}
+.source-toggle[data-source="xhs"][aria-pressed="true"] {
+  background-color: rgba(255, 36, 66, 0.22);
+  border-color: #f87171;
+  box-shadow: 0 0 10px rgba(255, 36, 66, 0.35);
+}
+
 /* Filter Tabs */
 .filter-tab {
   background-color: rgba(15, 23, 42, 0.8);
@@ -55,9 +106,104 @@ body {
   box-shadow: 0 12px 28px -8px rgba(56, 189, 248, 0.2);
 }
 
+.video-card.card-xhs:hover {
+  border-color: rgba(255, 36, 66, 0.5);
+  box-shadow: 0 12px 28px -8px rgba(255, 36, 66, 0.2);
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ---------------------------------------------------------------------------
+   Page 2 (AI Studio) — collapsible step cards, style tabs, censor hero card
+   --------------------------------------------------------------------------- */
+.acc:not(.open) .acc-body { display: none; }
+.acc:not(.open) .acc-chev { transform: rotate(-90deg); }
+.acc-chev { transition: transform 0.2s; }
+
+.tab-btn.active {
+  background: rgb(30 41 59);
+  color: #fff;
+  border-color: rgb(217 70 239);
+}
+
+.flash { animation: studio-flash 0.9s ease-out; }
+@keyframes studio-flash {
+  0%, 40% { box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.7); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+
+/* Red pulse while some queued clips still contain Chinese text */
+.censor-pending { animation: censor-pulse 2.2s ease-in-out infinite; }
+@keyframes censor-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(244, 63, 94, 0); }
+}
+
+/* ---------------------------------------------------------------------------
+   Page 1 sidebar — filter rows + on/off switches for each video source
+   --------------------------------------------------------------------------- */
+.filter-tab.side-filter {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #cbd5e1;
+  box-shadow: none;
+}
+.filter-tab.side-filter:hover { background: rgba(30, 41, 59, 0.9); color: #fff; }
+.filter-tab.side-filter.active {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #fff;
+}
+
+.source-toggle.source-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  border: none;
+  background: rgb(51 65 85);
+  text-decoration: none;
+  opacity: 1;
+  box-shadow: none;
+  cursor: pointer;
+}
+.source-toggle.source-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background: #fff;
+  transition: transform 0.2s;
+}
+.source-toggle.source-switch[aria-pressed="true"] { background: rgb(99 102 241); box-shadow: none; }
+.source-toggle.source-switch[aria-pressed="true"]::after { transform: translateX(1rem); }
+
+/* Floating Header/Sub position popup */
+#studioPosPopup .pos-btn {
+  width: 100%;
+  padding: 0.3rem 0;
+  border-radius: 0.5rem;
+  background: rgb(30 41 59);
+  color: rgb(226 232 240);
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+#studioPosPopup .pos-btn:hover { background: rgb(51 65 85); }
+#studioPosPopup .pos-range {
+  writing-mode: vertical-lr; /* min at top -> 0 = top of frame */
+  height: 150px;
+  width: 22px;
+  cursor: ns-resize;
+}
+#studioPosPopup [data-pos-target="header"] .pos-range { accent-color: #fde047; }
+#studioPosPopup [data-pos-target="sub"] .pos-range { accent-color: #38bdf8; }

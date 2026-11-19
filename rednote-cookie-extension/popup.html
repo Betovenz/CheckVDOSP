@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>RedNote Cookie Copier</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body {
+      width: 340px;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px;
+      font-size: 13px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 14px;
+    }
+    .header img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(255, 36, 66, 0.4);
+    }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+    .header p {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .status-card {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .status-row:last-child {
+      margin-bottom: 0;
+    }
+    .status-label {
+      color: #94a3b8;
+      font-size: 11px;
+    }
+    .status-val {
+      font-weight: 600;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+    .dot.green {
+      background: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+    .dot.amber {
+      background: #f59e0b;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+    }
+    .dot.red {
+      background: #ef4444;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    button {
+      width: 100%;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .btn-primary {
+      background: #ff2442;
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(255, 36, 66, 0.35);
+    }
+    .btn-primary:hover {
+      background: #e01b37;
+      box-shadow: 0 4px 14px rgba(255, 36, 66, 0.5);
+    }
+    .btn-secondary {
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+    }
+    .btn-secondary:hover {
+      background: rgba(14, 165, 233, 0.25);
+      border-color: rgba(56, 189, 248, 0.7);
+    }
+    .btn-link {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      padding: 7px 10px;
+    }
+    .btn-link:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #f1f5f9;
+    }
+    .msg {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      text-align: center;
+      display: none;
+    }
+    .msg.success {
+      display: block;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+    .msg.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+    .msg.info {
+      display: block;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #60a5fa;
+    }
+    .toggle-preview {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #64748b;
+      cursor: pointer;
+      text-align: center;
+    }
+    .toggle-preview:hover {
+      color: #94a3b8;
+      text-decoration: underline;
+    }
+    textarea {
+      width: 100%;
+      height: 70px;
+      margin-top: 8px;
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 6px;
+      resize: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="icons/icon48.png" alt="Logo">
+    <div>
+      <h1>RedNote Helper</h1>
+      <p>คัดลอก Cookie & ดาวน์โหลดวิดีโอในหน้าเว็บ</p>
+    </div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-row">
+      <span class="status-label">สถานะการตรวจพบ:</span>
+      <span class="status-val" id="statusVal">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">กำลังตรวจสอบ...</span>
+      </span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">แหล่งข้อมูล:</span>
+      <span class="status-val" id="domainText">-</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">จำนวน Cookie:</span>
+      <span class="status-val" id="cookieCount">0 รายการ</span>
+    </div>
+    <div class="status-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08);">
+      <span class="status-label">ปุ่มดาวน์โหลดในเว็บ:</span>
+      <span class="status-val" style="color: #34d399; font-size: 11px;">
+        <span class="dot green" style="width:6px; height:6px;"></span> เปิดใช้งานแล้ว
+      </span>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button type="button" class="btn-primary" id="copyBtn">
+      📋 คัดลอก Cookie RedNote
+    </button>
+    <button type="button" class="btn-link" id="openXhsBtn">
+      🌐 เปิดเว็บ RedNote / Xiaohongshu
+    </button>
+  </div>
+
+  <div class="msg" id="msgBox"></div>
+
+  <div class="toggle-preview" id="togglePreviewBtn">ดูข้อความ Cookie ▾</div>
+  <textarea id="cookiePreview" readonly placeholder="ข้อความ Cookie..."></textarea>
+
+  <script src="popup.js"></script>
+</body>
+</html>

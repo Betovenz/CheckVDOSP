@@ -15,6 +15,16 @@
 (function () {
   const STUDIO_TEMPLATES = [
     {
+      id: "clean-no-anim",
+      name: "✨ Clean / มาตรฐาน (ไม่มีอนิเมชั่น)",
+      badge: "คลีนมินิมอล • ยอดนิยม",
+      desc: "วิดีโอเต็มจอ 9:16 คมชัด เรียบหรู ไม่มีคลื่นเสียงหรือเส้นวิ่งกวนสายตา (แนะนำ)",
+      accentColor: "#fde047",
+      secondaryColor: "#ffffff",
+      frameMode: "full",
+      noAnimation: true,
+    },
+    {
       id: "slide-zoom",
       name: "✨ Slide Zoom Classic",
       badge: "เต็มจอ • ซูมสมูท",
@@ -70,8 +80,17 @@
     },
   ];
 
-  const ZOOM_EFFECTS = ["zoomIn", "zoomOut", "panLeft", "panRight", "kenBurns"];
-  const TRANSITION_POOL = ["cross-zoom", "whip-slide", "flash-pop"];
+  const ZOOM_EFFECTS = [
+    "static",
+    "zoomIn",
+    "static",
+    "zoomOut",
+    "kenBurns",
+    "static",
+    "panLeft",
+    "panRight",
+  ];
+  const TRANSITION_POOL = ["dissolve", "none", "cross-zoom", "dissolve", "whip-slide"];
 
   // Thai Word Segmenter (Guarantees Thai words are NEVER broken in the middle!)
   const thaiWordSegmenter =
@@ -82,14 +101,39 @@
   function segmentThaiWords(text) {
     const clean = String(text || "").replace(/\s+/g, " ").trim();
     if (!clean) return [];
+    let raw = [];
     if (thaiWordSegmenter) {
-      const tokens = [];
       for (const part of thaiWordSegmenter.segment(clean)) {
-        tokens.push(part.segment);
+        raw.push(part.segment);
       }
-      return tokens;
+    } else {
+      raw = clean.split(" ");
     }
-    return clean.split(" ");
+
+    // Merge invalid word-initial tokens into the previous token:
+    // 1. Combining marks (vowels, tone marks, garan): ิ, ี, ึ, ื, ุ, ู, ฺ, ์, ่, ้, ๊, ๋, ็, ํ
+    // 2. Orphan loanword suffix endings like 'อร์', 'ร์', 'ต์', 'ทร์', 'ตร์', 'ค์', 'ส์', 'ก์', 'ฟ์', 'ดร์', 'ม์', 'นท์'
+    // 3. Suffix endings with garan like 'เตอร์', 'เดอร์', 'เกอร์', 'เซอร์', 'เวอร์', 'เบอร์'
+    // 4. Isolated single Thai consonants
+    const isOrphan = (t) => {
+      if (!t) return false;
+      if (/^[\u0e31\u0e34-\u0e3a\u0e47-\u0e4e]/.test(t)) return true;
+      if (/^([ก-ฮ]?\u0e4c|อ[ก-ฮ]\u0e4c|[ก-ฮ]{1,2}\u0e4c)$/.test(t)) return true;
+      if (/^เ[ก-ฮ]{1,3}\u0e4c$/.test(t)) return true;
+      if (/^[ก-ฮ]$/.test(t)) return true;
+      return false;
+    };
+
+    const tokens = [];
+    for (let i = 0; i < raw.length; i++) {
+      const tok = raw[i];
+      if (isOrphan(tok) && tokens.length > 0 && !tokens[tokens.length - 1].endsWith(" ")) {
+        tokens[tokens.length - 1] += tok;
+      } else {
+        tokens.push(tok);
+      }
+    }
+    return tokens;
   }
 
   /**
@@ -100,6 +144,32 @@
     if (!clean) return [];
     if (ctx.measureText(clean).width <= maxWidth) {
       return [clean];
+    }
+
+    // If text has natural spaces (like "พรีวิววิดีโอได้ทันที เรนเดอร์ไฟล์ MP4 คมชัด"),
+    // prioritize breaking at existing space boundaries without splitting words!
+    if (clean.includes(" ")) {
+      const spaceWords = clean.split(" ").filter(Boolean);
+      const spaceLines = [];
+      let curLine = "";
+      let spaceWrapOk = true;
+      for (const w of spaceWords) {
+        const candidate = curLine ? `${curLine} ${w}` : w;
+        if (ctx.measureText(candidate).width <= maxWidth) {
+          curLine = candidate;
+        } else {
+          if (ctx.measureText(w).width > maxWidth) {
+            spaceWrapOk = false;
+            break;
+          }
+          if (curLine) spaceLines.push(curLine);
+          curLine = w;
+        }
+      }
+      if (curLine) spaceLines.push(curLine);
+      if (spaceWrapOk && spaceLines.length <= maxLines) {
+        return spaceLines;
+      }
     }
 
     const tokens = segmentThaiWords(clean);
@@ -179,7 +249,7 @@
     hiddenVideoPool = document.createElement("div");
     hiddenVideoPool.id = "studioHiddenVideoPool";
     hiddenVideoPool.style.cssText =
-      "position:fixed;left:-9999px;top:-9999px;width:320px;height:568px;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1;";
+      "position:fixed;left:0;top:0;width:2px;height:2px;overflow:hidden;opacity:0.001;pointer-events:none;z-index:-1;";
     document.body.appendChild(hiddenVideoPool);
   }
 
@@ -187,18 +257,24 @@
     activePage: "search", // 'search' | 'studio'
     clips: [], // { id, title, platform, url, blobUrl, thumb, thumbImg, videoEl, lastFrameCanvas, hasDecodedFrame, duration, sourceLabel, isCaching }
     cutSegments: [], // { index, start, duration, clipId, trimStart, zoomEffect, transition }
-    selectedTemplateId: "slide-zoom",
-    cutPaceSec: 2.0,
-    transitionMode: "random",
+    selectedTemplateId: "clean-no-anim",
+    exportResolution: "720p",
+    cutPaceSec: 4.0,
+    transitionMode: "none",
 
     // Header Config (Strictly NO background box behind Header, large bold with thick stroke)
+    showHeader: true,
     headerText: "ของใช้ตรงปก หยิบใช้ง่ายสะดวก",
-    headerFontSize: 80,
+    headerFontSize: 100,
     headerColor: "#fde047",
     headerStrokeColor: "#000000",
     headerStrokeWidth: 20,
+    // Vertical position (center, % of frame height). Horizontal stays centered.
+    headerPosY: 13.5,
+    subPosY: 77,
 
     // Subtitle Config
+    showSubtitles: true,
     scenes: [
       {
         index: 0,
@@ -235,8 +311,8 @@
     ],
     spokenScript:
       "ส่งคลิปเข้าสตูดิโอ ตัดสลับฉากให้อัตโนมัติ วางลิงก์สินค้า Shopee ให้ AI คิดบทพากย์ บอกแค่ว่าเป็นสินค้าอะไร รีวิวจริงไม่ขายเว่อร์ พรีวิววิดีโอได้ทันที เรนเดอร์ไฟล์ MP4 คมชัด",
-    subFontSize: 54,
-    subStrokeWidth: 14,
+    subFontSize: 76,
+    subStrokeWidth: 16,
     subShowBg: false,
 
     // Audio & Playback State
@@ -244,6 +320,9 @@
     currentTime: 0.0,
     isPlaying: false,
     isVoiceMuted: false,
+    isOriginalAudioMuted: true,
+    isCensoring: false,
+    blurChineseMode: "off", // "off" | "bottom" | "both"
     isExporting: false,
     voiceAudio: null,
     voiceAudioDataUrl: "",
@@ -255,6 +334,7 @@
 
     // API Keys
     geminiKeysText: "",
+    openrouterKeysText: "",
   };
 
   // DOM Elements
@@ -270,6 +350,9 @@
   const apiKeyModal = document.getElementById("apiKeyModal");
   const closeApiKeyModalBtn = document.getElementById("closeApiKeyModalBtn");
   const geminiApiKeysInput = document.getElementById("geminiApiKeysInput");
+  const openrouterApiKeysInput = document.getElementById("openrouterApiKeysInput");
+  const geminiSavedKeysList = document.getElementById("geminiSavedKeysList");
+  const openrouterSavedKeysList = document.getElementById("openrouterSavedKeysList");
   const testApiKeyBtn = document.getElementById("testApiKeyBtn");
   const saveApiKeyBtn = document.getElementById("saveApiKeyBtn");
   const apiKeyStatusBox = document.getElementById("apiKeyStatusBox");
@@ -278,9 +361,14 @@
   const studioBackToSearchBtn = document.getElementById("studioBackToSearchBtn");
   const studioGoSearchClipsBtn = document.getElementById("studioGoSearchClipsBtn");
   const studioPcVideoInput = document.getElementById("studioPcVideoInput");
+  const studioLinkInput = document.getElementById("studioLinkInput");
+  const studioAddLinkBtn = document.getElementById("studioAddLinkBtn");
   const studioClipsList = document.getElementById("studioClipsList");
   const studioQueueCountText = document.getElementById("studioQueueCountText");
   const studioClearClipsBtn = document.getElementById("studioClearClipsBtn");
+  const studioToggleOriginalAudioBtn = document.getElementById("studioToggleOriginalAudioBtn");
+  const studioOriginalAudioIcon = document.getElementById("studioOriginalAudioIcon");
+  const studioOriginalAudioText = document.getElementById("studioOriginalAudioText");
   const studioCutPaceSelect = document.getElementById("studioCutPaceSelect");
   const studioTransitionSelect = document.getElementById("studioTransitionSelect");
   const studioReshuffleBtn = document.getElementById("studioReshuffleBtn");
@@ -301,6 +389,7 @@
 
   const studioTemplateGrid = document.getElementById("studioTemplateGrid");
   const studioHeaderInput = document.getElementById("studioHeaderInput");
+  const studioToggleHeaderCheck = document.getElementById("studioToggleHeaderCheck");
   const studioHeaderSizeRange = document.getElementById("studioHeaderSizeRange");
   const studioHeaderSizeVal = document.getElementById("studioHeaderSizeVal");
   const studioHeaderStrokeRange = document.getElementById("studioHeaderStrokeRange");
@@ -315,6 +404,7 @@
   const studioSubStrokeRange = document.getElementById("studioSubStrokeRange");
   const studioSubStrokeVal = document.getElementById("studioSubStrokeVal");
   const studioSubBgCheck = document.getElementById("studioSubBgCheck");
+  const studioToggleSubCheck = document.getElementById("studioToggleSubCheck");
 
   const studioPreviewCanvas = document.getElementById("studioPreviewCanvas");
   const studioCanvasPlayOverlay = document.getElementById("studioCanvasPlayOverlay");
@@ -322,11 +412,14 @@
   const studioPlayPauseBtn = document.getElementById("studioPlayPauseBtn");
   const studioRestartBtn = document.getElementById("studioRestartBtn");
   const studioMuteVoiceBtn = document.getElementById("studioMuteVoiceBtn");
+  const studioMuteOriginalBtn = document.getElementById("studioMuteOriginalBtn");
+  const studioBlurChineseBtn = document.getElementById("studioBlurChineseBtn");
   const studioTimecodeText = document.getElementById("studioTimecodeText");
   const studioVoiceEngineBadge = document.getElementById("studioVoiceEngineBadge");
   const studioCutSummaryText = document.getElementById("studioCutSummaryText");
   const studioCutPreviewStrip = document.getElementById("studioCutPreviewStrip");
 
+  const studioResolutionSelect = document.getElementById("studioResolutionSelect");
   const studioExportMp4Btn = document.getElementById("studioExportMp4Btn");
   const studioExportProgressWrap = document.getElementById("studioExportProgressWrap");
   const studioExportProgressText = document.getElementById("studioExportProgressText");
@@ -343,10 +436,14 @@
     }
   }
 
+  // Safe for both element text and quoted attribute values ("" and '' are escaped too)
   function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str || "";
-    return div.innerHTML;
+    return String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   // ---------------------------------------------------------------------------
@@ -392,30 +489,81 @@
   // ---------------------------------------------------------------------------
   async function loadStudioConfigFromServer() {
     const localKeys = normalizeApiKeysText(localStorage.getItem("studio_gemini_api_keys") || "");
+    const localOrKeys = normalizeOpenRouterKeysText(localStorage.getItem("studio_openrouter_api_keys") || "");
     if (localKeys) {
       studioState.geminiKeysText = localKeys;
       if (geminiApiKeysInput) geminiApiKeysInput.value = localKeys;
-      updateApiKeyDot(localKeys);
     }
+    if (localOrKeys) {
+      studioState.openrouterKeysText = localOrKeys;
+      if (openrouterApiKeysInput) openrouterApiKeysInput.value = localOrKeys;
+    }
+    updateApiKeyDot(studioState.geminiKeysText, studioState.openrouterKeysText);
+    updateVoiceAvailability();
+    try {
+      const localPrefs = JSON.parse(localStorage.getItem("studio_preferences") || "null");
+      if (localPrefs && typeof localPrefs === "object") {
+        applyStudioPreferences(localPrefs);
+      }
+    } catch (_) {}
     try {
       const resp = await fetch("/api/studio/config");
       if (!resp.ok) return;
       const data = await resp.json();
       const serverKeys = normalizeApiKeysText(data.gemini_api_keys_text || "");
+      const serverOrKeys = normalizeOpenRouterKeysText(data.openrouter_api_keys_text || "");
       if (serverKeys) {
         studioState.geminiKeysText = serverKeys;
         if (geminiApiKeysInput) geminiApiKeysInput.value = serverKeys;
         localStorage.setItem("studio_gemini_api_keys", serverKeys);
-        updateApiKeyDot(serverKeys);
       }
-      if (data.default_voice && studioVoiceSelect) {
-        studioVoiceSelect.value = data.default_voice;
+      if (serverOrKeys) {
+        studioState.openrouterKeysText = serverOrKeys;
+        if (openrouterApiKeysInput) openrouterApiKeysInput.value = serverOrKeys;
+        localStorage.setItem("studio_openrouter_api_keys", serverOrKeys);
+      }
+      updateApiKeyDot(studioState.geminiKeysText, studioState.openrouterKeysText);
+      updateVoiceAvailability();
+      renderSavedApiKeysLists();
+      if (data.preferences && typeof data.preferences === "object" && Object.keys(data.preferences).length > 0) {
+        applyStudioPreferences(data.preferences);
+        try {
+          localStorage.setItem("studio_preferences", JSON.stringify(data.preferences));
+        } catch (_) {}
+      }
+      const preferredVoice = (data.preferences && data.preferences.default_voice) || data.default_voice;
+      if (preferredVoice && studioVoiceSelect) {
+        const targetOpt = Array.from(studioVoiceSelect.options).find((o) => o.value === preferredVoice);
+        if (targetOpt && !targetOpt.disabled) {
+          studioVoiceSelect.value = preferredVoice;
+        }
       }
     } catch (_) {}
   }
 
-  function updateApiKeyDot(keysText) {
-    const hasKey = Boolean((keysText || "").trim());
+  function updateVoiceAvailability() {
+    if (!studioVoiceSelect) return;
+    const hasOpenRouter = Boolean((studioState.openrouterKeysText || "").trim());
+    const hasGemini = Boolean((studioState.geminiKeysText || "").trim());
+    Array.from(studioVoiceSelect.options).forEach((opt) => {
+      const req = opt.getAttribute("data-requires");
+      if (req === "openrouter") {
+        opt.disabled = !hasOpenRouter;
+      } else if (req === "gemini") {
+        opt.disabled = !hasGemini;
+      }
+    });
+    const currentOpt = studioVoiceSelect.selectedOptions?.[0];
+    if (!currentOpt || currentOpt.disabled) {
+      const firstEnabled = Array.from(studioVoiceSelect.options).find((o) => !o.disabled);
+      if (firstEnabled) {
+        studioVoiceSelect.value = firstEnabled.value;
+      }
+    }
+  }
+
+  function updateApiKeyDot(geminiText, openrouterText) {
+    const hasKey = Boolean((geminiText || "").trim() || (openrouterText || "").trim());
     if (apiKeyStatusDot) {
       apiKeyStatusDot.className = hasKey
         ? "w-2 h-2 rounded-full bg-emerald-400 shadow shadow-emerald-400"
@@ -426,6 +574,7 @@
   function openApiKeyModal() {
     if (apiKeyModal) apiKeyModal.classList.remove("hidden");
     if (apiKeyStatusBox) apiKeyStatusBox.classList.add("hidden");
+    renderSavedApiKeysLists();
   }
 
   function closeApiKeyModal() {
@@ -449,6 +598,21 @@
     return keys.join("\n");
   }
 
+  function normalizeOpenRouterKeysText(text) {
+    const keys = [];
+    String(text || "")
+      .split(/[\r\n,;]+/)
+      .forEach((part) => {
+        const compact = part.replace(/[\s ​-‍⁠﻿]+/g, "");
+        if (!compact || /^http/i.test(compact)) return;
+        const pieces = (compact.match(/sk-or-/g) || []).length > 1 ? compact.split(/(?=sk-or-)/) : [compact];
+        pieces.forEach((k) => {
+          if (k && !keys.includes(k)) keys.push(k);
+        });
+      });
+    return keys.join("\n");
+  }
+
   function cleanApiKeysInput() {
     if (!geminiApiKeysInput) return "";
     const cleaned = normalizeApiKeysText(geminiApiKeysInput.value);
@@ -456,14 +620,81 @@
     return cleaned;
   }
 
+  function cleanOpenRouterKeysInput() {
+    if (!openrouterApiKeysInput) return "";
+    const cleaned = normalizeOpenRouterKeysText(openrouterApiKeysInput.value);
+    if (openrouterApiKeysInput.value !== cleaned) openrouterApiKeysInput.value = cleaned;
+    return cleaned;
+  }
+
+  function maskApiKey(k) {
+    const s = String(k || "");
+    if (s.length <= 16) return s;
+    return `${s.slice(0, 10)}••••••${s.slice(-6)}`;
+  }
+
+  function renderSavedKeysFor(containerEl, keysText, kind) {
+    if (!containerEl) return;
+    const keys = String(keysText || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    if (!keys.length) {
+      containerEl.innerHTML = "";
+      return;
+    }
+    containerEl.innerHTML = keys
+      .map(
+        (k, idx) => `
+      <div class="flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-slate-950/90 border border-slate-800 text-[11px]">
+        <span class="font-mono text-slate-300 truncate" title="${escapeHtml(k)}">#${idx + 1} ${escapeHtml(maskApiKey(k))}</span>
+        <button
+          type="button"
+          data-remove-api-kind="${kind}"
+          data-remove-api-idx="${idx}"
+          class="px-2 py-0.5 rounded bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white text-[10px] font-bold transition shrink-0"
+        >
+          ✕ ลบ
+        </button>
+      </div>`
+      )
+      .join("");
+
+    containerEl.querySelectorAll("[data-remove-api-idx]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const removeIdx = Number(btn.getAttribute("data-remove-api-idx"));
+        const targetKind = btn.getAttribute("data-remove-api-kind");
+        const currentText = targetKind === "openrouter" ? cleanOpenRouterKeysInput() : cleanApiKeysInput();
+        const arr = currentText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+        arr.splice(removeIdx, 1);
+        const nextText = arr.join("\n");
+        if (targetKind === "openrouter") {
+          if (openrouterApiKeysInput) openrouterApiKeysInput.value = nextText;
+        } else {
+          if (geminiApiKeysInput) geminiApiKeysInput.value = nextText;
+        }
+        await saveApiKeys();
+      });
+    });
+  }
+
+  function renderSavedApiKeysLists() {
+    renderSavedKeysFor(openrouterSavedKeysList, openrouterApiKeysInput?.value || studioState.openrouterKeysText, "openrouter");
+    renderSavedKeysFor(geminiSavedKeysList, geminiApiKeysInput?.value || studioState.geminiKeysText, "gemini");
+  }
+
   geminiApiKeysInput?.addEventListener("paste", () => setTimeout(cleanApiKeysInput, 0));
   geminiApiKeysInput?.addEventListener("blur", cleanApiKeysInput);
+  openrouterApiKeysInput?.addEventListener("paste", () => setTimeout(cleanOpenRouterKeysInput, 0));
+  openrouterApiKeysInput?.addEventListener("blur", cleanOpenRouterKeysInput);
 
   async function saveApiKeys() {
     const raw = cleanApiKeysInput();
+    const rawOr = cleanOpenRouterKeysInput();
     studioState.geminiKeysText = raw;
+    studioState.openrouterKeysText = rawOr;
     localStorage.setItem("studio_gemini_api_keys", raw);
-    updateApiKeyDot(raw);
+    localStorage.setItem("studio_openrouter_api_keys", rawOr);
+    updateApiKeyDot(raw, rawOr);
+    updateVoiceAvailability();
+    renderSavedApiKeysLists();
 
     try {
       const resp = await fetch("/api/studio/config", {
@@ -471,15 +702,14 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gemini_api_keys: raw,
+          openrouter_api_keys: rawOr,
           default_voice: studioVoiceSelect?.value || "Puck",
         }),
       });
       const data = await resp.json();
-      showApiKeyNotice(
-        `บันทึก API Key สำเร็จ (${data.key_count || 0} คีย์ พร้อมสลับโควตาอัตโนมัติ)`,
-        true
-      );
-      toast(`บันทึก Google AI API Key สำเร็จ (${data.key_count || 0} คีย์)`);
+      const msg = `บันทึกสำเร็จ (OpenRouter: ${data.openrouter_key_count || 0} คีย์ • Google AI: ${data.key_count || 0} คีย์)`;
+      showApiKeyNotice(msg, true);
+      toast(msg);
     } catch (err) {
       showApiKeyNotice(`บันทึกลงเบราว์เซอร์แล้ว (${err.message})`, true);
     }
@@ -487,12 +717,13 @@
 
   async function testApiKeys() {
     const raw = cleanApiKeysInput();
-    showApiKeyNotice("กำลังทดสอบการเชื่อมต่อกับ Google Gemini AI...", true);
+    const rawOr = cleanOpenRouterKeysInput();
+    showApiKeyNotice("กำลังทดสอบการเชื่อมต่อ API Key...", true);
     try {
       const resp = await fetch("/api/studio/test-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: raw }),
+        body: JSON.stringify({ api_key: raw, openrouter_api_key: rawOr }),
       });
       const data = await resp.json();
       showApiKeyNotice(data.message || "ทดสอบเสร็จสิ้น", Boolean(data.valid));
@@ -516,8 +747,8 @@
   function setupClipVideoAndFrameBuffer(clip) {
     // 1. Frame buffer canvas so seeking never flashes blank dark background
     const frameCanvas = document.createElement("canvas");
-    frameCanvas.width = 540;
-    frameCanvas.height = 960;
+    frameCanvas.width = 1080;
+    frameCanvas.height = 1920;
     clip.lastFrameCanvas = frameCanvas;
     clip.hasDecodedFrame = false;
 
@@ -530,6 +761,8 @@
         if (!clip.hasDecodedFrame) {
           const fctx = clip.lastFrameCanvas.getContext("2d");
           if (fctx) {
+            fctx.imageSmoothingEnabled = true;
+            fctx.imageSmoothingQuality = "high";
             fctx.drawImage(img, 0, 0, frameCanvas.width, frameCanvas.height);
             clip.hasDecodedFrame = true;
           }
@@ -555,13 +788,15 @@
     const captureFirstFrame = () => {
       if (studioState.isExporting) return; // export loop keeps the cache itself
       if (vid.readyState >= 2 && vid.videoWidth > 0) {
-        const cacheW = Math.min(vid.videoWidth, 480);
+        const cacheW = Math.min(vid.videoWidth, 1080);
         const cacheH = Math.round((vid.videoHeight / vid.videoWidth) * cacheW);
         clip.lastFrameCanvas.width = cacheW;
         clip.lastFrameCanvas.height = cacheH;
         const fctx = clip.lastFrameCanvas.getContext("2d");
         if (fctx) {
           try {
+            fctx.imageSmoothingEnabled = true;
+            fctx.imageSmoothingQuality = "high";
             fctx.drawImage(vid, 0, 0, cacheW, cacheH);
             clip.hasDecodedFrame = true;
           } catch (_) {}
@@ -601,17 +836,69 @@
     // 4. If remote clip, download into browser RAM Blob so random cuts seek in 0ms!
     if (!clip.url.startsWith("blob:")) {
       clip.isCaching = true;
+      clip.cacheProgress = 0;
+      clip.cacheLoadedMB = 0;
+      clip.cacheTotalMB = 0;
+      clip.cacheError = "";
       updateClipsUI();
+
+      const itemId = clip.rawItem?.id || "";
+      const plat = clip.platform || "";
+      let progressTimer = null;
+      if (plat && itemId) {
+        progressTimer = setInterval(async () => {
+          if (!clip.isCaching) {
+            clearInterval(progressTimer);
+            return;
+          }
+          try {
+            const pr = await fetch(
+              `/api/studio/clip-progress?platform=${encodeURIComponent(plat)}&id=${encodeURIComponent(itemId)}`
+            );
+            if (!pr.ok) return;
+            const pd = await pr.json();
+            if (typeof pd.pct === "number") {
+              clip.cacheProgress = pd.pct;
+              clip.cacheLoadedMB = (pd.loaded || 0) / (1024 * 1024);
+              clip.cacheTotalMB = (pd.total || 0) / (1024 * 1024);
+              updateClipProgressDOM(clip);
+            }
+          } catch {}
+        }, 350);
+      }
+
       fetch(clip.url)
-        .then((r) => {
+        .then(async (r) => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.blob();
+          const total = parseInt(r.headers.get("content-length") || "0", 10);
+          if (!r.body || !r.body.getReader) {
+            return await r.blob();
+          }
+          const reader = r.body.getReader();
+          const chunks = [];
+          let loaded = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            loaded += value.byteLength;
+            if (total > 0) {
+              clip.cacheProgress = Math.min(100, Math.round((loaded * 100) / total));
+              clip.cacheLoadedMB = loaded / (1024 * 1024);
+              clip.cacheTotalMB = total / (1024 * 1024);
+              updateClipProgressDOM(clip);
+            }
+          }
+          return new Blob(chunks, { type: r.headers.get("content-type") || "video/mp4" });
         })
         .then((blob) => {
+          if (progressTimer) clearInterval(progressTimer);
           if (blob && blob.size > 10000) {
             const localBlobUrl = URL.createObjectURL(blob);
             clip.blobUrl = localBlobUrl;
             clip.isCaching = false;
+            clip.cacheProgress = 100;
+            clip.cacheError = "";
             const curT = vid.currentTime || 0;
             vid.src = localBlobUrl;
             vid.load();
@@ -621,12 +908,39 @@
             }
             updateClipsUI();
             renderCurrentStudioFrame();
+          } else {
+            throw new Error("ไฟล์วิดีโอไม่สมบูรณ์");
           }
         })
-        .catch(() => {
+        .catch((err) => {
+          if (progressTimer) clearInterval(progressTimer);
           clip.isCaching = false;
+          clip.cacheError = (err && err.message) || "โหลดไม่สำเร็จ";
           updateClipsUI();
         });
+    }
+  }
+
+  function formatClipProgressText(clip) {
+    const pct = Math.max(0, Math.min(100, Math.round(clip.cacheProgress || 0)));
+    if (clip.cacheTotalMB > 0) {
+      return `⏳ กำลังโหลดคลิป ${pct}% (${clip.cacheLoadedMB.toFixed(1)}/${clip.cacheTotalMB.toFixed(1)} MB)`;
+    }
+    if (clip.cacheLoadedMB > 0) {
+      return `⏳ กำลังโหลดคลิป ${pct}% (${clip.cacheLoadedMB.toFixed(1)} MB)`;
+    }
+    return `⏳ กำลังโหลดคลิป ${pct}%...`;
+  }
+
+  function updateClipProgressDOM(clip) {
+    if (!studioClipsList || !clip) return;
+    const statusEl = studioClipsList.querySelector(`[data-clip-status="${CSS.escape(clip.id)}"]`);
+    if (statusEl) {
+      statusEl.textContent = formatClipProgressText(clip);
+    }
+    const barEl = studioClipsList.querySelector(`[data-clip-bar="${CSS.escape(clip.id)}"]`);
+    if (barEl) {
+      barEl.style.width = `${Math.max(4, Math.min(100, Math.round(clip.cacheProgress || 0)))}%`;
     }
   }
 
@@ -640,14 +954,17 @@
     }
 
     // Use backend local clip cache endpoint for fast seeking & zero range-request stalls
-    const cacheClipUrl = `/api/studio/clip-file?platform=${encodeURIComponent(item.platform)}&id=${encodeURIComponent(item.id)}&direct_url=${encodeURIComponent(item.direct_video_url || "")}`;
+    const cacheClipUrl = `/api/studio/clip-file?platform=${encodeURIComponent(item.platform)}&id=${encodeURIComponent(item.id)}&direct_url=${encodeURIComponent(
+      item.direct_video_url || (item.platform === "xhs" ? item.url || "" : "")
+    )}`;
     const thumbUrl = item.cover ? `/api/proxy-image?url=${encodeURIComponent(item.cover)}` : "";
 
     const newClip = {
       id: clipKey,
       title: item.title || `คลิปจาก ${item.platform}`,
       platform: item.platform,
-      sourceLabel: item.platform === "douyin" ? "🎵 Douyin" : "📺 Bilibili",
+      sourceLabel:
+        item.platform === "douyin" ? "🎵 Douyin" : item.platform === "xhs" ? "📕 RedNote" : "📺 Bilibili",
       url: cacheClipUrl,
       blobUrl: "",
       thumb: thumbUrl,
@@ -658,6 +975,10 @@
       lastFrameCanvas: null,
       hasDecodedFrame: false,
       isCaching: false,
+      cacheProgress: 0,
+      cacheLoadedMB: 0,
+      cacheTotalMB: 0,
+      cacheError: "",
     };
 
     setupClipVideoAndFrameBuffer(newClip);
@@ -675,6 +996,71 @@
     toast(`🎬 ส่งคลิปเข้าสตูดิโอแล้ว! ตัดยำสลับฉากให้อัตโนมัติ (รวม ${studioState.clips.length} คลิป)`);
   }
 
+  // Paste Douyin / RedNote / Bilibili links -> resolve -> add to the cut queue
+  function splitPastedLinks(text) {
+    const urls = text.match(/https?:\/\/[^\s"'<>，。]+/g);
+    if (urls && urls.length) return [...new Set(urls)];
+    return text
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+
+  async function addClipsFromLinks() {
+    const raw = (studioLinkInput?.value || "").trim();
+    if (!raw) {
+      toast("กรุณาวางลิงก์ Douyin / RedNote / Bilibili ก่อน");
+      return;
+    }
+    const links = splitPastedLinks(raw);
+    if (links.some((l) => /shopee|shp\.ee/i.test(l))) {
+      toast("ลิงก์ Shopee ใช้ที่หน้าค้นหา (หน้าที่ 1) — ช่องนี้รับเฉพาะลิงก์คลิป Douyin / RedNote / Bilibili", false, 5000);
+      return;
+    }
+    studioAddLinkBtn.disabled = true;
+    const oldLabel = studioAddLinkBtn.textContent;
+    studioAddLinkBtn.textContent = "⏳ กำลังโหลด...";
+    const failed = [];
+    let added = 0;
+    toast(`🔗 กำลังดึง ${links.length} คลิปพร้อมกันอย่างรวดเร็ว...`, true, 60000);
+    const resolvedResults = await Promise.allSettled(
+      links.map(async (url) => {
+        const resp = await fetch("/api/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.item) throw new Error(data.detail || `HTTP ${resp.status}`);
+        return { url, item: data.item };
+      })
+    );
+
+    for (const res of resolvedResults) {
+      if (res.status === "fulfilled" && res.value?.item) {
+        const before = studioState.clips.length;
+        addClipFromPage1(res.value.item);
+        if (studioState.clips.length > before) added++;
+      } else {
+        const failedUrl = res.reason?.url || (res.value && res.value.url) || "";
+        if (failedUrl) failed.push(failedUrl);
+      }
+    }
+    studioAddLinkBtn.disabled = false;
+    studioAddLinkBtn.textContent = oldLabel;
+    // keep only the links that failed so the user can fix / retry them
+    studioLinkInput.value = failed.join("\n");
+    if (links.length > 1) {
+      toast(
+        failed.length
+          ? `เพิ่มเข้าคิว ${added} คลิป • ดึงไม่สำเร็จ ${failed.length} ลิงก์ (ค้างไว้ในช่องให้ลองใหม่)`
+          : `🎬 เพิ่มเข้าคิว ${added} คลิปจากลิงก์แล้ว (รวม ${studioState.clips.length} คลิป)`,
+        false,
+        5000
+      );
+    }
+  }
+
   function handlePcVideoUpload(fileList) {
     if (!fileList || fileList.length === 0) return;
     let added = 0;
@@ -689,6 +1075,7 @@
         sourceLabel: "💻 PC Upload",
         url: objUrl,
         blobUrl: objUrl,
+        rawFile: file,
         thumb: "",
         thumbImg: null,
         duration: 12.0,
@@ -773,11 +1160,131 @@
     }
   }
 
+  function updateOriginalAudioUI() {
+    const isMuted = Boolean(studioState.isOriginalAudioMuted);
+    if (studioToggleOriginalAudioBtn) {
+      if (isMuted) {
+        studioToggleOriginalAudioBtn.className =
+          "px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 bg-slate-900 border-red-500/40 text-red-300 hover:border-red-400 self-start sm:self-auto cursor-pointer";
+        if (studioOriginalAudioIcon) studioOriginalAudioIcon.textContent = "🔇";
+        if (studioOriginalAudioText) studioOriginalAudioText.textContent = "เสียงคลิปต้นฉบับ: ปิด 100% (Default)";
+      } else {
+        studioToggleOriginalAudioBtn.className =
+          "px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 bg-emerald-950/40 border-emerald-500 text-emerald-300 hover:border-emerald-400 self-start sm:self-auto cursor-pointer shadow-sm shadow-emerald-500/20";
+        if (studioOriginalAudioIcon) studioOriginalAudioIcon.textContent = "🔊";
+        if (studioOriginalAudioText) studioOriginalAudioText.textContent = "เสียงคลิปต้นฉบับ: เปิด (70%)";
+      }
+    }
+
+    if (studioMuteOriginalBtn) {
+      studioMuteOriginalBtn.textContent = isMuted ? "🔇 เสียงคลิป: ปิด" : "🔊 เสียงคลิป: เปิด";
+      studioMuteOriginalBtn.className = isMuted
+        ? "px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-semibold transition"
+        : "px-2.5 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 text-xs font-semibold border border-emerald-500/40 transition";
+    }
+
+    syncActiveClipVideoElement(
+      studioState.currentTime,
+      studioState.isPlaying && studioState.activePage === "studio" && !studioState.isExporting
+    );
+  }
+
+  function toggleOriginalAudio() {
+    studioState.isOriginalAudioMuted = !studioState.isOriginalAudioMuted;
+    try {
+      localStorage.setItem("studio_original_audio_muted", String(studioState.isOriginalAudioMuted));
+    } catch (_) {}
+    updateOriginalAudioUI();
+    updateClipsUI();
+    toast(studioState.isOriginalAudioMuted ? "🔇 ปิดเสียงคลิปต้นฉบับแล้ว (Default)" : "🔊 เปิดเสียงคลิปต้นฉบับแล้ว (70%)");
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chinese-censor hero card (right column): status, counter, progress, button
+  // ---------------------------------------------------------------------------
+  const CENSOR_BTN_RED =
+    "w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-rose-600 via-red-500 to-orange-500 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-rose-600/30 transition flex items-center justify-center gap-2 disabled:cursor-wait";
+  const CENSOR_BTN_DONE =
+    "w-full py-3 px-5 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/35 border border-emerald-500/50 text-emerald-200 font-extrabold text-sm transition flex items-center justify-center gap-2 disabled:cursor-wait";
+
+  function renderCensorUI() {
+    const card = document.getElementById("censorCard");
+    if (!card) return;
+    const icon = document.getElementById("censorIcon");
+    const statusEl = document.getElementById("studioCensorStatusText");
+    const badge = document.getElementById("studioCensorCountBadge");
+    const bar = document.getElementById("studioCensorProgressBar");
+    const note = document.getElementById("studioCensorProgressText");
+    const total = studioState.clips.length;
+    const done = studioState.clips.filter((c) => c.isCensored).length;
+    const left = total - done;
+    const allDone = total > 0 && left === 0;
+
+    if (badge) badge.textContent = `${done}/${total}`;
+    if (studioState.isCensoring) return; // the running scan owns the button/progress text
+
+    card.className = allDone
+      ? "rounded-2xl bg-gradient-to-br from-emerald-950/70 via-slate-900 to-slate-900 border-2 border-emerald-500/60 p-4 shadow-2xl space-y-3"
+      : "censor-pending rounded-2xl bg-gradient-to-br from-rose-950/80 via-slate-900 to-slate-900 border-2 border-rose-500/70 p-4 shadow-2xl shadow-rose-900/30 space-y-3";
+    if (icon) {
+      icon.textContent = allDone ? "✅" : "🈲";
+      icon.className = `w-10 h-10 rounded-xl ${allDone ? "bg-emerald-500/20 border-emerald-500/50" : "bg-rose-500/20 border-rose-500/50"} border flex items-center justify-center text-xl`;
+    }
+    if (statusEl) {
+      statusEl.className = `text-[11px] font-semibold ${allDone ? "text-emerald-300" : "text-rose-300"}`;
+      statusEl.textContent = !total
+        ? "ยังไม่มีคลิปในคิว"
+        : allDone
+          ? "เบลอตัวจีนครบทุกคลิปแล้ว"
+          : `เหลือ ${left} จาก ${total} คลิปที่ยังไม่ได้เซนเซอร์`;
+    }
+    if (badge) {
+      badge.className = `px-2.5 py-1 rounded-lg border text-xs font-extrabold font-mono ${allDone ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200" : "bg-rose-500/20 border-rose-500/40 text-rose-200"}`;
+    }
+    if (studioBlurChineseBtn) {
+      studioBlurChineseBtn.disabled = false;
+      studioBlurChineseBtn.className = allDone ? CENSOR_BTN_DONE : CENSOR_BTN_RED;
+      studioBlurChineseBtn.textContent = allDone
+        ? "🔍 เซนเซอร์จีนใหม่"
+        : done > 0
+          ? `🔍 เซนเซอร์จีน ${left} คลิปที่เหลือ`
+          : "🔍 เซนเซอร์จีนทั้งหมด";
+    }
+    if (bar) {
+      bar.style.width = total ? `${(done / total) * 100}%` : "0%";
+      bar.className = `h-full transition-all duration-150 bg-gradient-to-r ${allDone ? "from-emerald-400 to-teal-400" : "from-rose-500 to-orange-400"}`;
+    }
+  }
+
+  // Open (if collapsed), scroll to and briefly highlight a page-2 card
+  function flashStudioSection(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.classList.contains("acc")) el.classList.add("open");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  }
+
+  function showStudioStyleTab(tabId) {
+    document.querySelectorAll("#secStyle .tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabId));
+    document.querySelectorAll("#secStyle .tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== tabId));
+  }
+
   function updateClipsUI() {
     const count = studioState.clips.length;
     if (studioClipCountBadge) studioClipCountBadge.textContent = `${count} คลิป`;
     if (studioQueueCountText) studioQueueCountText.textContent = String(count);
     if (studioClearClipsBtn) studioClearClipsBtn.classList.toggle("hidden", count === 0);
+    window.dispatchEvent(new CustomEvent("studio:clips-changed")); // page 1 badges + "go to studio" button
+    const footageSummary = document.getElementById("footageSummary");
+    if (footageSummary) {
+      footageSummary.textContent = count
+        ? `${count} คลิปในคิว • เสียงต้นฉบับ${studioState.isOriginalAudioMuted ? "ปิด" : "เปิด"}`
+        : "ส่งมาจากหน้าหาคลิป หรือ อัปโหลดจากเครื่อง PC";
+    }
+    renderCensorUI();
 
     if (!studioClipsList) return;
     if (count === 0) {
@@ -792,25 +1299,37 @@
     studioClipsList.innerHTML = studioState.clips
       .map(
         (clip, i) => `
-      <div class="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+      <div class="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-950 border ${clip.isCensored ? "border-slate-800" : "border-rose-500/40"}">
         <div class="flex items-center gap-2.5 min-w-0">
           <div class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-fuchsia-400">
             ${
               clip.thumb
-                ? `<img src="${clip.thumb}" class="w-full h-full object-cover" alt="" />`
+                ? `<img src="${clip.thumb}" class="w-full h-full object-cover" alt="" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" /><span style="display:none" class="w-full h-full items-center justify-center">#${i + 1}</span>`
                 : `<span>#${i + 1}</span>`
             }
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-slate-300">${escapeHtml(clip.sourceLabel)}</span>
-              <span class="text-[10px] text-emerald-400 font-semibold">🔇 ปิดเสียงแล้ว</span>
+              ${
+                clip.isCensored
+                  ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/40 text-[10px] text-emerald-300 font-bold">✓ เซนเซอร์แล้ว</span>`
+                  : `<span class="px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/40 text-[10px] text-rose-300 font-bold">🈲 ยังไม่เซนเซอร์</span>`
+              }
+              <span class="text-[10px] ${studioState.isOriginalAudioMuted ? "text-emerald-400" : "text-amber-300"} font-semibold" title="${studioState.isOriginalAudioMuted ? "ปิดเสียงคลิปต้นฉบับ 100%" : "เปิดเสียงคลิปต้นฉบับ"}">${studioState.isOriginalAudioMuted ? "🔇" : "🔊"}</span>
               ${
                 clip.isCaching
-                  ? `<span class="text-[10px] text-amber-300 animate-pulse">⏳ กำลังซิงค์ลงพรีวิว...</span>`
-                  : `<span class="text-[10px] text-sky-400 font-semibold">✓ พร้อมตัดสลับ</span>`
+                  ? `<span data-clip-status="${escapeHtml(clip.id)}" class="text-[10px] text-amber-300 font-semibold">${escapeHtml(formatClipProgressText(clip))}</span>`
+                  : clip.cacheError
+                    ? `<span class="text-[10px] text-rose-400 font-semibold" title="${escapeHtml(clip.cacheError)}">✕ โหลดไม่สำเร็จ</span>`
+                    : `<span class="text-[10px] text-sky-400 font-semibold">✓ พร้อมตัดสลับ</span>`
               }
             </div>
+            ${
+              clip.isCaching
+                ? `<div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden mt-1"><div data-clip-bar="${escapeHtml(clip.id)}" class="h-full bg-gradient-to-r from-amber-400 to-fuchsia-500 transition-all duration-200" style="width:${Math.max(4, Math.min(100, Math.round(clip.cacheProgress || 0)))}%"></div></div>`
+                : ""
+            }
             <p class="text-xs font-semibold text-slate-200 truncate mt-0.5" title="${escapeHtml(clip.title)}">
               ${escapeHtml(clip.title)}
             </p>
@@ -850,93 +1369,153 @@
   /**
    * Build randomized cut & shuffle segments across totalDuration
    */
-  function buildRandomCutPlan() {
+  function buildRandomCutPlan(forceReshuffle = false) {
     const totalDur = Math.max(4, Number(studioState.totalDuration) || 20);
-    const basePace = Math.max(1.2, Number(studioCutPaceSelect?.value || studioState.cutPaceSec || 2.0));
+    const paceVal = studioCutPaceSelect?.value || String(studioState.cutPaceSec || "4.0");
+    const isAutoScenes = paceVal === "auto_scenes";
+    const basePace = isAutoScenes
+      ? 4.0
+      : Math.max(1.2, Number(paceVal) || studioState.cutPaceSec || 4.0);
     studioState.cutPaceSec = basePace;
-    studioState.transitionMode = studioTransitionSelect?.value || "random";
+    studioState.transitionMode = studioTransitionSelect?.value || "none";
 
-    const clips = studioState.clips;
-    const rawSlices = [];
-
-    if (clips.length > 0) {
-      clips.forEach((clip, cIdx) => {
-        const vidDur = Math.max(4, Number(clip.duration) || 12);
-        const usableStart = vidDur > 3 ? 0.3 : 0;
-        const usableEnd = Math.max(usableStart + basePace, vidDur - 0.5);
-        let cursor = usableStart;
-        while (cursor < usableEnd) {
-          rawSlices.push({
-            clipId: clip.id,
-            clipIndex: cIdx + 1,
-            trimStart: Number(cursor.toFixed(2)),
-          });
-          cursor += basePace * 0.85;
-        }
+    // Build timeline durations
+    const timeSlices = [];
+    if (isAutoScenes && Array.isArray(studioState.scenes) && studioState.scenes.length > 0) {
+      studioState.scenes.forEach((sc) => {
+        timeSlices.push({
+          start: Number(sc.start) || 0,
+          duration: Math.max(1.0, Number(sc.duration) || 4.0),
+        });
       });
-
-      // Fisher-Yates random shuffle
-      for (let i = rawSlices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        const tmp = rawSlices[i];
-        rawSlices[i] = rawSlices[j];
-        rawSlices[j] = tmp;
+    } else {
+      const targetCount = Math.max(1, Math.round(totalDur / basePace));
+      const exactAvg = totalDur / targetCount;
+      let curr = 0;
+      for (let i = 0; i < targetCount; i++) {
+        if (i === targetCount - 1) {
+          timeSlices.push({
+            start: Number(curr.toFixed(2)),
+            duration: Number(Math.max(1.0, totalDur - curr).toFixed(2)),
+          });
+        } else {
+          // Subtle organic jitter (±6%) so cuts feel natural and not like a rigid metronome
+          const jitter = 0.95 + Math.random() * 0.10;
+          const dur = Number((exactAvg * jitter).toFixed(2));
+          timeSlices.push({
+            start: Number(curr.toFixed(2)),
+            duration: dur,
+          });
+          curr += dur;
+        }
       }
     }
 
+    const clips = studioState.clips;
     const segments = [];
-    let t = 0;
-    let idx = 0;
 
-    while (t < totalDur - 0.15) {
-      const jitter = 0.9 + Math.random() * 0.2;
-      let segDur = Number((basePace * jitter).toFixed(2));
-      if (t + segDur > totalDur - 0.4) {
-        segDur = Number((totalDur - t).toFixed(2));
-      }
-
-      const slice =
-        rawSlices.length > 0
-          ? { ...rawSlices[idx % rawSlices.length] }
-          : { clipId: null, clipIndex: 0, trimStart: 0 };
-
-      if (
-        segments.length > 0 &&
-        rawSlices.length > 1 &&
-        slice.clipId === segments[segments.length - 1].clipId &&
-        Math.abs(slice.trimStart - segments[segments.length - 1].trimStart) < 1.0
-      ) {
-        const alt = rawSlices[(idx + 1) % rawSlices.length];
-        if (alt) {
-          slice.clipId = alt.clipId;
-          slice.clipIndex = alt.clipIndex;
-          slice.trimStart = alt.trimStart;
-        }
-      }
-
-      const zoom = ZOOM_EFFECTS[Math.floor(Math.random() * ZOOM_EFFECTS.length)];
-      let trans = "none";
-      if (idx > 0) {
-        if (studioState.transitionMode === "random") {
-          trans = TRANSITION_POOL[Math.floor(Math.random() * TRANSITION_POOL.length)];
-        } else {
-          trans = studioState.transitionMode;
-        }
-      }
-
-      segments.push({
-        index: idx,
-        start: Number(t.toFixed(2)),
-        duration: segDur,
-        clipId: slice.clipId,
-        clipIndex: slice.clipIndex,
-        trimStart: slice.trimStart,
-        zoomEffect: zoom,
-        transition: trans,
+    if (clips.length === 0) {
+      timeSlices.forEach((ts, idx) => {
+        segments.push({
+          index: idx,
+          start: ts.start,
+          duration: ts.duration,
+          clipId: null,
+          clipIndex: 0,
+          trimStart: 0,
+          zoomEffect: "static",
+          transition: idx === 0 ? "none" : (studioState.transitionMode === "random" ? "dissolve" : studioState.transitionMode),
+        });
       });
+    } else if (clips.length === 1) {
+      // Single clip: Flow forward chronologically through the video!
+      // NEVER scramble backwards (e.g. 13.9s -> 10.5s -> 7.1s) which makes viewers dizzy!
+      const clip = clips[0];
+      const vidDur = Math.max(4, Number(clip.duration) || 12);
+      const usableStart = vidDur > 4 ? 0.4 : 0;
+      const usableEnd = Math.max(usableStart + 2, vidDur - 0.6);
+      const availableSpan = Math.max(0.5, usableEnd - usableStart);
 
-      t = Number((t + segDur).toFixed(2));
-      idx++;
+      const nSlices = timeSlices.length;
+      timeSlices.forEach((ts, idx) => {
+        const progress = nSlices > 1 ? idx / (nSlices - 1) : 0;
+        let tStart = usableStart + progress * (availableSpan * 0.75);
+        if (tStart + ts.duration > vidDur) {
+          tStart = Math.max(0, vidDur - ts.duration - 0.2);
+        }
+
+        const zoom = ZOOM_EFFECTS[Math.floor(Math.random() * ZOOM_EFFECTS.length)];
+        let trans = "none";
+        if (idx > 0) {
+          trans = studioState.transitionMode === "random"
+            ? TRANSITION_POOL[Math.floor(Math.random() * TRANSITION_POOL.length)]
+            : studioState.transitionMode;
+        }
+
+        segments.push({
+          index: idx,
+          start: ts.start,
+          duration: ts.duration,
+          clipId: clip.id,
+          clipIndex: 1,
+          trimStart: Number(tStart.toFixed(2)),
+          zoomEffect: zoom,
+          transition: trans,
+        });
+      });
+    } else {
+      // Multiple clips: Alternate between clips (Clip 1 -> Clip 2 -> Clip 1...)
+      // Each clip advances chronologically forward!
+      const clipProgress = {};
+      clips.forEach((c) => { clipProgress[c.id] = 0; });
+
+      let lastClipIdx = -1;
+      const nSlices = timeSlices.length;
+
+      timeSlices.forEach((ts, idx) => {
+        let chosenIdx;
+        if (forceReshuffle) {
+          const candidates = clips.map((_, i) => i).filter((i) => i !== lastClipIdx || clips.length === 1);
+          chosenIdx = candidates[Math.floor(Math.random() * candidates.length)];
+        } else {
+          chosenIdx = idx % clips.length;
+        }
+        lastClipIdx = chosenIdx;
+        const clip = clips[chosenIdx];
+
+        const vidDur = Math.max(4, Number(clip.duration) || 12);
+        const usableStart = vidDur > 4 ? 0.4 : 0;
+        const usableEnd = Math.max(usableStart + 2, vidDur - 0.6);
+        const availableSpan = Math.max(0.5, usableEnd - usableStart);
+
+        const timesUsed = clipProgress[clip.id] || 0;
+        clipProgress[clip.id] = timesUsed + 1;
+
+        let tStart = usableStart + (timesUsed * (availableSpan / Math.max(2, Math.ceil(nSlices / clips.length))));
+        tStart = (tStart % availableSpan) + usableStart;
+        if (tStart + ts.duration > vidDur) {
+          tStart = Math.max(0, vidDur - ts.duration - 0.2);
+        }
+
+        const zoom = ZOOM_EFFECTS[Math.floor(Math.random() * ZOOM_EFFECTS.length)];
+        let trans = "none";
+        if (idx > 0) {
+          trans = studioState.transitionMode === "random"
+            ? TRANSITION_POOL[Math.floor(Math.random() * TRANSITION_POOL.length)]
+            : studioState.transitionMode;
+        }
+
+        segments.push({
+          index: idx,
+          start: ts.start,
+          duration: ts.duration,
+          clipId: clip.id,
+          clipIndex: chosenIdx + 1,
+          trimStart: Number(tStart.toFixed(2)),
+          zoomEffect: zoom,
+          transition: trans,
+        });
+      });
     }
 
     studioState.cutSegments = segments;
@@ -955,10 +1534,11 @@
       <button
         type="button"
         data-seek-time="${s.start}"
-        class="shrink-0 px-2 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-mono transition"
+        class="shrink-0 px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-mono transition text-[11px] flex items-center gap-1"
         title="คลิกเพื่อดูพรีวิวฉากที่ ${s.index + 1}"
       >
-        ✂️ ฉาก ${s.index + 1} ${s.clipIndex ? `(คลิป#${s.clipIndex} @${s.trimStart.toFixed(1)}s)` : `(${s.start.toFixed(1)}s)`}
+        <span>✂️ ฉาก ${s.index + 1}</span>
+        <span class="text-slate-400 font-normal">${s.clipIndex ? `(คลิป#${s.clipIndex} @${s.trimStart.toFixed(1)}s • ${s.duration.toFixed(1)}s)` : `(${s.start.toFixed(1)}s • ${s.duration.toFixed(1)}s)`}</span>
       </button>
     `
       )
@@ -1081,7 +1661,7 @@
     if (studioGenSpinner) studioGenSpinner.classList.remove("hidden");
     if (studioGenBtnText) {
       studioGenBtnText.textContent = rewriteScript
-        ? "กำลังให้ Google AI คิดบท + สร้าง Header + พากย์เสียง..."
+        ? "กำลังให้ AI คิดบท + สร้าง Header + พากย์เสียง..."
         : "กำลังพากย์เสียงและซิงค์ซับไตเติ้ลใหม่...";
     }
     toast("กำลังสร้างบทพากย์ เสียงพากย์ไทย และซับไตเติ้ล...", true, 0);
@@ -1089,6 +1669,54 @@
     try {
       const selectedOpt = studioVoiceSelect?.selectedOptions?.[0];
       const voiceGender = selectedOpt?.getAttribute("data-gender") || "Male";
+
+      let activeScript = customScript;
+      let activeHeader = studioHeaderInput?.value || "";
+
+      if (rewriteScript) {
+        if (studioGenBtnText) studioGenBtnText.textContent = "กำลังให้ AI คิดบท + Header...";
+        toast("กำลังให้ AI คิดบทพากย์และ Header...", true, 0);
+        const scriptResp = await fetch("/api/studio/generate-script", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_title: title,
+            product_description: desc,
+            target_duration: Number(studioTargetDuration?.value || 20),
+            sales_angle: studioSalesAngle?.value || "podcast_ad",
+            custom_header: "",
+            voice_name: studioVoiceSelect?.value || "Puck",
+            voice_gender: voiceGender,
+            api_key: studioState.geminiKeysText || "",
+            openrouter_api_key: studioState.openrouterKeysText || "",
+            rewrite_script: true,
+          }),
+        });
+        const scriptData = await scriptResp.json();
+        if (!scriptResp.ok) {
+          throw new Error(scriptData.detail || "คิดบทพูดไม่สำเร็จ");
+        }
+
+        if (scriptData.short_headline) {
+          activeHeader = scriptData.short_headline;
+          studioState.headerText = activeHeader;
+          if (studioHeaderInput) studioHeaderInput.value = activeHeader;
+        }
+        activeScript = scriptData.spoken_script || "";
+        studioState.spokenScript = activeScript;
+        if (studioScriptTextarea) studioScriptTextarea.value = activeScript;
+        if (Array.isArray(scriptData.scenes) && scriptData.scenes.length > 0) {
+          studioState.scenes = scriptData.scenes;
+        }
+        renderCurrentStudioFrame();
+
+        if (studioGenBtnText) studioGenBtnText.textContent = "✓ คิดบทแล้ว • กำลังพากย์เสียง...";
+        if (scriptData.model_used === "template-fallback") {
+          toast("⚠️ AI คิดบทติดจำกัด/ยังไม่ได้ใส่ Key — ใช้บทพื้นฐานแทนชั่วคราว และกำลังพากย์เสียง...", true, 0);
+        } else {
+          toast("✓ วางบทในช่องแล้ว — กำลังสร้างเสียงพากย์...", true, 0);
+        }
+      }
 
       const resp = await fetch("/api/studio/generate-all", {
         method: "POST",
@@ -1098,18 +1726,20 @@
           product_description: desc,
           target_duration: Number(studioTargetDuration?.value || 20),
           sales_angle: studioSalesAngle?.value || "podcast_ad",
-          custom_header: rewriteScript ? "" : studioHeaderInput?.value || "",
-          custom_script: rewriteScript ? "" : customScript,
+          custom_header: activeHeader,
+          custom_script: activeScript,
           voice_name: studioVoiceSelect?.value || "Puck",
           voice_gender: voiceGender,
           speed_rate: studioVoiceSpeed?.value || "+15%",
           api_key: studioState.geminiKeysText || "",
-          rewrite_script: rewriteScript,
+          openrouter_api_key: studioState.openrouterKeysText || "",
+          rewrite_script: false,
         }),
       });
       const data = await resp.json();
       if (!resp.ok) {
-        throw new Error(data.detail || "สร้างบทและเสียงพากย์ไม่สำเร็จ");
+        const prefix = rewriteScript ? "วางบทในช่องแล้ว แต่พากย์เสียงไม่สำเร็จ: " : "";
+        throw new Error(prefix + (data.detail || "พากย์เสียงไม่สำเร็จ"));
       }
 
       if (data.short_headline) {
@@ -1139,6 +1769,15 @@
       studioState.voiceEngineLabel = data.engine || "AI Voice Ready";
       if (studioVoiceEngineBadge) {
         studioVoiceEngineBadge.textContent = studioState.voiceEngineLabel;
+      }
+
+      // Fold the AI card down to a one-line summary and open the script/subtitle tab for review
+      if (rewriteScript) {
+        const aiSummary = document.getElementById("aiSummary");
+        const speedLabel = (studioVoiceSpeed?.selectedOptions?.[0]?.textContent || "").trim().split(" ")[0];
+        if (aiSummary) {
+          aiSummary.textContent = `✓ สร้างบทแล้ว • ${dur.toFixed(0)} วินาที • เสียง ${studioVoiceSelect?.value || ""} ${speedLabel}`;
+        }
       }
 
       buildRandomCutPlan();
@@ -1197,7 +1836,10 @@
 
     studioTemplateGrid.querySelectorAll("[data-tpl-id]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        studioState.selectedTemplateId = btn.getAttribute("data-tpl-id") || "slide-zoom";
+        studioState.selectedTemplateId = btn.getAttribute("data-tpl-id") || "clean-no-anim";
+        try {
+          localStorage.setItem("studio_selected_template", studioState.selectedTemplateId);
+        } catch (_) {}
         renderTemplateSelectorGrid();
         renderCurrentStudioFrame();
       });
@@ -1288,7 +1930,7 @@
         // Keep the fallback frame always current (so a seek shows the last frame, never an old one),
         // but at reduced size so the copy stays cheap.
         if (clipObj.lastFrameCanvas) {
-          const cacheW = Math.min(srcW, 480);
+          const cacheW = Math.min(srcW, 1080);
           const cacheH = Math.round((srcH / srcW) * cacheW);
           if (clipObj.lastFrameCanvas.width !== cacheW || clipObj.lastFrameCanvas.height !== cacheH) {
             clipObj.lastFrameCanvas.width = cacheW;
@@ -1297,6 +1939,8 @@
           const fctx = clipObj.lastFrameCanvas.getContext("2d");
           if (fctx) {
             try {
+              fctx.imageSmoothingEnabled = true;
+              fctx.imageSmoothingQuality = "high";
               fctx.drawImage(vid, 0, 0, cacheW, cacheH);
               clipObj.hasDecodedFrame = true;
             } catch (_) {}
@@ -1304,8 +1948,8 @@
         }
       } else if (clipObj.hasDecodedFrame && clipObj.lastFrameCanvas) {
         drawableSource = clipObj.lastFrameCanvas;
-        srcW = clipObj.lastFrameCanvas.width || 540;
-        srcH = clipObj.lastFrameCanvas.height || 960;
+        srcW = clipObj.lastFrameCanvas.width || 1080;
+        srcH = clipObj.lastFrameCanvas.height || 1920;
       } else if (clipObj.thumbImg && clipObj.thumbImg.complete) {
         drawableSource = clipObj.thumbImg;
         srcW = clipObj.thumbImg.naturalWidth || 540;
@@ -1318,35 +1962,45 @@
       const segDur = activeSeg ? Math.max(0.4, activeSeg.duration) : 3.0;
       const prog = Math.max(0, Math.min(1, localT / segDur));
 
-      let zoom = 1.05;
+      let zoom = 1.03;
       let panX = 0;
       let panY = 0;
-      const zType = activeSeg?.zoomEffect || "zoomIn";
-      if (zType === "zoomIn") zoom = 1.02 + 0.14 * prog;
-      else if (zType === "zoomOut") zoom = 1.16 - 0.14 * prog;
-      else if (zType === "panLeft") {
-        zoom = 1.12;
-        panX = (0.5 - prog) * 55;
+      const zType = activeSeg?.zoomEffect || "static";
+      if (zType === "zoomIn") {
+        zoom = 1.02 + 0.04 * prog;
+      } else if (zType === "zoomOut") {
+        zoom = 1.06 - 0.04 * prog;
+      } else if (zType === "panLeft") {
+        zoom = 1.04;
+        panX = (0.5 - prog) * 16;
       } else if (zType === "panRight") {
-        zoom = 1.12;
-        panX = (prog - 0.5) * 55;
+        zoom = 1.04;
+        panX = (prog - 0.5) * 16;
       } else if (zType === "kenBurns") {
-        zoom = 1.04 + 0.12 * prog;
-        panX = (0.5 - prog) * 40;
-        panY = (0.5 - prog) * 30;
+        zoom = 1.02 + 0.03 * prog;
+        panX = (0.5 - prog) * 12;
+        panY = (0.5 - prog) * 8;
+      } else {
+        // static - smooth steady frame, zero eye strain
+        zoom = 1.03;
+        panX = 0;
+        panY = 0;
       }
 
-      const transDur = 0.26;
+      const transDur = 0.28;
       let slideOffsetX = 0;
       let flashAlpha = 0;
+      let fadeAlpha = 1.0;
       if (activeSeg && activeSeg.index > 0 && localT < transDur) {
         const tp = localT / transDur;
         if (activeSeg.transition === "whip-slide") {
-          slideOffsetX = (1 - tp) * vw * (activeSeg.index % 2 === 0 ? 1 : -1);
+          slideOffsetX = (1 - tp) * 140 * (activeSeg.index % 2 === 0 ? 1 : -1);
         } else if (activeSeg.transition === "cross-zoom") {
-          zoom *= 1.16 - 0.16 * tp;
+          zoom *= 1.05 - 0.05 * tp;
         } else if (activeSeg.transition === "flash-pop") {
-          flashAlpha = (1 - tp) * 0.55;
+          flashAlpha = (1 - tp) * 0.22;
+        } else if (activeSeg.transition === "dissolve") {
+          fadeAlpha = Math.min(1, 0.4 + 0.6 * tp);
         }
       }
 
@@ -1356,9 +2010,14 @@
       const drawX = vx + (vw - drawW) / 2 + panX + slideOffsetX;
       const drawY = vy + (vh - drawH) / 2 + panY;
 
+      ctx.save();
+      if (fadeAlpha < 0.99) {
+        ctx.globalAlpha = fadeAlpha;
+      }
       try {
         ctx.drawImage(drawableSource, drawX, drawY, drawW, drawH);
       } catch (_) {}
+      ctx.restore();
 
       if (flashAlpha > 0.02) {
         ctx.fillStyle = `rgba(255,255,255,${flashAlpha})`;
@@ -1405,6 +2064,11 @@
   }
 
   function drawTemplateDecorations(ctx, w, h, timeSec, tpl) {
+    if (tpl.id === "clean-no-anim" || tpl.noAnimation) {
+      // Pure clean template: strictly NO audio wave bars, NO scan lines, NO HUD, NO ticker!
+      return;
+    }
+
     const totalDur = Math.max(1, studioState.totalDuration || 20);
     const prog = Math.max(0, Math.min(1, timeSec / totalDur));
     const accent = tpl.accentColor || "#fde047";
@@ -1564,7 +2228,20 @@
       c.fillStyle = fillFor(idx);
       c.fillText(line, 0, ly);
     });
+    canvas.contentH = Math.max(lines.length * lineHeight, boxH);
     return canvas;
+  }
+
+  function fitPresetLines(lines, weight, startSize, minSize, maxW) {
+    const c = document.createElement("canvas").getContext("2d");
+    let fontSize = startSize;
+    const fontOf = (sz) => `${weight} ${sz}px "Kanit", "IBM Plex Sans Thai", sans-serif`;
+    c.font = fontOf(fontSize);
+    while (fontSize > minSize && lines.some((line) => c.measureText(line).width > maxW)) {
+      fontSize -= 2;
+      c.font = fontOf(fontSize);
+    }
+    return { lines, fontSize, font: fontOf(fontSize) };
   }
 
   function fitWrappedLines(text, weight, startSize, minSize, maxW) {
@@ -1581,11 +2258,19 @@
     return { lines, fontSize, font: fontOf(fontSize) };
   }
 
+  // Center Y for a text sprite at posPct (0 = top, 100 = bottom), clamped so the
+  // text never leaves the frame. X is always the horizontal center.
+  function spriteCenterY(sprite, h, posPct, fallbackPct) {
+    const pct = Number.isFinite(Number(posPct)) ? Number(posPct) : fallbackPct;
+    const half = Math.min(h / 2, (sprite.contentH || sprite.height) / 2 + 12);
+    return Math.max(half, Math.min(h - half, (h * pct) / 100));
+  }
+
   function drawProminentStrokedHeader(ctx, w, h, timeSec) {
     const rawHeader = (studioState.headerText || "").trim();
     if (!rawHeader) return;
 
-    const baseFont = Number(studioState.headerFontSize) || 80;
+    const baseFont = Number(studioState.headerFontSize) || 100;
     const strokeWidth = Number(studioState.headerStrokeWidth) || 20;
     const fillColor = studioState.headerColor || "#fde047";
     const strokeColor = studioState.headerStrokeColor || "#000000";
@@ -1609,7 +2294,7 @@
 
     const popScale = 1 + Math.sin(timeSec * 3.5) * 0.015;
     ctx.save();
-    ctx.translate(w / 2, h * 0.135);
+    ctx.translate(w / 2, spriteCenterY(sprite, h, studioState.headerPosY, 13.5));
     ctx.scale(popScale, popScale);
     ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
     ctx.restore();
@@ -1622,21 +2307,32 @@
     const activeScene = getActiveSubtitleScene(timeSec);
     if (!activeScene) return;
 
+    const top = (activeScene.line_top || "").trim();
+    const bot = (activeScene.line_bottom || "").trim();
+    const hasExplicitLines = Boolean(top && bot);
+
     const fullText = (
       activeScene.full_narration ||
-      `${activeScene.line_top || ""} ${activeScene.line_bottom || ""}`
+      `${top} ${bot}`
     ).trim();
     if (!fullText) return;
 
-    const baseFont = Number(studioState.subFontSize) || 54;
+    const baseFont = Number(studioState.subFontSize) || 76;
     const strokeWidth = Number(studioState.subStrokeWidth) || 14;
     const showBg = Boolean(studioState.subShowBg);
     const accent = tpl.accentColor || "#fde047";
 
+    const spriteKey = hasExplicitLines
+      ? `sub-lines|${top}///${bot}|${baseFont}|${strokeWidth}|${showBg}|${accent}|${w}`
+      : `sub|${fullText}|${baseFont}|${strokeWidth}|${showBg}|${accent}|${w}`;
+
     const sprite = getTextSprite(
-      `sub|${fullText}|${baseFont}|${strokeWidth}|${showBg}|${accent}|${w}`,
+      spriteKey,
       () => {
-        const fit = fitWrappedLines(fullText, 800, baseFont, 34, w * 0.88);
+        const fit = hasExplicitLines
+          ? fitPresetLines([top, bot], 800, baseFont, 32, w * 0.88)
+          : fitWrappedLines(fullText, 800, baseFont, 32, w * 0.88);
+
         return buildStrokedTextSprite(
           fit.lines,
           fit.font,
@@ -1655,7 +2351,7 @@
     const scale = 0.9 + 0.1 * entryP;
 
     ctx.save();
-    ctx.translate(w / 2, h * 0.77);
+    ctx.translate(w / 2, spriteCenterY(sprite, h, studioState.subPosY, 77));
     ctx.scale(scale, scale);
     ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
     ctx.restore();
@@ -1665,8 +2361,29 @@
     const tpl = getActiveTemplate();
     drawVideoLayer(ctx, w, h, timeSec, tpl);
     drawTemplateDecorations(ctx, w, h, timeSec, tpl);
-    drawProminentStrokedHeader(ctx, w, h, timeSec);
-    drawSynchronizedSubtitle(ctx, w, h, timeSec, tpl);
+    if (studioState.showHeader) {
+      drawProminentStrokedHeader(ctx, w, h, timeSec);
+    }
+    if (studioState.showSubtitles) {
+      drawSynchronizedSubtitle(ctx, w, h, timeSec, tpl);
+    }
+  }
+
+  function ensureVideoPlaying(vid) {
+    if (!vid || vid._playPending || !vid.paused || vid.readyState < 2) return;
+    vid._playPending = true;
+    try {
+      const p = vid.play();
+      if (p && typeof p.then === "function") {
+        p.catch(() => {}).finally(() => {
+          vid._playPending = false;
+        });
+      } else {
+        vid._playPending = false;
+      }
+    } catch (_) {
+      vid._playPending = false;
+    }
   }
 
   function syncActiveClipVideoElement(timeSec, shouldPlay) {
@@ -1683,27 +2400,42 @@
       vid.volume = 0;
 
       if (clip.id === activeClipId && activeSeg) {
+        if (!studioState.isOriginalAudioMuted && !studioState.isExporting) {
+          vid.muted = false;
+          vid.defaultMuted = false;
+          vid.volume = 0.7;
+        } else {
+          vid.muted = true;
+          vid.defaultMuted = true;
+          vid.volume = 0;
+        }
         const dur = Math.max(1, Number.isFinite(vid.duration) && vid.duration > 0 ? vid.duration : 10);
         const targetTime = ((activeSeg.trimStart || 0) + Math.max(0, timeSec - activeSeg.start)) % dur;
 
         if (shouldPlay) {
           const drift = targetTime - vid.currentTime;
           if (!vid.seeking) {
-            if (Math.abs(drift) > 1.0) {
-              // Real jump (new cut / clip loop): hard seek
+            if (Math.abs(drift) > 0.65 || vid.ended) {
+              // Real jump (new cut / clip loop): hard seek and resume play immediately on seeked
               try {
                 vid.currentTime = targetTime;
               } catch (_) {}
               vid.playbackRate = 1;
+              if (!vid._hasSeekResumeHook) {
+                vid._hasSeekResumeHook = true;
+                vid.addEventListener("seeked", () => {
+                  if (studioState.isPlaying && !studioState.isExporting) {
+                    ensureVideoPlaying(vid);
+                  }
+                });
+              }
             } else {
               // Small drift: nudge speed instead of seeking (seeks = frozen/flickering frames)
               const rate = Math.abs(drift) > 0.06 ? Math.max(0.85, Math.min(1.15, 1 + drift * 0.8)) : 1;
               if (Math.abs(vid.playbackRate - rate) > 0.01) vid.playbackRate = rate;
             }
           }
-          if (vid.paused && vid.readyState >= 2) {
-            vid.play().catch(() => {});
-          }
+          ensureVideoPlaying(vid);
         } else {
           if (!vid.paused) vid.pause();
           if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.2) {
@@ -1867,14 +2599,28 @@
 
     try {
       const fps = 30;
-      const width = 720;
-      const height = 1280;
+      const resMode = studioResolutionSelect?.value || studioState.exportResolution || "720p";
+      let width = 720;
+      let height = 1280;
+      let targetBitrate = 9_000_000; // 9 Mbps high bitrate for crystal-clear 720p
+
+      if (resMode === "1080p") {
+        width = 1080;
+        height = 1920;
+        targetBitrate = 18_000_000; // 18 Mbps for ultra-sharp Full HD
+      } else if (resMode === "480p") {
+        width = 480;
+        height = 854;
+        targetBitrate = 4_000_000;
+      }
       const targetDur = Math.max(3, Number(studioState.totalDuration) || 20);
 
       const offCanvas = document.createElement("canvas");
       offCanvas.width = width;
       offCanvas.height = height;
       const ctx = offCanvas.getContext("2d", { alpha: false });
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
       // Manual frame capture (captureStream(0) + requestFrame): one encoded frame per drawn frame,
       // no duplicated / half-drawn frames from the auto-capture timer.
@@ -1930,7 +2676,7 @@
 
       const recorder = new MediaRecorder(combinedStream, {
         mimeType: chosenMime,
-        videoBitsPerSecond: 5_000_000,
+        videoBitsPerSecond: targetBitrate,
         audioBitsPerSecond: 192_000,
       });
 
@@ -1956,77 +2702,75 @@
 
       recorder.start(1000);
       // Clock = audio clock when available, so picture and voice can't drift apart.
-      // Both clocks stop while the export is paused (tab in background).
       const audioStartAt = audioCtx ? audioCtx.currentTime + 0.05 : 0;
       if (audioSource) audioSource.start(audioStartAt);
       const startTs = performance.now() + (audioCtx ? 50 : 0);
-      let pausedMs = 0;
-      let pausedAt = 0;
-      let isPaused = false;
       const clockNow = () =>
         audioCtx
           ? audioCtx.currentTime - audioStartAt
-          : (performance.now() - startTs - pausedMs) / 1000;
+          : (performance.now() - startTs) / 1000;
 
-      // A background tab gets no canvas frames and paused videos while the voice keeps going
-      // -> frozen picture. So pause recording + voice + clips together, resume on return.
-      const pauseExport = () => {
-        if (isPaused) return;
-        isPaused = true;
-        pausedAt = performance.now();
-        try {
-          if (recorder.state === "recording") recorder.pause();
-        } catch (_) {}
-        if (audioCtx) audioCtx.suspend().catch(() => {});
-        studioState.clips.forEach((c) => {
-          if (c.videoEl && !c.videoEl.paused) c.videoEl.pause();
-        });
-        if (studioExportProgressText) {
-          studioExportProgressText.textContent = "⏸ หยุดเรนเดอร์ชั่วคราว — กลับมาที่แท็บนี้เพื่อเรนเดอร์ต่อ";
-        }
-      };
-      const resumeExport = async () => {
-        if (!isPaused) return;
-        if (audioCtx) await audioCtx.resume().catch(() => {});
-        pausedMs += performance.now() - pausedAt;
-        lastFrameT = -1;
-        try {
-          if (recorder.state === "paused") recorder.resume();
-        } catch (_) {}
-        isPaused = false;
-      };
-      const onVisibility = () => {
-        if (document.hidden) pauseExport();
-        else resumeExport();
-      };
-      document.addEventListener("visibilitychange", onVisibility);
-      if (document.hidden) pauseExport();
+      // Web Worker Unthrottled Ticker:
+      // Browsers throttle setTimeout to 1000ms in background tabs/minimized windows,
+      // but Web Workers are NEVER throttled! This allows video rendering to continue smoothly
+      // even when the user switches tabs, minimizes the browser, or works in other apps!
+      let workerTicker = null;
+      try {
+        const workerCode = `
+          let timer = null;
+          self.onmessage = function(e) {
+            if (e.data === 'start') {
+              if (timer) clearInterval(timer);
+              timer = setInterval(function() {
+                self.postMessage('tick');
+              }, 10);
+            } else if (e.data === 'stop') {
+              if (timer) clearInterval(timer);
+              timer = null;
+            }
+          };
+        `;
+        const blob = new Blob([workerCode], { type: "application/javascript" });
+        const workerUrl = URL.createObjectURL(blob);
+        const worker = new Worker(workerUrl);
+        workerTicker = {
+          start(cb) {
+            worker.onmessage = cb;
+            worker.postMessage("start");
+          },
+          stop() {
+            try {
+              worker.postMessage("stop");
+              worker.terminate();
+              URL.revokeObjectURL(workerUrl);
+            } catch (_) {}
+          },
+        };
+      } catch (we) {
+        console.warn("[Studio] Web Worker ticker fallback:", we);
+      }
 
       const frameInterval = 1 / fps;
       let lastFrameT = -1;
       let lastUiTs = 0;
 
       await new Promise((resolve) => {
+        let isDone = false;
         const tick = () => {
-          if (isPaused) {
-            setTimeout(tick, 200);
-            return;
-          }
+          if (isDone) return;
           const elapsed = clockNow();
           if (elapsed >= targetDur) {
+            isDone = true;
             resolve();
             return;
           }
 
           if (elapsed >= 0 && elapsed - lastFrameT >= frameInterval * 0.9) {
             syncActiveClipVideoElement(elapsed, true);
-            // If the active clip is mid-seek, hold the previous output frame (max 0.4s)
-            // instead of drawing a stale cached picture -> no flicker.
             const seg = getActiveCutSegment(elapsed);
             const activeVid = seg ? studioState.clips.find((c) => c.id === seg.clipId)?.videoEl : null;
             const notReady = activeVid && (activeVid.seeking || activeVid.readyState < 2);
-            if (notReady && lastFrameT >= 0 && elapsed - lastFrameT < 0.4) {
-              scheduleNext();
+            if (notReady && lastFrameT >= 0 && elapsed - lastFrameT < 0.3) {
               return;
             }
             lastFrameT = elapsed;
@@ -2049,18 +2793,24 @@
             if (studioExportProgressBar) studioExportProgressBar.style.width = `${pct}%`;
             if (studioExportPctText) studioExportPctText.textContent = `${pct}%`;
             if (studioExportProgressText) {
-              studioExportProgressText.textContent = `กำลังบันทึกวิดีโอ ${shown.toFixed(1)}s / ${targetDur.toFixed(1)}s... (เปิดแท็บนี้ค้างไว้จนเสร็จ)`;
+              studioExportProgressText.textContent = `กำลังเรนเดอร์วิดีโอ ${shown.toFixed(1)}s / ${targetDur.toFixed(1)}s (สลับแท็บ/พับจอทำงานอื่นได้ ระบบจะโหลดไฟล์ให้เองอัตโนมัติ)...`;
             }
           }
-
-          scheduleNext();
         };
-        // Timer-driven (not requestAnimationFrame): rAF stops when the window is covered or
-        // minimized even if the page still reports "visible", which stalled the render.
-        const scheduleNext = () => setTimeout(tick, 4);
-        tick();
+
+        if (workerTicker) {
+          workerTicker.start(tick);
+        } else {
+          const runLoop = () => {
+            if (isDone) return;
+            tick();
+            setTimeout(runLoop, 4);
+          };
+          runLoop();
+        }
       });
-      document.removeEventListener("visibilitychange", onVisibility);
+
+      if (workerTicker) workerTicker.stop();
 
       studioState.clips.forEach((c) => {
         if (c.videoEl && !c.videoEl.paused) c.videoEl.pause();
@@ -2166,7 +2916,14 @@
         studioFinalVideoPlayer.play().catch(() => {});
       }
       studioFinalMp4Card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      toast("🎬 สร้างไฟล์วิดีโอ .MP4 เสร็จสมบูรณ์! ดูพรีวิวและกดดาวน์โหลดได้เลย", false, 4500);
+
+      // Automatically download to computer immediately!
+      try {
+        downloadExportedMp4();
+      } catch (dlErr) {
+        console.warn("[Studio] Auto download warning:", dlErr);
+      }
+      toast("🎬 เรนเดอร์วิดีโอ .MP4 สำเร็จและดาวน์โหลดลงเครื่องอัตโนมัติแล้ว!", false, 5000);
     } catch (err) {
       toast(`เรนเดอร์วิดีโอไม่สำเร็จ: ${err.message}`, false, 4500);
     } finally {
@@ -2219,17 +2976,30 @@
       handlePcVideoUpload(e.target.files);
       e.target.value = "";
     });
+    studioAddLinkBtn?.addEventListener("click", addClipsFromLinks);
+    studioLinkInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        addClipsFromLinks();
+      }
+    });
     studioClearClipsBtn?.addEventListener("click", clearAllStudioClips);
     studioCutPaceSelect?.addEventListener("change", () => {
+      try {
+        localStorage.setItem("studio_cut_pace", studioCutPaceSelect.value);
+      } catch (_) {}
       buildRandomCutPlan();
       renderCurrentStudioFrame();
     });
     studioTransitionSelect?.addEventListener("change", () => {
+      try {
+        localStorage.setItem("studio_transition", studioTransitionSelect.value);
+      } catch (_) {}
       buildRandomCutPlan();
       renderCurrentStudioFrame();
     });
     studioReshuffleBtn?.addEventListener("click", () => {
-      buildRandomCutPlan();
+      buildRandomCutPlan(true);
       seekStudioPreview(0);
       startStudioPreview();
       toast("🔀 สุ่มลำดับการตัดยำสลับคลิปใหม่เรียบร้อย!");
@@ -2258,9 +3028,19 @@
       studioState.headerText = studioHeaderInput.value;
       renderCurrentStudioFrame();
     });
+    studioToggleHeaderCheck?.addEventListener("change", () => {
+      studioState.showHeader = Boolean(studioToggleHeaderCheck.checked);
+      try {
+        localStorage.setItem("studio_show_header", String(studioState.showHeader));
+      } catch (_) {}
+      renderCurrentStudioFrame();
+    });
     studioHeaderSizeRange?.addEventListener("input", () => {
       studioState.headerFontSize = Number(studioHeaderSizeRange.value);
       if (studioHeaderSizeVal) studioHeaderSizeVal.textContent = studioHeaderSizeRange.value;
+      try {
+        localStorage.setItem("studio_header_font_size", studioHeaderSizeRange.value);
+      } catch (_) {}
       renderCurrentStudioFrame();
     });
     studioHeaderStrokeRange?.addEventListener("input", () => {
@@ -2298,6 +3078,9 @@
     studioSubSizeRange?.addEventListener("input", () => {
       studioState.subFontSize = Number(studioSubSizeRange.value);
       if (studioSubSizeVal) studioSubSizeVal.textContent = studioSubSizeRange.value;
+      try {
+        localStorage.setItem("studio_sub_font_size", studioSubSizeRange.value);
+      } catch (_) {}
       renderCurrentStudioFrame();
     });
     studioSubStrokeRange?.addEventListener("input", () => {
@@ -2309,6 +3092,172 @@
       studioState.subShowBg = Boolean(studioSubBgCheck.checked);
       renderCurrentStudioFrame();
     });
+    studioToggleSubCheck?.addEventListener("change", () => {
+      studioState.showSubtitles = Boolean(studioToggleSubCheck.checked);
+      try {
+        localStorage.setItem("studio_show_subtitles", String(studioState.showSubtitles));
+      } catch (_) {}
+      renderCurrentStudioFrame();
+    });
+
+    // Original Audio Buttons (Step 1 header & player bar)
+    studioToggleOriginalAudioBtn?.addEventListener("click", toggleOriginalAudio);
+    studioMuteOriginalBtn?.addEventListener("click", toggleOriginalAudio);
+
+    function updateCensorBtnUI() {
+      renderCensorUI();
+    }
+
+    // Live progress on the censor hero card while a scan is running
+    function setCensorProgress(idx, total, pct, label, clipTitle) {
+      const safePct = Math.max(0, Math.min(100, Number(pct) || 0));
+      if (studioBlurChineseBtn) {
+        studioBlurChineseBtn.innerHTML = `<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> ⏳ ${escapeHtml(label)} (${idx + 1}/${total})`;
+      }
+      const bar = document.getElementById("studioCensorProgressBar");
+      if (bar) bar.style.width = `${((idx + safePct / 100) / total) * 100}%`;
+      const statusEl = document.getElementById("studioCensorStatusText");
+      if (statusEl && clipTitle) statusEl.textContent = `กำลังเซนเซอร์: ${clipTitle}`;
+    }
+
+    async function applyCensoredVideoToClip(clip, censoredUrl) {
+      clip.url = censoredUrl;
+      clip.isCensored = true;
+      clip.hasDecodedFrame = false;
+      const resp = await fetch(censoredUrl);
+      if (!resp.ok) throw new Error(`โหลดคลิปที่เซนเซอร์แล้วไม่สำเร็จ (HTTP ${resp.status})`);
+      const blob = await resp.blob();
+      const localBlobUrl = URL.createObjectURL(blob);
+      clip.blobUrl = localBlobUrl;
+
+      const vid = clip.videoEl;
+      if (vid) {
+        const curT = Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
+        await new Promise((resolve) => {
+          const onReady = () => {
+            vid.removeEventListener("loadeddata", onReady);
+            resolve();
+          };
+          vid.addEventListener("loadeddata", onReady, { once: true });
+          vid.src = localBlobUrl;
+          vid.load();
+          setTimeout(resolve, 2500);
+        });
+        try {
+          vid.currentTime = curT;
+        } catch (_) {}
+        if (studioState.isPlaying && studioState.activePage === "studio") {
+          vid.play().catch(() => {});
+        }
+      }
+    }
+
+    async function runChineseCensorScan() {
+      if (studioState.isCensoring) return;
+      if (!studioState.clips.length) {
+        toast("กรุณาเพิ่มคลิปเข้าคิวก่อนกดเซนเซอร์จีน");
+        flashStudioSection("secFootage");
+        return;
+      }
+      // Only scan clips not censored yet; if all are done, the button means "scan everything again"
+      const pending = studioState.clips.filter((c) => !c.isCensored);
+      const targets = pending.length ? pending : studioState.clips.slice();
+      studioState.isCensoring = true;
+      if (studioBlurChineseBtn) studioBlurChineseBtn.disabled = true;
+      const censorCard = document.getElementById("censorCard");
+      if (censorCard) censorCard.classList.remove("censor-pending");
+      setCensorProgress(0, targets.length, 0, "เริ่มสแกน", targets[0].title);
+      let totalHits = 0;
+      try {
+        for (let idx = 0; idx < targets.length; idx++) {
+          const clip = targets[idx];
+          const progressPlatform = clip.platform === "pc" ? "pc" : clip.platform;
+          const progressId = clip.platform === "pc" ? clip.id : (clip.rawItem?.id || "");
+          let pollTimer = null;
+          if (progressId) {
+            pollTimer = setInterval(async () => {
+              try {
+                const url = clip.platform === "pc"
+                  ? `/api/studio/censor-progress?platform=pc&id=${encodeURIComponent(clip.id)}`
+                  : `/api/studio/censor-progress?platform=${encodeURIComponent(progressPlatform)}&id=${encodeURIComponent(progressId)}`;
+                const pr = await fetch(url);
+                if (!pr.ok) return;
+                const pd = await pr.json();
+                if (pd.status === "idle") {
+                  // backend is still downloading the source clip before it can scan
+                  setCensorProgress(idx, targets.length, 0, "รอโหลดคลิป...", clip.title);
+                } else if (typeof pd.pct === "number") {
+                  const phase = pd.status === "rendering" ? "เรนเดอร์" : "สแกน";
+                  setCensorProgress(idx, targets.length, pd.pct, `${phase} ${pd.pct}%`, clip.title);
+                }
+              } catch {}
+            }, 350);
+          } else {
+            setCensorProgress(idx, targets.length, 0, "เซนเซอร์...", clip.title);
+          }
+
+          try {
+            let data;
+            if (clip.platform === "pc" && clip.rawFile) {
+              const fd = new FormData();
+              fd.append("file", clip.rawFile);
+              fd.append("clip_key", `pc_${clip.id}`);
+              const resp = await fetch("/api/studio/censor-chinese-upload", { method: "POST", body: fd });
+              data = await resp.json();
+              if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            } else {
+              const resp = await fetch("/api/studio/censor-chinese", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  platform: clip.platform,
+                  id: clip.rawItem?.id || "",
+                  direct_url: clip.rawItem?.direct_video_url || clip.rawItem?.url || "",
+                  force: true,
+                }),
+              });
+              data = await resp.json();
+              if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            }
+            totalHits += Number(data.hits || 0);
+            if (data.censored_url) {
+              setCensorProgress(idx, targets.length, 100, "อัปเดตพรีวิว...", clip.title);
+              await applyCensoredVideoToClip(clip, data.censored_url);
+            }
+          } finally {
+            if (pollTimer) clearInterval(pollTimer);
+          }
+          updateClipsUI(); // flip this clip's badge to "censored" right away
+        }
+        studioState.isCensoring = false;
+        updateClipsUI();
+        renderCurrentStudioFrame();
+        toast(`✅ เซนเซอร์ภาษาจีนเสร็จแล้ว (${totalHits} ช่วงเวลา) — พรีวิวใช้คลิปที่เซนเซอร์แล้ว`, false, 4500);
+      } catch (err) {
+        studioState.isCensoring = false;
+        updateCensorBtnUI();
+        toast(err?.message || "เซนเซอร์ภาษาจีนไม่สำเร็จ", false, 4500);
+      } finally {
+        studioState.isCensoring = false;
+        renderCensorUI();
+      }
+    }
+
+    // Auto-Censor Chinese Text from start to end of every clip in the queue
+    studioBlurChineseBtn?.addEventListener("click", runChineseCensorScan);
+
+    // Collapsible step cards (click the card header; buttons inside the header keep working)
+    document.querySelectorAll("#pageStudioView .acc-head").forEach((head) => {
+      head.addEventListener("click", (e) => {
+        if (e.target.closest("button,label,input,select,a")) return;
+        head.parentElement.classList.toggle("open");
+      });
+    });
+    // Style card tabs: Template / Header / Script & subtitles
+    document.querySelectorAll("#secStyle .tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => showStudioStyleTab(btn.dataset.tab));
+    });
+    renderCensorUI();
 
     // Live Preview Video Player Controls
     studioPlayPauseBtn?.addEventListener("click", toggleStudioPreview);
@@ -2331,6 +3280,14 @@
       seekStudioPreview(Number(studioTimelineScrubber.value));
     });
 
+    // Export Resolution Selector
+    studioResolutionSelect?.addEventListener("change", () => {
+      studioState.exportResolution = studioResolutionSelect.value || "720p";
+      try {
+        localStorage.setItem("studio_export_resolution", studioState.exportResolution);
+      } catch (_) {}
+    });
+
     // Export MP4 & Download
     studioExportMp4Btn?.addEventListener("click", exportStudioVideoToMp4);
     studioDownloadFinalMp4Btn?.addEventListener("click", downloadExportedMp4);
@@ -2341,9 +3298,337 @@
     addClipFromPage1,
     syncShopeeProduct,
     switchAppPage,
+    // Used by page 1 to mark search results that are already in the studio queue
+    hasClip: (item) => Boolean(item) && studioState.clips.some((c) => c.id === `${item.platform}:${item.id}`),
+    clipCount: () => studioState.clips.length,
   };
+  window.dispatchEvent(new CustomEvent("studio:clips-changed"));
 
   // Boot
+  try {
+    const savedRes = localStorage.getItem("studio_export_resolution");
+    if (savedRes && studioResolutionSelect) {
+      studioResolutionSelect.value = savedRes;
+    } else if (studioResolutionSelect) {
+      studioResolutionSelect.value = "720p";
+    }
+    studioState.exportResolution = studioResolutionSelect?.value || "720p";
+
+    const savedTpl = localStorage.getItem("studio_selected_template");
+    if (savedTpl && STUDIO_TEMPLATES.some((t) => t.id === savedTpl)) {
+      studioState.selectedTemplateId = savedTpl;
+    } else {
+      studioState.selectedTemplateId = "clean-no-anim";
+    }
+
+    const savedPace = localStorage.getItem("studio_cut_pace");
+    if (savedPace && studioCutPaceSelect) {
+      studioCutPaceSelect.value = savedPace;
+    }
+    const savedTrans = localStorage.getItem("studio_transition");
+    if (studioTransitionSelect) {
+      studioTransitionSelect.value = savedTrans || "none";
+    }
+    studioState.transitionMode = studioTransitionSelect?.value || "none";
+
+    const savedHSize = localStorage.getItem("studio_header_font_size");
+    const hSize = savedHSize ? Number(savedHSize) : 100;
+    studioState.headerFontSize = hSize;
+    if (studioHeaderSizeRange) studioHeaderSizeRange.value = String(hSize);
+    if (studioHeaderSizeVal) studioHeaderSizeVal.textContent = String(hSize);
+
+    const savedSubSize = localStorage.getItem("studio_sub_font_size");
+    const subSize = savedSubSize ? Number(savedSubSize) : 76;
+    studioState.subFontSize = subSize;
+    if (studioSubSizeRange) studioSubSizeRange.value = String(subSize);
+    if (studioSubSizeVal) studioSubSizeVal.textContent = String(subSize);
+
+    const savedShowHeader = localStorage.getItem("studio_show_header");
+    studioState.showHeader = savedShowHeader !== null ? savedShowHeader === "true" : true;
+    if (studioToggleHeaderCheck) studioToggleHeaderCheck.checked = studioState.showHeader;
+
+    const savedShowSub = localStorage.getItem("studio_show_subtitles");
+    studioState.showSubtitles = savedShowSub !== null ? savedShowSub === "true" : true;
+    if (studioToggleSubCheck) studioToggleSubCheck.checked = studioState.showSubtitles;
+
+    const savedAudioMuted = localStorage.getItem("studio_original_audio_muted");
+    studioState.isOriginalAudioMuted = savedAudioMuted !== null ? savedAudioMuted === "true" : true;
+    updateOriginalAudioUI();
+  } catch (_) {}
+
+  // ---- Floating popup: move Header / Subtitle up & down (no horizontal movement) ----
+  (function setupPositionPopup() {
+    const popup = document.getElementById("studioPosPopup");
+    const toggleBtn = document.getElementById("studioPosPopupToggleBtn");
+    if (!popup || !toggleBtn) return;
+    const handle = document.getElementById("studioPosPopupHandle");
+    const DEFAULTS = { header: 13.5, sub: 77 };
+    const STEP = 2;
+    const targets = {
+      header: {
+        key: "headerPosY",
+        storage: "studio_header_pos_y",
+        range: document.getElementById("studioHeaderPosRange"),
+        label: document.getElementById("studioHeaderPosVal"),
+      },
+      sub: {
+        key: "subPosY",
+        storage: "studio_sub_pos_y",
+        range: document.getElementById("studioSubPosRange"),
+        label: document.getElementById("studioSubPosVal"),
+      },
+    };
+
+    function setPos(name, value, persist = true) {
+      const t = targets[name];
+      const v = Math.max(0, Math.min(100, Math.round(Number(value) * 2) / 2));
+      studioState[t.key] = v;
+      if (t.range) t.range.value = String(v);
+      if (t.label) t.label.textContent = `${v}%`;
+      if (persist) {
+        try { localStorage.setItem(t.storage, String(v)); } catch (_) {}
+      }
+      renderCurrentStudioFrame();
+    }
+
+    Object.entries(targets).forEach(([name, t]) => {
+      let saved = null;
+      try { saved = localStorage.getItem(t.storage); } catch (_) {}
+      setPos(name, saved !== null && saved !== "" ? Number(saved) : DEFAULTS[name], false);
+      t.range?.addEventListener("input", () => setPos(name, t.range.value));
+    });
+
+    popup.querySelectorAll("[data-pos-target]").forEach((col) => {
+      const name = col.dataset.posTarget;
+      col.querySelectorAll("[data-pos-act]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const cur = Number(studioState[targets[name].key]) || 0;
+          const act = btn.dataset.posAct;
+          const next = act === "top" ? 0 : act === "bottom" ? 100 : act === "up" ? cur - STEP : cur + STEP;
+          setPos(name, next);
+        });
+      });
+    });
+
+    document.getElementById("studioPosResetBtn")?.addEventListener("click", () => {
+      setPos("header", DEFAULTS.header);
+      setPos("sub", DEFAULTS.sub);
+    });
+
+    const PANEL_KEY = "studio_pos_popup_xy";
+    function clampPanel(left, top) {
+      const maxL = Math.max(0, window.innerWidth - popup.offsetWidth - 4);
+      const maxT = Math.max(0, window.innerHeight - popup.offsetHeight - 4);
+      popup.style.left = `${Math.max(4, Math.min(maxL, left))}px`;
+      popup.style.top = `${Math.max(4, Math.min(maxT, top))}px`;
+      popup.style.right = "auto";
+      popup.style.bottom = "auto";
+    }
+    function showPopup(show) {
+      popup.classList.toggle("hidden", !show);
+      toggleBtn.classList.toggle("ring-2", show);
+      toggleBtn.classList.toggle("ring-amber-400", show);
+      if (show) {
+        try {
+          const xy = JSON.parse(localStorage.getItem(PANEL_KEY) || "null");
+          if (xy) clampPanel(xy.left, xy.top);
+        } catch (_) {}
+      }
+    }
+    toggleBtn.addEventListener("click", () => showPopup(popup.classList.contains("hidden")));
+    document.getElementById("studioPosPopupCloseBtn")?.addEventListener("click", () => showPopup(false));
+
+    // Drag the popup window itself by its title bar
+    handle?.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+      const rect = popup.getBoundingClientRect();
+      const dx = e.clientX - rect.left;
+      const dy = e.clientY - rect.top;
+      handle.setPointerCapture(e.pointerId);
+      const move = (ev) => clampPanel(ev.clientX - dx, ev.clientY - dy);
+      const up = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        const r = popup.getBoundingClientRect();
+        try { localStorage.setItem(PANEL_KEY, JSON.stringify({ left: r.left, top: r.top })); } catch (_) {}
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+    });
+    window.addEventListener("resize", () => {
+      if (!popup.classList.contains("hidden")) {
+        const r = popup.getBoundingClientRect();
+        clampPanel(r.left, r.top);
+      }
+    });
+  })();
+
+  // ---- Persist all Page 2 Studio preferences to JSON (data/studio_config.json) + localStorage ----
+  function collectStudioPreferences() {
+    return {
+      default_voice: studioVoiceSelect?.value || "Puck",
+      voice_speed: studioVoiceSpeed?.value || "+15%",
+      target_duration: Number(studioTargetDuration?.value || 20),
+      sales_angle: studioSalesAngle?.value || "podcast_ad",
+      cut_pace_sec: Number(studioState.cutPaceSec || 4.0),
+      transition_mode: studioState.transitionMode || "none",
+      is_original_audio_muted: Boolean(studioState.isOriginalAudioMuted),
+      selected_template_id: studioState.selectedTemplateId || "clean-no-anim",
+      show_header: Boolean(studioState.showHeader),
+      header_font_size: Number(studioState.headerFontSize || 100),
+      header_color: studioState.headerColor || "#fde047",
+      header_stroke_color: studioState.headerStrokeColor || "#000000",
+      header_stroke_width: Number(studioState.headerStrokeWidth || 20),
+      header_pos_y: Number(studioState.headerPosY ?? 13.5),
+      show_subtitles: Boolean(studioState.showSubtitles),
+      sub_font_size: Number(studioState.subFontSize || 76),
+      sub_stroke_width: Number(studioState.subStrokeWidth || 16),
+      sub_show_bg: Boolean(studioState.subShowBg),
+      sub_pos_y: Number(studioState.subPosY ?? 77),
+      export_resolution: studioResolutionSelect?.value || studioState.exportResolution || "720p",
+    };
+  }
+
+  function applyStudioPreferences(prefs) {
+    if (!prefs || typeof prefs !== "object") return;
+    if (prefs.default_voice && studioVoiceSelect) {
+      const opt = Array.from(studioVoiceSelect.options).find((o) => o.value === prefs.default_voice);
+      if (opt && !opt.disabled) studioVoiceSelect.value = prefs.default_voice;
+    }
+    if (prefs.voice_speed && studioVoiceSpeed) studioVoiceSpeed.value = prefs.voice_speed;
+    if (prefs.target_duration && studioTargetDuration) studioTargetDuration.value = String(prefs.target_duration);
+    if (prefs.sales_angle && studioSalesAngle) studioSalesAngle.value = prefs.sales_angle;
+
+    if (typeof prefs.cut_pace_sec === "number") {
+      studioState.cutPaceSec = prefs.cut_pace_sec;
+      if (studioCutPaceSelect) studioCutPaceSelect.value = String(prefs.cut_pace_sec);
+    }
+    if (prefs.transition_mode) {
+      studioState.transitionMode = prefs.transition_mode;
+      if (studioTransitionSelect) studioTransitionSelect.value = prefs.transition_mode;
+    }
+    if (typeof prefs.is_original_audio_muted === "boolean") {
+      studioState.isOriginalAudioMuted = prefs.is_original_audio_muted;
+      updateOriginalAudioUI();
+    }
+    if (prefs.selected_template_id) {
+      studioState.selectedTemplateId = prefs.selected_template_id;
+    }
+    if (typeof prefs.show_header === "boolean") {
+      studioState.showHeader = prefs.show_header;
+      if (studioToggleHeaderCheck) studioToggleHeaderCheck.checked = prefs.show_header;
+    }
+    if (typeof prefs.header_font_size === "number") {
+      studioState.headerFontSize = prefs.header_font_size;
+      if (studioHeaderSizeRange) studioHeaderSizeRange.value = String(prefs.header_font_size);
+      if (studioHeaderSizeVal) studioHeaderSizeVal.textContent = String(prefs.header_font_size);
+    }
+    if (prefs.header_color) {
+      studioState.headerColor = prefs.header_color;
+      if (studioHeaderColor) studioHeaderColor.value = prefs.header_color;
+    }
+    if (prefs.header_stroke_color) {
+      studioState.headerStrokeColor = prefs.header_stroke_color;
+      if (studioHeaderStrokeColor) studioHeaderStrokeColor.value = prefs.header_stroke_color;
+    }
+    if (typeof prefs.header_stroke_width === "number") {
+      studioState.headerStrokeWidth = prefs.header_stroke_width;
+      if (studioHeaderStrokeRange) studioHeaderStrokeRange.value = String(prefs.header_stroke_width);
+      if (studioHeaderStrokeVal) studioHeaderStrokeVal.textContent = String(prefs.header_stroke_width);
+    }
+    if (typeof prefs.header_pos_y === "number") {
+      studioState.headerPosY = prefs.header_pos_y;
+      const hPosR = document.getElementById("studioHeaderPosRange");
+      const hPosV = document.getElementById("studioHeaderPosVal");
+      if (hPosR) hPosR.value = String(prefs.header_pos_y);
+      if (hPosV) hPosV.textContent = `${prefs.header_pos_y}%`;
+    }
+    if (typeof prefs.show_subtitles === "boolean") {
+      studioState.showSubtitles = prefs.show_subtitles;
+      if (studioToggleSubCheck) studioToggleSubCheck.checked = prefs.show_subtitles;
+    }
+    if (typeof prefs.sub_font_size === "number") {
+      studioState.subFontSize = prefs.sub_font_size;
+      if (studioSubSizeRange) studioSubSizeRange.value = String(prefs.sub_font_size);
+      if (studioSubSizeVal) studioSubSizeVal.textContent = String(prefs.sub_font_size);
+    }
+    if (typeof prefs.sub_stroke_width === "number") {
+      studioState.subStrokeWidth = prefs.sub_stroke_width;
+      if (studioSubStrokeRange) studioSubStrokeRange.value = String(prefs.sub_stroke_width);
+      if (studioSubStrokeVal) studioSubStrokeVal.textContent = String(prefs.sub_stroke_width);
+    }
+    if (typeof prefs.sub_show_bg === "boolean") {
+      studioState.subShowBg = prefs.sub_show_bg;
+      if (studioSubBgCheck) studioSubBgCheck.checked = prefs.sub_show_bg;
+    }
+    if (typeof prefs.sub_pos_y === "number") {
+      studioState.subPosY = prefs.sub_pos_y;
+      const sPosR = document.getElementById("studioSubPosRange");
+      const sPosV = document.getElementById("studioSubPosVal");
+      if (sPosR) sPosR.value = String(prefs.sub_pos_y);
+      if (sPosV) sPosV.textContent = `${prefs.sub_pos_y}%`;
+    }
+    if (prefs.export_resolution) {
+      studioState.exportResolution = prefs.export_resolution;
+      if (studioResolutionSelect) studioResolutionSelect.value = prefs.export_resolution;
+    }
+    renderTemplateSelectorGrid();
+    renderCurrentStudioFrame();
+  }
+
+  let _prefSaveTimer = null;
+  function scheduleSaveStudioPreferences() {
+    const prefs = collectStudioPreferences();
+    try {
+      localStorage.setItem("studio_preferences", JSON.stringify(prefs));
+    } catch (_) {}
+    clearTimeout(_prefSaveTimer);
+    _prefSaveTimer = setTimeout(() => {
+      fetch("/api/studio/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preferences: prefs,
+          default_voice: prefs.default_voice,
+        }),
+      }).catch(() => {});
+    }, 250);
+  }
+
+  [
+    studioVoiceSelect,
+    studioVoiceSpeed,
+    studioTargetDuration,
+    studioSalesAngle,
+    studioCutPaceSelect,
+    studioTransitionSelect,
+    studioResolutionSelect,
+    studioToggleHeaderCheck,
+    studioToggleSubCheck,
+    studioHeaderSizeRange,
+    studioHeaderColor,
+    studioHeaderStrokeColor,
+    studioHeaderStrokeRange,
+    studioSubSizeRange,
+    studioSubStrokeRange,
+    studioSubBgCheck,
+    document.getElementById("studioHeaderPosRange"),
+    document.getElementById("studioSubPosRange"),
+  ].forEach((el) => {
+    el?.addEventListener("change", scheduleSaveStudioPreferences);
+  });
+  [
+    studioToggleOriginalAudioBtn,
+    studioMuteOriginalBtn,
+    studioTemplateGrid,
+    document.getElementById("studioPosPopup"),
+  ].forEach((el) => {
+    el?.addEventListener("click", () => setTimeout(scheduleSaveStudioPreferences, 30));
+  });
+  document.querySelectorAll(".hdr-color-preset, .hdr-stroke-preset").forEach((btn) => {
+    btn.addEventListener("click", () => setTimeout(scheduleSaveStudioPreferences, 30));
+  });
+
   renderTemplateSelectorGrid();
   updateClipsUI();
   buildRandomCutPlan();

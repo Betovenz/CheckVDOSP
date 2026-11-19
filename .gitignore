@@ -11,3 +11,15 @@ data/*.json
 data/clip_cache/
 
 
+
+# Local secrets: login cookies (Douyin/Shopee) written by the app
+config.json
+shopee_channels.json
+
+# PyInstaller / PyArmor build output
+/build/
+/dist/
+*.exe
+pyarmor_runtime*
+.pyarmor/
+*.patched.spec

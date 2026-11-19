@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from services.net_guard import guarded_client
 from services.douyin_signer import (
     DEFAULT_UA,
     mint_guest_douyin_cookies,
@@ -18,7 +19,7 @@ from services.douyin_signer import (
     sign_douyin_query,
 )
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
+from services.paths import CONFIG_PATH
 
 
 def _parse_cookie_string(cookie_str: str) -> Dict[str, str]:
@@ -156,7 +157,7 @@ class DouyinService:
         if not target_url.startswith("http"):
             return None
 
-        async with httpx.AsyncClient(
+        async with guarded_client(
             headers={"User-Agent": self.user_agent},
             follow_redirects=True,
             timeout=12.0,
@@ -270,10 +271,11 @@ class DouyinService:
     async def _search_via_douyin_api(
         self, keyword: str, page: int = 1, limit: int = 16
     ) -> List[Dict[str, Any]]:
-        cookies = await self.ensure_signing_cookies()
         # Only call direct search if user has configured a session cookie (otherwise Douyin returns 2483 login required)
-        if not (cookies.get("sessionid") or cookies.get("sessionid_ss") or cookies.get("sid_tt")):
+        user_cookies = _parse_cookie_string(self.get_user_cookie())
+        if not (user_cookies.get("sessionid") or user_cookies.get("sessionid_ss") or user_cookies.get("sid_tt")):
             return []
+        cookies = await self.ensure_signing_cookies()
 
         offset = max(0, (page - 1) * limit)
         params = {
@@ -345,13 +347,13 @@ class DouyinService:
 
         for g in groups:
             if re.search(r"[A-Za-z0-9]", g):
-                # Keep brand+model phrase together (e.g. "大疆 Osmo Mobile 8P")
                 if g not in roots:
                     roots.append(g)
-                # Also add pure Chinese prefix if mixed (e.g. "大疆" from "大疆 Osmo Mobile 8P")
-                cjk_part = re.sub(r"[^\u4e00-\u9fff]", "", g).strip()
-                if len(cjk_part) >= 2 and cjk_part not in roots:
-                    roots.append(cjk_part)
+                # Only add stripped CJK fallback if the mixed string is a long Brand+Model string (> 10 chars)
+                if len(g) > 10:
+                    cjk_part = re.sub(r"[^\u4e00-\u9fff]", "", g).strip()
+                    if len(cjk_part) >= 2 and cjk_part not in roots:
+                        roots.append(cjk_part)
             else:
                 for tok in g.split():
                     t = tok.strip()
@@ -419,69 +421,67 @@ class DouyinService:
 
         async with httpx.AsyncClient(
             follow_redirects=True,
-            timeout=15.0,
+            timeout=8.0,
         ) as client:
-            # Fetch live ByteDance search suggestions (search_sug) for root terms
+            # Fetch live ByteDance search suggestions (search_sug) only on page > 1 to keep page 1 ultra-fast
             sug_keywords: List[str] = []
-            try:
-                sug_tasks = [
-                    client.get(
-                        "https://so.toutiao.com/2/article/search_sug/",
-                        params={"keyword": r},
-                        headers={
-                            "User-Agent": self._random_toutiao_ua(i),
-                            "Referer": "https://so.toutiao.com/",
-                        },
-                    )
-                    for i, r in enumerate(roots[:4])
-                ]
-                sug_resps = await asyncio.gather(*sug_tasks, return_exceptions=True)
-                sug_lists: List[List[str]] = []
-                for sr in sug_resps:
-                    if isinstance(sr, Exception) or sr.status_code != 200:
-                        continue
-                    s_list = [
-                        item.get("keyword")
-                        for item in (sr.json().get("data") or [])
-                        if item.get("keyword")
+            if page > 1:
+                try:
+                    sug_tasks = [
+                        client.get(
+                            "https://so.toutiao.com/2/article/search_sug/",
+                            params={"keyword": r},
+                            headers={
+                                "User-Agent": self._random_toutiao_ua(i),
+                                "Referer": "https://so.toutiao.com/",
+                            },
+                        )
+                        for i, r in enumerate(roots[:4])
                     ]
-                    if s_list:
-                        sug_lists.append(s_list)
-                # Interleave suggestions across all roots so multi-keyword queries are balanced
-                max_sug = max((len(sl) for sl in sug_lists), default=0)
-                for s_idx in range(max_sug):
-                    for sl in sug_lists:
-                        if s_idx < len(sl) and sl[s_idx] not in sug_keywords:
-                            sug_keywords.append(sl[s_idx])
-            except Exception:
-                pass
+                    sug_resps = await asyncio.gather(*sug_tasks, return_exceptions=True)
+                    sug_lists: List[List[str]] = []
+                    for sr in sug_resps:
+                        if isinstance(sr, Exception) or sr.status_code != 200:
+                            continue
+                        s_list = [
+                            item.get("keyword")
+                            for item in (sr.json().get("data") or [])
+                            if item.get("keyword")
+                        ]
+                        if s_list:
+                            sug_lists.append(s_list)
+                    max_sug = max((len(sl) for sl in sug_lists), default=0)
+                    for s_idx in range(max_sug):
+                        for sl in sug_lists:
+                            if s_idx < len(sl) and sl[s_idx] not in sug_keywords:
+                                sug_keywords.append(sl[s_idx])
+                except Exception:
+                    pass
 
             # Build full ordered candidate query list across all pages (round-robin across roots)
             all_candidates: List[str] = []
-            # 1) Bare roots first (highest yield)
-            all_candidates.extend(roots[:6])
-            # 2) Top proven patterns on primary roots (round-robin across roots)
-            for pat in ["抖音 {r}", "{r} 教程", "{r}推荐", "{r}制作"]:
+            # 1) Highest-yield product video carousel patterns first ("{r} 开箱", "{r} 测评", "{r}推荐", "{r} 推荐", "{r}制作")
+            for pat in ["{r} 开箱", "{r} 测评", "{r}推荐", "{r} 推荐", "{r}制作", "{r} 教程", "{r}好物", "{r}"]:
                 for r in roots[:4]:
                     q_str = pat.format(r=r)
                     if q_str not in all_candidates:
                         all_candidates.append(q_str)
-            # 3) Real ByteDance search_sug keywords (already interleaved across roots)
+            # 2) Real ByteDance search_sug keywords (already interleaved across roots)
             for sk in sug_keywords:
                 if sk not in all_candidates:
                     all_candidates.append(sk)
             for sk in sug_keywords[:8]:
-                q_dy = f"抖音 {sk}"
+                q_dy = f"{sk} 开箱"
                 if q_dy not in all_candidates:
                     all_candidates.append(q_dy)
-            # 4) Remaining pattern_pool variations
+            # 3) Remaining pattern_pool variations
             for pat in pattern_pool:
                 for r in roots[:4]:
                     q_str = pat.format(r=r)
                     if q_str not in all_candidates:
                         all_candidates.append(q_str)
 
-            batch_size = 14
+            batch_size = 8
             start_idx = ((max(1, page) - 1) * batch_size) % max(1, len(all_candidates))
             selected_queries: List[str] = []
             for i in range(batch_size):
@@ -490,7 +490,8 @@ class DouyinService:
                     q_cand = f"{q_cand} {page}"
                 selected_queries.append(q_cand)
 
-            sem = asyncio.Semaphore(5)
+            sem = asyncio.Semaphore(8)
+            session_ua = self._random_toutiao_ua(page)
 
             async def _fetch_query(idx: int, q: str):
                 async with sem:
@@ -498,7 +499,7 @@ class DouyinService:
                         "https://so.toutiao.com/search",
                         params={"keyword": q, "pd": "synthesis"},
                         headers={
-                            "User-Agent": self._random_toutiao_ua(idx + page * 3),
+                            "User-Agent": session_ua,
                             "Referer": "https://so.toutiao.com/",
                         },
                     )
@@ -584,16 +585,27 @@ class DouyinService:
     async def search_videos(
         self, keyword: str, page: int = 1, limit: int = 75
     ) -> List[Dict[str, Any]]:
-        direct_items = await self._search_via_douyin_api(keyword, page=page, limit=limit)
-        if direct_items and len(direct_items) >= limit:
-            return direct_items[:limit]
-        synth_items = await self._search_via_bytedance_synthesis(keyword, page=page, limit=limit)
-        if not direct_items:
-            return synth_items
-        seen = {item["id"] for item in direct_items}
-        combined = list(direct_items)
-        for item in synth_items:
-            if item["id"] not in seen:
-                seen.add(item["id"])
-                combined.append(item)
-        return combined[:limit]
+        for attempt in range(3):
+            direct_items = await self._search_via_douyin_api(keyword, page=page, limit=limit)
+            if direct_items and len(direct_items) >= limit:
+                return direct_items[:limit]
+            synth_items = await self._search_via_bytedance_synthesis(keyword, page=page, limit=limit)
+            if not direct_items:
+                combined = synth_items
+            else:
+                seen = {item["id"] for item in direct_items}
+                combined = list(direct_items)
+                for item in synth_items:
+                    if item["id"] not in seen:
+                        seen.add(item["id"])
+                        combined.append(item)
+            if combined:
+                return combined[:limit]
+            if attempt < 2:
+                await asyncio.sleep(0.45)
+                if attempt == 1 and self.get_user_cookie():
+                    try:
+                        await self.ensure_signing_cookies(force_refresh=True)
+                    except Exception:
+                        pass
+        return []

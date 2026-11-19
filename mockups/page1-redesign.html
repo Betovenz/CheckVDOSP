@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MOCK หน้า 1 ใหม่ — ค้นหาและโหลดคลิป</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'IBM Plex Sans Thai', 'Inter', sans-serif; }
+    .badge-douyin { background: linear-gradient(135deg,#111827,#1f2937); color:#fb7185; border:1px solid rgba(244,63,94,.55); }
+    .badge-bilibili { background: linear-gradient(135deg,rgba(14,165,233,.92),rgba(236,72,153,.92)); color:#fff; border:1px solid rgba(125,211,252,.5); }
+    .badge-xhs { background: linear-gradient(135deg,#ff2442,#e11d48); color:#fff; border:1px solid rgba(254,205,211,.5); }
+    .source-toggle { border:1px dashed rgba(71,85,105,.6); background:rgba(15,23,42,.6); color:#64748b; text-decoration:line-through; opacity:.55; transition:all .2s; }
+    .source-toggle[aria-pressed="true"] { text-decoration:none; color:#fff; opacity:1; border-style:solid; }
+    .source-toggle[data-source="douyin"][aria-pressed="true"] { background:rgba(244,63,94,.22); border-color:#fb7185; }
+    .source-toggle[data-source="bilibili"][aria-pressed="true"] { background:rgba(14,165,233,.22); border-color:#38bdf8; }
+    .source-toggle[data-source="xhs"][aria-pressed="true"] { background:rgba(255,36,66,.22); border-color:#f87171; }
+    .filter-tab { background:rgba(15,23,42,.8); color:#94a3b8; border:1px solid rgba(51,65,85,.6); }
+    .filter-tab:hover { background:rgba(30,41,59,.9); color:#f1f5f9; }
+    .filter-tab.active { background:linear-gradient(135deg,rgba(79,70,229,.25),rgba(225,29,72,.2)); color:#fff; border-color:rgba(99,102,241,.65); }
+    .side-filter.active { background: rgba(99,102,241,.18); color:#fff; }
+    .video-card { transition: transform .2s cubic-bezier(.16,1,.3,1), border-color .2s; }
+    .video-card:hover { transform: translateY(-3px); border-color: rgba(148,163,184,.4); }
+    .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .mode-btn.active { background: rgb(30 41 59); color:#fff; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/4 -right-32 w-96 h-96 bg-sky-500/15 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="bg-amber-500/95 text-slate-950 text-[11px] font-extrabold text-center py-1">MOCK UI — ข้อมูลทั้งหมดเป็นของจำลอง ไม่ได้เชื่อมต่อเซิร์ฟเวอร์จริง</div>
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px]"><div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold tracking-tighter"><span class="text-rose-400">D</span><span class="text-sky-400">B</span></div></div>
+        <h1 class="font-bold text-lg tracking-tight">Douyin & Bilibili</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="inline-flex p-1 rounded-2xl bg-slate-900 border border-slate-800">
+          <button type="button" id="navPage1Btn" data-act="nav1" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white">🔍 หาคลิป</button>
+          <button type="button" id="navPage2Btn" data-act="go-studio" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-300 hover:text-white flex items-center gap-2">🎬 ทำคลิป AI <span id="studioClipCountBadge" class="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[11px] font-extrabold">0</span></button>
+        </div>
+        <button type="button" id="openApiKeyModalBtn" data-act="open-api" class="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5">🔑 API<span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span></button>
+        <button type="button" id="openXhsCookieBtn" data-act="open-cookie" class="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-red-500/40 text-red-300 text-xs font-bold flex items-center gap-1.5">📕 Cookie<span class="xhs-cookie-dot w-2 h-2 rounded-full bg-slate-500"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="root" class="max-w-7xl mx-auto px-4 sm:px-6 py-6"></main>
+
+  <div id="mockToast" class="fixed top-28 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-xs font-semibold text-white shadow-2xl"></div>
+
+  <!-- Modals -->
+  <div id="xhsMissingModal" class="modal fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-sm w-full overflow-hidden">
+      <div class="h-1.5 bg-gradient-to-r from-red-500 via-rose-500 to-orange-400"></div>
+      <div class="p-5 text-center space-y-2">
+        <div class="mx-auto w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/40 flex items-center justify-center text-2xl">📕</div>
+        <h3 class="text-base font-bold text-white">RedNote ต้องใช้ Cookie</h3>
+        <p class="text-xs text-slate-400">ถ้าข้ามไป จะค้นได้แค่ Douyin และ Bilibili</p>
+      </div>
+      <div class="px-5 pb-5 flex flex-col gap-2">
+        <button type="button" id="xhsMissingSetBtn" data-act="missing-set" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white text-sm font-bold">📕 ตั้งค่า Cookie</button>
+        <button type="button" id="xhsMissingSkipBtn" data-act="missing-skip" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold">ค้นต่อโดยไม่มี RedNote</button>
+        <button type="button" id="xhsMissingCloseBtn" data-act="close" class="w-full py-1.5 text-xs text-slate-500 hover:text-slate-300">ปิด</button>
+      </div>
+    </div>
+  </div>
+  <div id="xhsCookieModal" class="modal fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-lg w-full overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between"><h3 class="text-sm font-bold">📕 Cookie & Proxy RedNote</h3><button data-act="close" id="closeXhsCookieBtn" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300">✕</button></div>
+      <div class="p-5 space-y-3">
+        <textarea id="xhsCookieInput" rows="3" placeholder="Cookie: a1=...; web_session=..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-red-200"></textarea>
+        <input id="xhsProxyInput" placeholder="Proxy (ไม่บังคับ)" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-sky-200" />
+        <div class="flex justify-end gap-2"><button id="clearXhsCookieBtn" data-act="cookie-clear" class="px-3 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs">ล้างค่า</button><button id="saveXhsCookieBtn" data-act="cookie-save" class="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold">บันทึก</button></div>
+      </div>
+    </div>
+  </div>
+  <div id="apiKeyModal" class="modal fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between"><h3 class="text-sm font-bold">🔑 Gemini API Key</h3><button data-act="close" id="closeApiKeyModalBtn" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300">✕</button></div>
+      <div class="p-5 space-y-3">
+        <textarea id="geminiApiKeysInput" rows="4" placeholder="AIzaSy... (mock)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-amber-200"></textarea>
+        <div id="apiKeyStatusBox" class="hidden p-3 rounded-xl text-xs"></div>
+        <div class="flex justify-end gap-2"><button id="testApiKeyBtn" data-act="api-test" class="px-4 py-2.5 rounded-xl bg-slate-800 text-amber-300 border border-amber-500/30 text-xs font-bold">⚡ ทดสอบ</button><button id="saveApiKeyBtn" data-act="api-save" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-extrabold">💾 บันทึก</button></div>
+      </div>
+    </div>
+  </div>
+  <div id="previewModal" class="modal fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-2"><h3 id="previewTitle" class="text-sm font-bold truncate"></h3><button data-act="close" class="w-8 h-8 shrink-0 rounded-lg bg-slate-800 text-slate-300">✕</button></div>
+      <div class="p-4 space-y-3">
+        <div id="previewBox" class="mx-auto w-52 aspect-[9/16] rounded-xl flex items-center justify-center text-4xl"></div>
+        <div class="grid grid-cols-2 gap-2"><button data-act="preview-dl" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold">⬇ โหลด MP4</button><button data-act="preview-send" class="py-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white text-xs font-bold">🎬 ส่งไปทำคลิป</button></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const META = {
+    douyin: { label: "🎵 Douyin", badge: "badge-douyin", hue: "#be185d", dot: "bg-rose-500" },
+    bilibili: { label: "📺 Bilibili", badge: "badge-bilibili", hue: "#0369a1", dot: "bg-sky-400" },
+    xhs: { label: "📕 RedNote", badge: "badge-xhs", hue: "#b91c1c", dot: "bg-red-500" },
+  };
+  const KWS = [["แมว", "🐱 แมว"], ["อาหาร", "🍜 อาหาร"], ["เต้น", "💃 เต้น"], ["ตลก", "😂 ตลก"], ["หม้อทอดไร้น้ำมัน", "🍳 หม้อทอด"]];
+  const TITLES = ["รีวิวใช้งานจริง 7 วัน", "แกะกล่องตัวใหม่ล่าสุด", "เทียบ 3 รุ่นขายดี", "ใช้แล้วชีวิตง่ายขึ้นมาก", "ของมันต้องมีในบ้าน", "ทดสอบความทน", "สอนใช้แบบละเอียด", "ไอเทมฮิตในจีนตอนนี้"];
+  const AUTHORS = ["小美生活", "Tech阿杰", "好物分享", "家居达人", "测评君", "日常vlog"];
+  const S = {
+    mode: "kw", q: "", link: "", items: [], filter: "all", loading: false,
+    sources: { douyin: true, bilibili: true, xhs: true }, sent: new Set(), sentItems: new Map(), checked: new Set(),
+    kw: "", xhsCookie: false, product: false, zh: 0, current: null, pending: null, drawer: true,
+  };
+
+  const fmt = (n) => (n >= 10000 ? (n / 10000).toFixed(1) + "w" : n.toLocaleString());
+  const toast = (m) => { const t = $("mockToast"); t.textContent = m; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("hidden"), 2200); };
+  const openModal = (id) => $(id).classList.remove("hidden");
+  const closeAll = () => document.querySelectorAll(".modal").forEach((m) => m.classList.add("hidden"));
+  const counts = () => ({ all: S.items.length, douyin: S.items.filter((i) => i.platform === "douyin").length, bilibili: S.items.filter((i) => i.platform === "bilibili").length, xhs: S.items.filter((i) => i.platform === "xhs").length });
+  const visible = () => S.items.filter((i) => S.filter === "all" || i.platform === S.filter);
+  const stat = (it) => (it.platform === "bilibili" ? "👁 " + fmt(it.views) : "❤ " + fmt(it.likes));
+  const thumbBg = (it) => `background:linear-gradient(160deg, ${META[it.platform].hue} 0%, hsl(222 47% ${8 + it.shade / 4}%) 100%)`;
+
+  function makeItems(kw, n) {
+    const plats = Object.keys(S.sources).filter((p) => S.sources[p]);
+    return Array.from({ length: n }, (_, i) => ({
+      id: Math.random().toString(36).slice(2, 9), platform: plats[i % plats.length],
+      title: `${kw} ${TITLES[Math.floor(Math.random() * TITLES.length)]}`, author: AUTHORS[Math.floor(Math.random() * AUTHORS.length)],
+      likes: Math.floor(Math.random() * 90000) + 300, views: Math.floor(Math.random() * 900000) + 5000,
+      duration: `0:${String(Math.floor(Math.random() * 50) + 10)}`, shade: Math.floor(Math.random() * 40),
+    }));
+  }
+
+  // ---------------- shared pieces ----------------
+  // One input: keyword OR Shopee/clip link (auto-detected), no mode toggle
+  const modeToggle = () => "";
+  const isLink = (v) => /https?:\/\/|shopee|douyin|b23\.tv|bilibili|xhslink|xiaohongshu/i.test(v);
+  function searchForm(stack) {
+    const link = isLink(S.q);
+    return `<form id="searchForm" data-form="search" class="flex ${stack ? "flex-col" : ""} gap-2">
+          <div class="relative flex-1"><input id="searchInput" data-bind="q" value="${S.q}" placeholder="วางคำค้นหาหรือลิงก์ Shopee" class="w-full pl-9 pr-14 py-2.5 rounded-xl bg-slate-950 border ${link ? "border-orange-500/70" : "border-slate-700/80"} text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" /><span id="searchIcon" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm ${link ? "text-orange-400" : "text-slate-400"}">${link ? "🛒" : "⌕"}</span><button type="button" id="pasteClipboardBtn" data-act="paste" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300" title="วางจากคลิปบอร์ด">วาง</button></div>
+          <button type="submit" id="searchBtn" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white font-semibold text-sm shrink-0">ค้นหา</button></form>`;
+  }
+  const sourceBtns = () => ["douyin", "bilibili", "xhs"].map((p) => `<button type="button" data-act="source" data-source="${p}" aria-pressed="${S.sources[p]}" class="source-toggle px-2.5 py-1 rounded-lg font-semibold text-xs" title="กดเพื่อเปิด/ปิด">${META[p].label}</button>`).join("");
+  const kwChips = () => (S.mode === "kw" ? KWS.map(([k, l]) => `<button type="button" data-act="kw" data-kw="${k}" class="kw-chip px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs">${l}</button>`).join("") : "");
+  function filterTabs() {
+    const c = counts();
+    return [["all", "ทั้งหมด"], ["douyin", "Douyin"], ["bilibili", "Bilibili"], ["xhs", "RedNote"]].map(([k, l]) =>
+      `<button data-act="filter" data-filter="${k}" class="filter-tab ${S.filter === k ? "active" : ""} px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5">${k !== "all" ? `<span class="w-2 h-2 rounded-full ${META[k].dot}"></span>` : ""}${l} <span class="px-1.5 rounded-full bg-slate-800 text-[11px]">${c[k]}</span></button>`).join("");
+  }
+  function productCard(compact) {
+    if (!S.product) return "";
+    const angles = ["ไม้กันสั่น", "รีวิว gimbal", "ถ่าย vlog", "แกะกล่อง"];
+    return `<div id="resolvedSection" class="relative rounded-2xl bg-slate-900/90 border border-orange-500/40 p-3.5">
+      <button id="closeResolvedBtn" data-act="close-product" class="absolute top-2.5 right-2.5 w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs" title="ปิด">✕</button>
+      <div class="flex gap-3 items-start pr-7">
+        <div class="${compact ? "w-14 h-14" : "w-20 h-20"} rounded-xl shrink-0 bg-gradient-to-br from-orange-500 to-rose-700 flex items-center justify-center text-2xl">📦</div>
+        <div class="min-w-0 flex-1 space-y-1.5">
+          <div class="flex items-center gap-2 text-xs"><span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold">฿1,290</span><a href="#" data-act="toast" data-msg="(mock) เปิดหน้า Shopee" class="text-orange-400 hover:underline" title="Shop ID 12345 • Item ID 67890">Shopee ↗</a></div>
+          <h4 class="text-xs sm:text-sm font-bold text-white line-clamp-2">ไม้กันสั่นมือถือ 3 แกน มีไฟเติมแสง + รีโมทไร้สาย</h4>
+        </div>
+      </div>
+      <form id="customShopeeKwForm" data-form="customkw" class="flex gap-1.5 mt-2.5"><input id="customShopeeKwInput" value="ไม้กันสั่น, gimbal" class="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white" /><button type="submit" class="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold">ค้นใหม่</button></form>
+      <div class="flex flex-wrap items-center gap-1.5 mt-2.5">${angles.map((a, i) => `<button type="button" data-act="zh" data-i="${i}" data-kw="${a}" class="shopee-zh-chip px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${S.zh === i ? "bg-orange-500 text-white border-orange-400" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-700"}">${a}</button>`).join("")}</div>
+      <button type="button" id="sendShopeeProductToStudioBtn" data-act="toast" data-msg="(mock) ซิงค์สินค้าไปหน้า 2 แล้ว" class="mt-2.5 w-full py-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white text-xs font-bold">🎬 ใช้สินค้านี้ทำคลิป</button>
+    </div>`;
+  }
+  function stateBlock(big) {
+    if (S.loading) return `<div id="loadingState" class="py-16 text-center"><div class="inline-block w-7 h-7 border-[3px] border-rose-500 border-t-sky-400 rounded-full animate-spin"></div><p class="text-sm text-slate-400 mt-2">กำลังค้นหา...</p></div>`;
+    if (!S.items.length) return `<div id="emptyState" class="${big ? "py-20" : "py-14"} text-center"><div class="text-4xl mb-2 opacity-60">🎬</div><p class="text-sm font-semibold text-slate-300">พิมพ์คำค้นหา หรือวางลิงก์</p><p class="text-xs text-slate-500 mt-1">แล้วกด 🎬 เพื่อส่งคลิปไปหน้า 2</p></div>`;
+    return "";
+  }
+  function loadMore() {
+    if (!S.items.length || S.loading) return "";
+    return `<div id="paginationBar" class="pt-4 flex flex-col items-center gap-1.5"><button id="loadMoreBtn" data-act="more" class="px-6 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sm font-bold">⬇ โหลดเพิ่ม</button><span id="pageIndicator" class="text-[11px] text-slate-500">แสดง ${S.items.length} คลิป</span></div>`;
+  }
+  const sendBtn = (it, cls) => { const s = S.sent.has(it.id); return `<button type="button" data-act="send" data-id="${it.id}" class="${cls} rounded-lg text-[11px] font-bold ${s ? "bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-300" : "bg-gradient-to-r from-fuchsia-600/90 to-indigo-600/90 hover:from-fuchsia-500 hover:to-indigo-500 text-white"}">${s ? "✓ ในคิว" : "🎬 ทำคลิป"}</button>`; };
+  const dlBtn = (it, cls) => `<button type="button" data-act="download" data-id="${it.id}" class="${cls} rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs" title="โหลด MP4 ไม่มีลายน้ำ">⬇</button>`;
+
+  // ---------------- card variants ----------------
+  function cardB(it) {
+    const m = META[it.platform];
+    return `<article class="video-card rounded-xl bg-slate-900/95 border border-slate-800/90 overflow-hidden group">
+      <div class="relative aspect-[4/5] cursor-pointer" data-act="preview" data-id="${it.id}" style="${thumbBg(it)}">
+        <span class="absolute top-1.5 left-1.5 w-2.5 h-2.5 rounded-full ${m.dot} ring-2 ring-black/40" title="${m.label}"></span>
+        <span class="absolute bottom-1.5 right-1.5 font-mono text-[10px] bg-black/60 px-1 rounded">${it.duration}</span>
+        <div class="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-2">
+          ${sendBtn(it, "w-full py-1.5")}
+          <div class="flex gap-1.5 w-full">${dlBtn(it, "flex-1 py-1")}<a href="#" data-act="open" class="flex-1 py-1 rounded-lg bg-slate-800 text-center text-xs" title="เปิดต้นฉบับ">↗</a></div>
+        </div>
+        ${S.sent.has(it.id) ? `<span class="absolute top-1.5 right-1.5 px-1.5 rounded bg-fuchsia-600 text-[10px] font-bold">✓</span>` : ""}
+      </div>
+      <div class="px-2 py-1.5"><h3 class="text-[11px] font-semibold line-clamp-2 leading-snug">${it.title}</h3><p class="text-[10px] text-slate-500 mt-0.5">${stat(it)}</p></div></article>`;
+  }
+
+  // ---------------- layouts ----------------
+  function layoutB() {
+    const c = counts();
+    return `<div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
+      <aside class="lg:sticky lg:top-24 space-y-3">
+        <div class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3.5 space-y-3">
+          ${modeToggle(true)}${searchForm(true)}
+          ${S.mode === "kw" ? `<div class="flex flex-wrap gap-1.5">${kwChips()}</div>` : ""}
+        </div>
+        <div class="rounded-2xl bg-slate-900/90 border border-slate-800 p-2 space-y-0.5 text-sm">
+          <p class="px-2 pt-1 pb-1.5 text-[11px] text-slate-500 font-semibold">แหล่งวิดีโอ</p>
+          ${[["all", "ทั้งหมด"], ["douyin", "Douyin"], ["bilibili", "Bilibili"], ["xhs", "RedNote"]].map(([k, l]) => `
+            <div class="flex items-center gap-1">
+              <button data-act="filter" data-filter="${k}" class="side-filter filter-tab-b ${S.filter === k ? "active" : ""} flex-1 flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-slate-800 text-slate-300 text-left">
+                ${k === "all" ? '<span class="w-2 h-2"></span>' : `<span class="w-2 h-2 rounded-full ${META[k].dot}"></span>`}<span class="flex-1">${l}</span><span class="text-xs text-slate-500">${c[k]}</span></button>
+              ${k === "all" ? '<span class="w-9"></span>' : `<button data-act="source" data-source="${k}" aria-pressed="${S.sources[k]}" class="w-9 h-5 rounded-full relative transition ${S.sources[k] ? "bg-indigo-500" : "bg-slate-700"}" title="เปิด/ปิดการค้นจาก ${l}"><span class="absolute top-0.5 ${S.sources[k] ? "left-[18px]" : "left-0.5"} w-4 h-4 rounded-full bg-white transition-all"></span></button>`}
+            </div>`).join("")}
+        </div>
+        ${productCard(true)}
+        <button data-act="go-studio" class="w-full py-2.5 rounded-xl ${S.sent.size ? "bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white" : "bg-slate-900 border border-slate-800 text-slate-500"} text-xs font-bold">🎬 ไปทำคลิป (${S.sent.size} คลิป)</button>
+      </aside>
+      <section>
+        <div class="flex items-baseline justify-between mb-3"><h2 class="text-base font-bold">${S.kw ? `“${S.kw}”` : "ผลการค้นหา"}</h2><span id="searchMetaInfo" class="text-xs text-slate-500">${S.items.length ? visible().length + " คลิป" : ""}</span></div>
+        ${stateBlock(true)}
+        <div id="videoGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">${S.loading ? "" : visible().map(cardB).join("")}</div>
+        ${loadMore()}
+      </section></div>`;
+  }
+  function render() {
+    $("root").innerHTML = layoutB();
+    $("studioClipCountBadge").textContent = S.sent.size;
+  }
+
+  // ---------------- actions ----------------
+  function doSearch(kw, skipXhsCheck) {
+    if (!kw) { toast("พิมพ์คำค้นหาก่อน"); return; }
+    if (!Object.values(S.sources).some(Boolean)) { toast("เปิดอย่างน้อย 1 แหล่งวิดีโอ"); return; }
+    if (S.sources.xhs && !S.xhsCookie && !skipXhsCheck) { S.pending = kw; openModal("xhsMissingModal"); return; }
+    S.kw = kw; S.items = []; S.checked.clear(); S.loading = true; render();
+    setTimeout(() => { S.loading = false; S.items = makeItems(kw, 15); render(); }, 800);
+  }
+  function toggleSend(id) {
+    if (S.sent.has(id)) { S.sent.delete(id); S.sentItems.delete(id); toast("เอาออกจากคิวแล้ว"); }
+    else { S.sent.add(id); S.sentItems.set(id, S.items.find((x) => x.id === id)); toast("🎬 ส่งไปหน้า 2 แล้ว"); }
+    render();
+  }
+
+  document.addEventListener("input", (e) => {
+    const k = e.target.dataset.bind; if (!k) return; S[k] = e.target.value;
+    if (k === "q") { // live hint: keyword vs link
+      const link = isLink(S.q), ic = $("searchIcon");
+      ic.textContent = link ? "🛒" : "⌕"; ic.className = `absolute left-3 top-1/2 -translate-y-1/2 text-sm ${link ? "text-orange-400" : "text-slate-400"}`;
+      e.target.classList.toggle("border-orange-500/70", link); e.target.classList.toggle("border-slate-700/80", !link);
+    }
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target.dataset.form; if (!f) return; e.preventDefault();
+    if (f === "search" && !isLink(S.q)) doSearch(S.q.trim());
+    if (f === "customkw") doSearch($("customShopeeKwInput").value.trim(), true);
+    if (f === "search" && isLink(S.q)) {
+      const v = S.q.trim();
+      if (/shopee/.test(v)) { S.product = true; S.zh = 0; doSearch("ไม้กันสั่น", true); }
+      else { const it = makeItems("คลิปจากลิงก์", 1)[0]; it.platform = /xhs|xiaohongshu/.test(v) ? "xhs" : /b23|bilibili/.test(v) ? "bilibili" : "douyin"; S.items.unshift(it); S.kw = "ลิงก์"; render(); toast("ดึงคลิปจากลิงก์แล้ว"); }
+    }
+  });
+  document.addEventListener("click", (e) => {
+    const m = e.target.classList.contains("modal") ? e.target : null;
+    if (m) { closeAll(); return; }
+    const el = e.target.closest("[data-act]"); if (!el) return;
+    const a = el.dataset.act, id = el.dataset.id, it = id && S.items.find((x) => x.id === id);
+    if (a !== "check" && a !== "check-all") e.preventDefault();
+    e.stopPropagation();
+    switch (a) {
+      case "mode": S.mode = el.dataset.mode; render(); (S.mode === "kw" ? $("searchInput") : $("resolveInput")).focus(); break;
+      case "source": S.sources[el.dataset.source] = !S.sources[el.dataset.source]; render(); break;
+      case "kw": S.q = el.dataset.kw; doSearch(S.q); break;
+      case "paste": S.q = "https://s.shopee.co.th/mockDemo123"; render(); break;
+      case "filter": S.filter = el.dataset.filter; render(); break;
+      case "more": S.items.push(...makeItems(S.kw, 10)); render(); break;
+      case "send": toggleSend(id); break;
+      case "download": toast("⬇ (mock) กำลังโหลด MP4 ไม่มีลายน้ำ..."); break;
+      case "open": toast("(mock) เปิดหน้าเว็บต้นฉบับ"); break;
+      case "preview": S.current = it; $("previewTitle").textContent = it.title; $("previewBox").style.background = META[it.platform].hue; $("previewBox").textContent = "▶"; openModal("previewModal"); break;
+      case "preview-dl": toast("⬇ (mock) กำลังโหลด MP4..."); break;
+      case "preview-send": if (S.current && !S.sent.has(S.current.id)) toggleSend(S.current.id); closeAll(); break;
+      case "check": S.checked.has(id) ? S.checked.delete(id) : S.checked.add(id); render(); break;
+      case "check-all": { const vis = visible(); const all = vis.every((i) => S.checked.has(i.id)); vis.forEach((i) => (all ? S.checked.delete(i.id) : S.checked.add(i.id))); render(); break; }
+      case "bulk-send": S.checked.forEach((x) => { S.sent.add(x); S.sentItems.set(x, S.items.find((i) => i.id === x)); }); toast(`🎬 ส่ง ${S.checked.size} คลิปไปหน้า 2 แล้ว`); S.checked.clear(); render(); break;
+      case "bulk-dl": toast(`⬇ (mock) กำลังโหลด ${S.checked.size} คลิป...`); break;
+      case "drawer": S.drawer = !S.drawer; render(); break;
+      case "zh": S.zh = +el.dataset.i; doSearch(el.dataset.kw, true); break;
+      case "close-product": S.product = false; render(); break;
+      case "toast": toast(el.dataset.msg); break;
+      case "go-studio": location.href = "page2-redesign.html"; break;
+      case "nav1": toast("อยู่หน้า 1 แล้ว"); break;
+      case "open-api": openModal("apiKeyModal"); break;
+      case "open-cookie": openModal("xhsCookieModal"); break;
+      case "close": closeAll(); break;
+      case "api-test": { const b = $("apiKeyStatusBox"); b.className = "p-3 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/40 text-emerald-300"; b.textContent = "✓ (mock) คีย์ใช้งานได้"; break; }
+      case "api-save": $("apiKeyStatusDot").className = "w-2 h-2 rounded-full bg-emerald-400"; closeAll(); toast("บันทึก API Key แล้ว"); break;
+      case "cookie-save": S.xhsCookie = true; document.querySelectorAll(".xhs-cookie-dot").forEach((d) => (d.className = "xhs-cookie-dot w-2 h-2 rounded-full bg-emerald-400")); closeAll(); toast("บันทึก Cookie แล้ว"); break;
+      case "cookie-clear": S.xhsCookie = false; $("xhsCookieInput").value = ""; $("xhsProxyInput").value = ""; document.querySelectorAll(".xhs-cookie-dot").forEach((d) => (d.className = "xhs-cookie-dot w-2 h-2 rounded-full bg-slate-500")); break;
+      case "missing-set": closeAll(); openModal("xhsCookieModal"); break;
+      case "missing-skip": closeAll(); S.sources.xhs = false; doSearch(S.pending, true); break;
+    }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAll(); });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MOCK หน้า 2 — เลือก 4 แบบ</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Kanit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'IBM Plex Sans Thai', 'Inter', sans-serif; }
+    /* accordion */
+    .acc:not(.open) .acc-body { display: none; }
+    .acc:not(.open) .acc-chev { transform: rotate(-90deg); }
+    .acc-chev { transition: transform .2s; }
+    .flash { animation: flash 0.9s ease-out; }
+    @keyframes flash { 0%,40% { box-shadow: 0 0 0 3px rgba(244,63,94,.7); } 100% { box-shadow: 0 0 0 0 rgba(244,63,94,0); } }
+    /* censor hero pulse while pending */
+    .censor-pending { animation: czpulse 2.2s ease-in-out infinite; }
+    @keyframes czpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(244,63,94,.35); } 50% { box-shadow: 0 0 0 8px rgba(244,63,94,0); } }
+    .tab-btn.active { background: rgb(30 41 59); color: #fff; border-color: rgb(217 70 239); }
+    .mock-ribbon { background: repeating-linear-gradient(45deg,#f59e0b,#f59e0b 10px,#d97706 10px,#d97706 20px); }
+    .vbtn.active { background:#0f172a; color:#fbbf24; }
+    [data-v="C"] .acc-chev, [data-v="D"] .acc-chev { display:none; }
+    [data-v="C"] .acc .acc-body, [data-v="D"] .acc .acc-body { display:block !important; }
+    [data-v="C"] .acc-head, [data-v="D"] .acc-head { cursor:default; }
+    [data-v="C"] #previewCard .max-w-\[280px\] { max-width: 340px; }
+    [data-v="B"] #previewCard .max-w-\[280px\] { max-width: 100%; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-rose-500 selection:text-white">
+
+  <div class="mock-ribbon text-slate-950">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex items-center gap-2 flex-wrap text-xs font-bold">
+      <span>MOCK หน้า 2 — เลือกแบบ:</span>
+      <button class="vbtn px-2.5 py-1 rounded-lg border border-slate-900/40" data-v="A">A · 2 คอลัมน์ (ปัจจุบัน)</button>
+      <button class="vbtn px-2.5 py-1 rounded-lg border border-slate-900/40" data-v="B">B · 3 คอลัมน์ พรีวิวกลาง</button>
+      <button class="vbtn px-2.5 py-1 rounded-lg border border-slate-900/40" data-v="C">C · พรีวิวเด่น + แท็บล่าง</button>
+      <button class="vbtn px-2.5 py-1 rounded-lg border border-slate-900/40" data-v="D">D · แถบเครื่องมือซ้าย</button>
+      <span class="ml-auto font-semibold">ข้อมูลจำลอง • กดได้ทุกปุ่ม</span>
+    </div>
+  </div>
+
+  <!-- Background Glow -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/4 -right-32 w-96 h-96 bg-sky-500/15 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-0 left-1/3 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+  </div>
+
+  <!-- Top Navbar (copied from real page, page 2 active) -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px] shadow-lg shadow-rose-500/20">
+            <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold text-lg tracking-tighter">
+              <span class="text-rose-400">D</span><span class="text-sky-400">B</span>
+            </div>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg sm:text-xl tracking-tight"><span>Douyin & Bilibili</span></h1>
+            <p class="text-xs text-slate-400">ค้นหาโหลดคลิปไร้ลายน้ำ & สตูดิโอตัดต่อทำคลิปรีวิว AI</p>
+          </div>
+        </div>
+        <button type="button" id="openApiKeyModalBtnMobile" class="md:hidden px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5"><span>🔑 API Google AI</span></button>
+        <button type="button" id="openXhsCookieBtnMobile" class="md:hidden px-3 py-1.5 rounded-xl bg-slate-900 border border-red-500/40 text-red-300 text-xs font-semibold flex items-center gap-1.5"><span>📕 Cookie RedNote</span><span class="xhs-cookie-dot w-2 h-2 rounded-full bg-slate-500"></span></button>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="inline-flex p-1 rounded-2xl bg-slate-900 border border-slate-800">
+          <button type="button" id="navPage1Btn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 text-slate-300 hover:text-white">
+            <span>🔍 หน้าที่ 1: ค้นหาและโหลดคลิป</span>
+          </button>
+          <button type="button" id="navPage2Btn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white shadow-md">
+            <span>🎬 หน้าที่ 2: ทำคลิป AI</span>
+            <span id="studioClipCountBadge" class="px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white text-[11px] font-extrabold">0 คลิป</span>
+          </button>
+        </div>
+        <button type="button" id="openApiKeyModalBtn" class="hidden md:flex px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold transition items-center gap-1.5 shadow-sm">
+          <span>🔑 ตั้งค่า API Google AI</span><span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+        </button>
+        <button type="button" id="openXhsCookieBtn" class="hidden md:flex px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-bold transition items-center gap-1.5 shadow-sm">
+          <span>📕 ตั้งค่า Cookie RedNote</span><span class="xhs-cookie-dot w-2 h-2 rounded-full bg-slate-500"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====================================================================== -->
+  <!-- PAGE 2 (REDESIGN): AI VIDEO MAKER STUDIO                                -->
+  <!-- ====================================================================== -->
+  <main id="pageStudioView" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+
+    <div id="layoutRoot"></div>
+    <div id="layoutSource" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- ================================================================== -->
+      <!-- LEFT COLUMN (7 cols)                                               -->
+      <!-- ================================================================== -->
+      <div class="lg:col-span-7 space-y-5">
+
+        <!-- STEP 1: FOOTAGE -->
+        <section id="secFootage" class="acc open rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl">
+          <div class="acc-head flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-5 cursor-pointer select-none">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 font-extrabold text-xs flex items-center justify-center">1</span>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold text-white">คลิปวิดีโอต้นฉบับ & ระบบตัดยำสลับฉาก</h3>
+                <p id="footageSummary" class="text-[11px] text-slate-400">ส่งมาจากหน้าหาคลิป หรือ อัปโหลดจากเครื่อง PC</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 self-start sm:self-auto">
+              <button type="button" id="studioToggleOriginalAudioBtn" class="px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500 cursor-pointer" title="คลิกเพื่อเปิด/ปิดเสียงคลิปต้นฉบับ (ค่าเริ่มต้น: ปิดเสียง 100%)">
+                <span id="studioOriginalAudioIcon">🔇</span>
+                <span id="studioOriginalAudioText">เสียงต้นฉบับ: ปิด 100%</span>
+              </button>
+              <span class="acc-chev text-slate-400 text-sm">▾</span>
+            </div>
+          </div>
+
+          <div class="acc-body px-5 pb-5 space-y-4 border-t border-slate-800 pt-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label for="studioPcVideoInput" class="cursor-pointer rounded-xl border-2 border-dashed border-slate-700 hover:border-fuchsia-500 bg-slate-950/70 hover:bg-slate-950 p-3 flex flex-col items-center justify-center text-center transition group">
+                <input id="studioPcVideoInput" type="file" accept="video/mp4,video/webm,video/quicktime,video/*" multiple class="hidden" />
+                <span class="text-lg group-hover:scale-110 transition">💻</span>
+                <span class="text-xs font-bold text-slate-200">อัปโหลดจาก PC</span>
+                <span class="text-[10px] text-slate-400">.MP4 .MOV .WEBM หลายไฟล์</span>
+              </label>
+              <button type="button" id="studioGoSearchClipsBtn" class="rounded-xl border border-slate-800 hover:border-sky-500/50 bg-slate-950/70 hover:bg-slate-950 p-3 flex flex-col items-center justify-center text-center transition group">
+                <span class="text-lg group-hover:scale-110 transition">🔍</span>
+                <span class="text-xs font-bold text-slate-200">เลือกจากหน้า 1</span>
+                <span class="text-[10px] text-slate-400">กด "🎬 ส่งไปทำคลิป"</span>
+              </button>
+            </div>
+
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-bold text-slate-200">🔗 วางลิงก์โหลดฟุตเทจ</span>
+                <span class="text-[10px] text-slate-400">🎵 Douyin • 📕 RedNote • 📺 Bilibili — บรรทัดละลิงก์</span>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <textarea id="studioLinkInput" rows="2" placeholder="วางลิงก์หรือข้อความแชร์จากแอป เช่น https://v.douyin.com/... , http://xhslink.com/... , https://b23.tv/..." class="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-500 resize-y"></textarea>
+                <button type="button" id="studioAddLinkBtn" class="sm:w-36 px-3 py-2 rounded-lg bg-gradient-to-r from-fuchsia-600 to-sky-600 hover:from-fuchsia-500 hover:to-sky-500 text-xs font-bold text-white transition disabled:opacity-50 disabled:cursor-wait">⬇️ โหลดเข้าคิว</button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold text-slate-300">คิวคลิปที่จะตัดยำรวมกัน (<span id="studioQueueCountText">0</span> คลิป):</span>
+                <button type="button" id="studioClearClipsBtn" class="text-[11px] text-rose-400 hover:underline hidden">ล้างคิวคลิปทั้งหมด</button>
+              </div>
+              <div id="studioClipsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1"></div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800/90 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">ความยาวต่อจังหวะตัดหั่น (Cut Pace):</label>
+                <select id="studioCutPaceSelect" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-fuchsia-500">
+                  <option value="auto_scenes">🧠 สลับฉากตามประโยคบทพูด AI</option>
+                  <option value="5.0">🍃 นิ่งสบายตา (~5.0 วินาที)</option>
+                  <option value="4.0" selected>🎬 สมดุลสบายตา (~4.0 วินาที • แนะนำ)</option>
+                  <option value="3.0">⚡ กระชับกำลังดี (~3.0 วินาที)</option>
+                  <option value="2.0">🔥 ตัดเร็ว สไตล์หยุดนิ้ว (~2.0 วินาที)</option>
+                  <option value="1.5">⚡ ตัดรัว เร็วมาก (~1.5 วินาที)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">เอฟเฟกต์รอยต่อฉาก (Transition):</label>
+                <select id="studioTransitionSelect" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-fuchsia-500">
+                  <option value="none" selected>✂️ Hard Cut</option>
+                  <option value="dissolve">🍃 Dissolve ละมุนตา</option>
+                  <option value="random">🎲 สุ่มเอฟเฟกต์ผสม</option>
+                  <option value="cross-zoom">🔍 Cross Zoom</option>
+                  <option value="whip-slide">💨 Whip Slide</option>
+                  <option value="flash-pop">⚡ Flash Pop</option>
+                </select>
+              </div>
+              <button type="button" id="studioReshuffleBtn" class="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5">
+                <span>🔀 สุ่มสลับตำแหน่งคลิปใหม่</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- STEP 3: SHOPEE + AI -->
+        <section id="secAi" class="acc open rounded-2xl bg-slate-900/90 border border-orange-500/30 shadow-xl">
+          <div class="acc-head flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-5 cursor-pointer select-none">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 text-orange-300 font-extrabold text-xs flex items-center justify-center">3</span>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold text-white">ลิงก์สินค้า Shopee & ให้ Google AI คิดบท + พากย์ + ซับ</h3>
+                <p id="aiSummary" class="text-[11px] text-slate-400">ถ้าค้นด้วยลิงก์ Shopee ในหน้า 1 ไว้ ระบบจะดึงข้อมูลมาให้อัตโนมัติ</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 self-start sm:self-auto">
+              <span id="studioShopeeSyncBadge" class="hidden px-2.5 py-1 rounded-lg bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[11px] font-bold">✓ ซิงค์จากหน้า 1 แล้ว</span>
+              <span class="acc-chev text-slate-400 text-sm">▾</span>
+            </div>
+          </div>
+
+          <div class="acc-body px-5 pb-5 space-y-4 border-t border-slate-800 pt-4">
+            <div class="flex flex-col sm:flex-row gap-2">
+              <div class="relative flex-1">
+                <input id="studioShopeeUrlInput" type="text" placeholder="วางลิงก์สินค้า Shopee (https://s.shopee.co.th/...)" class="w-full pl-9 pr-14 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500" />
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400 text-sm">🛒</span>
+                <button type="button" id="studioPasteShopeeBtn" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300">วาง</button>
+              </div>
+              <button type="button" id="studioFetchShopeeBtn" class="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition shrink-0 flex items-center justify-center gap-1.5 shadow-md"><span>📥 ดึงชื่อ & รายละเอียดสินค้า</span></button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">ชื่อสินค้า (ส่งให้ Google AI):</label>
+                <input id="studioProductTitle" type="text" placeholder="เช่น DJI Osmo Mobile 8P ไม้กันสั่นมือถืออัจฉริยะ..." class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700/90 text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">รายละเอียดสินค้า / จุดเด่น:</label>
+                <textarea id="studioProductDesc" rows="3" placeholder="วางรายละเอียดสินค้า สเปก หรือจุดเด่น..." class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700/90 text-xs text-slate-200 focus:outline-none focus:border-orange-500 leading-relaxed"></textarea>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">ความยาวคลิป:</label>
+                <select id="studioTargetDuration" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                  <option value="15">15 วินาที</option><option value="20" selected>20 วินาที</option><option value="30">30 วินาที</option><option value="45">45 วินาที</option><option value="60">60 วินาที</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">สไตล์บทพากย์:</label>
+                <select id="studioSalesAngle" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                  <option value="podcast_ad" selected>🎙️ Podcast + โฆษณา</option><option value="hard_sell">🔥 ป้ายยาหยุดนิ้ว</option><option value="review_real">⭐ รีวิวใช้จริง</option><option value="feature_focus">⚡ สรุปจุดเด่นสเปก</option><option value="flash_promo">🛒 โปรเดือด</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">เสียงพากย์:</label>
+                <select id="studioVoiceSelect" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                  <option value="Puck" selected>✨ Puck (ชาย • สดใส)</option><option value="Aoede">✨ Aoede (หญิง • สดใส)</option><option value="Kore">✨ Kore (หญิง • นุ่มนวล)</option><option value="Fenrir">⚡ Fenrir (ชาย • หนักแน่น)</option><option value="Charon">☕ Charon (ชาย • ทุ้มลึก)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">ความเร็วเสียง:</label>
+                <select id="studioVoiceSpeed" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-orange-500">
+                  <option value="+0%">1.0x ปกติ</option><option value="+15%" selected>1.15x (แนะนำ)</option><option value="+25%">1.25x TikTok</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="button" id="studioGenerateAllBtn" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-rose-500/20 transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait">
+              <span id="studioGenSpinner" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></span>
+              <span id="studioGenBtnText">✨ ให้ AI คิดบท + สร้าง Header + พากย์เสียง + ทำซับไตเติ้ล</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- STEP 4: STYLE (tabs) -->
+        <section id="secStyle" class="acc open rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl">
+          <div class="acc-head flex items-center justify-between gap-2 p-5 cursor-pointer select-none">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 font-extrabold text-xs flex items-center justify-center">4</span>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold text-white">สไตล์คลิป: Template • Header • บท & ซับ</h3>
+                <p id="styleSummary" class="text-[11px] text-slate-400">ปรับปุ๊บ เห็นผลบน Preview ด้านขวาทันที</p>
+              </div>
+            </div>
+            <span class="acc-chev text-slate-400 text-sm">▾</span>
+          </div>
+
+          <div class="acc-body px-5 pb-5 space-y-4 border-t border-slate-800 pt-4">
+            <div class="inline-flex p-1 rounded-xl bg-slate-950 border border-slate-800 gap-1">
+              <button type="button" data-tab="tabTemplate" class="tab-btn active px-3 py-1.5 rounded-lg border border-transparent text-xs font-bold text-slate-300 transition">🎨 Template</button>
+              <button type="button" data-tab="tabHeader" class="tab-btn px-3 py-1.5 rounded-lg border border-transparent text-xs font-bold text-slate-300 transition">🅷 Header</button>
+              <button type="button" data-tab="tabScript" class="tab-btn px-3 py-1.5 rounded-lg border border-transparent text-xs font-bold text-slate-300 transition">💬 บท & ซับ</button>
+            </div>
+
+            <div id="tabTemplate" class="tab-panel">
+              <div id="studioTemplateGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+            </div>
+
+            <div id="tabHeader" class="tab-panel hidden">
+              <div class="p-4 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-3.5">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[11px] font-bold">HEADER พาดหัวด้านบน • มี Stroke • ไร้พื้นหลัง</span>
+                  <label class="inline-flex items-center gap-2 cursor-pointer bg-slate-900 border border-slate-700 hover:border-amber-400 px-3 py-1.5 rounded-lg transition">
+                    <input id="studioToggleHeaderCheck" type="checkbox" checked class="rounded accent-amber-400 cursor-pointer" />
+                    <span class="text-xs font-bold text-amber-300">แสดง Header บนคลิป</span>
+                  </label>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-slate-400 mb-1">ข้อความ Header บนคลิป:</label>
+                  <input id="studioHeaderInput" type="text" value="ไอเทมเด็ด ของมันต้องมี!" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-amber-500/40 text-sm font-extrabold text-amber-300 focus:outline-none focus:border-amber-400" />
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">ขนาด (<span id="studioHeaderSizeVal">100</span>px):</label>
+                    <input id="studioHeaderSizeRange" type="range" min="58" max="130" value="100" class="w-full accent-amber-400" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">ขอบ Stroke (<span id="studioHeaderStrokeVal">20</span>px):</label>
+                    <input id="studioHeaderStrokeRange" type="range" min="6" max="32" value="20" class="w-full accent-amber-400" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">สีตัวอักษร:</label>
+                    <div class="flex items-center gap-1.5">
+                      <input id="studioHeaderColor" type="color" value="#fde047" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0" />
+                      <button type="button" data-hcolor="#fde047" class="hdr-color-preset w-5 h-5 rounded-full bg-yellow-300 border border-white/40" title="เหลืองทอง"></button>
+                      <button type="button" data-hcolor="#ffffff" class="hdr-color-preset w-5 h-5 rounded-full bg-white border border-white/40" title="ขาว"></button>
+                      <button type="button" data-hcolor="#4ade80" class="hdr-color-preset w-5 h-5 rounded-full bg-green-400 border border-white/40" title="เขียวนีออน"></button>
+                      <button type="button" data-hcolor="#fb923c" class="hdr-color-preset w-5 h-5 rounded-full bg-orange-400 border border-white/40" title="ส้ม"></button>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">สีเส้นขอบ:</label>
+                    <div class="flex items-center gap-1.5">
+                      <input id="studioHeaderStrokeColor" type="color" value="#000000" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0" />
+                      <button type="button" data-scolor="#000000" class="hdr-stroke-preset w-5 h-5 rounded-full bg-black border border-white/40" title="ขอบดำ"></button>
+                      <button type="button" data-scolor="#7f1d1d" class="hdr-stroke-preset w-5 h-5 rounded-full bg-red-900 border border-white/40" title="ขอบแดงเข้ม"></button>
+                      <button type="button" data-scolor="#1e1b4b" class="hdr-stroke-preset w-5 h-5 rounded-full bg-indigo-950 border border-white/40" title="ขอบกรมท่า"></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="tabScript" class="tab-panel hidden space-y-2.5">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <label class="text-xs font-bold text-slate-200">💬 บทพากย์ & ซับไตเติ้ล (แก้แล้วกดพากย์ใหม่ได้):</label>
+                <button type="button" id="studioRevoiceBtn" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5"><span>🔄 พากย์เสียง & ซิงค์ซับตามบทที่แก้</span></button>
+              </div>
+              <textarea id="studioScriptTextarea" rows="4" placeholder="บทพากย์ที่ AI เขียนให้จะแสดงที่นี่..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-slate-100 focus:outline-none focus:border-indigo-500 leading-relaxed"></textarea>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">ขนาดซับ (<span id="studioSubSizeVal">76</span>px):</label>
+                  <input id="studioSubSizeRange" type="range" min="38" max="96" value="76" class="w-full accent-sky-400" />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">ขอบซับ (<span id="studioSubStrokeVal">14</span>px):</label>
+                  <input id="studioSubStrokeRange" type="range" min="6" max="24" value="14" class="w-full accent-sky-400" />
+                </div>
+                <div class="flex items-center gap-3 pt-4 flex-wrap">
+                  <label class="inline-flex items-center gap-2 text-xs font-bold text-sky-300 cursor-pointer bg-slate-900 border border-slate-700 hover:border-sky-400 px-3 py-1.5 rounded-lg transition">
+                    <input id="studioToggleSubCheck" type="checkbox" checked class="rounded accent-sky-400 cursor-pointer" /><span>แสดงซับ</span>
+                  </label>
+                  <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                    <input id="studioSubBgCheck" type="checkbox" class="rounded accent-sky-500 cursor-pointer" /><span>แถบพื้นหลังซับ</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- RIGHT COLUMN (5 cols, sticky): CENSOR HERO + PREVIEW + EXPORT      -->
+      <!-- ================================================================== -->
+      <div class="lg:col-span-5 lg:sticky lg:top-20 space-y-4">
+
+        <!-- STEP 2: CHINESE CENSOR (HERO) -->
+        <section id="censorCard" class="censor-pending rounded-2xl bg-gradient-to-br from-rose-950/80 via-slate-900 to-slate-900 border-2 border-rose-500/70 p-4 shadow-2xl shadow-rose-900/30 space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <span id="censorIcon" class="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/50 flex items-center justify-center text-xl">🈲</span>
+              <div>
+                <h3 class="text-sm sm:text-base font-extrabold text-white">เซนเซอร์ตัวอักษรจีน</h3>
+                <p id="studioCensorStatusText" class="text-[11px] text-rose-300 font-semibold">ยังไม่มีคลิปในคิว</p>
+              </div>
+            </div>
+            <span id="studioCensorCountBadge" class="px-2.5 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs font-extrabold font-mono">0/0</span>
+          </div>
+          <button type="button" id="studioBlurChineseBtn" title="สแกนและเบลอตัวอักษรภาษาจีนอัตโนมัติตั้งแต่ต้นคลิปจนจบคลิป" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-rose-600 via-red-500 to-orange-500 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-rose-600/30 transition flex items-center justify-center gap-2 disabled:cursor-wait">
+            🔍 เซนเซอร์จีนทั้งหมด
+          </button>
+          <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+            <div id="studioCensorProgressBar" class="h-full bg-gradient-to-r from-rose-500 to-orange-400 transition-all duration-150" style="width:0%"></div>
+          </div>
+          <p id="studioCensorProgressText" class="text-[11px] text-slate-400">OCR สแกนทุกเฟรม → เบลอตัวจีน → อัปเดตพรีวิวให้อัตโนมัติ</p>
+        </section>
+
+        <!-- LIVE PREVIEW -->
+        <section id="previewCard" class="rounded-2xl bg-slate-900/95 border border-slate-800 p-4 sm:p-5 shadow-2xl space-y-3.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <h3 class="text-sm sm:text-base font-extrabold text-white">▶ Preview Video</h3>
+            </div>
+            <span id="studioVoiceEngineBadge" class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-semibold">9:16 Full HD (1080×1920)</span>
+          </div>
+
+          <div class="relative mx-auto w-full max-w-[280px] aspect-[9/16] rounded-2xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-2xl">
+            <canvas id="studioPreviewCanvas" width="540" height="960" class="w-full h-full object-contain block cursor-pointer"></canvas>
+            <button type="button" id="studioCanvasPlayOverlay" class="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition group" title="คลิกเพื่อเล่น/หยุดพรีวิว">
+              <div class="w-14 h-14 rounded-full bg-white/95 text-slate-950 flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition">
+                <svg class="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" /></svg>
+              </div>
+            </button>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+            <input id="studioTimelineScrubber" type="range" min="0" max="20" step="0.05" value="0" class="w-full accent-rose-500 cursor-pointer" />
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button type="button" id="studioPlayPauseBtn" class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1"><span>▶ เล่นพรีวิว</span></button>
+                <button type="button" id="studioRestartBtn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition" title="เล่นซ้ำตั้งแต่ต้น">↺ เริ่มใหม่</button>
+                <button type="button" id="studioMuteVoiceBtn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition" title="เปิด/ปิดเสียงพากย์ขณะพรีวิว">🔊 เสียงพากย์</button>
+                <button type="button" id="studioMuteOriginalBtn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-semibold transition" title="เปิด/ปิดเสียงคลิปต้นฉบับ">🔇 เสียงต้นฉบับ</button>
+              </div>
+              <span id="studioTimecodeText" class="text-xs font-mono text-slate-300">00.0s / 20.0s</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>ลำดับฉากที่สุ่มตัดยำ (Random Cut Timeline):</span>
+              <span id="studioCutSummaryText">0 ฉาก</span>
+            </div>
+            <div id="studioCutPreviewStrip" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]"></div>
+          </div>
+        </section>
+
+        <!-- STEP 5: EXPORT -->
+        <section id="exportCard" class="rounded-2xl bg-slate-900/95 border border-emerald-500/30 p-4 shadow-2xl space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-extrabold text-xs flex items-center justify-center">5</span>
+              <h3 class="text-sm font-bold text-white">ส่งออกวิดีโอ</h3>
+            </div>
+            <select id="studioResolutionSelect" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-sky-300 font-bold focus:outline-none focus:border-sky-400 cursor-pointer text-xs" title="เลือกความคมชัดของไฟล์ MP4">
+              <option value="720p" selected>720p HD • เรนเดอร์ไว</option>
+              <option value="1080p">1080p Full HD • คมสุด</option>
+              <option value="480p">480p SD • ไฟล์เล็ก</option>
+            </select>
+          </div>
+          <button type="button" id="studioExportMp4Btn" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait">
+            <span>💾 เรนเดอร์และสร้างไฟล์วิดีโอ (.MP4)</span>
+          </button>
+          <div id="studioExportProgressWrap" class="hidden p-3 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span id="studioExportProgressText" class="text-emerald-300 font-semibold">กำลังเรนเดอร์วิดีโอ...</span>
+              <span id="studioExportPctText" class="font-mono text-white font-bold">0%</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div id="studioExportProgressBar" class="h-full bg-gradient-to-r from-emerald-400 to-sky-400 transition-all duration-150" style="width: 0%"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- FINAL MP4 -->
+        <section id="studioFinalMp4Card" class="hidden rounded-2xl bg-gradient-to-b from-emerald-950/50 to-slate-900 border border-emerald-500/50 p-4 sm:p-5 shadow-2xl space-y-3.5">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 text-[11px] font-extrabold">MP4 READY</span>
+            <h4 class="text-sm font-bold text-white">🎬 พรีวิวไฟล์ .MP4 ที่เรนเดอร์เสร็จแล้ว</h4>
+          </div>
+          <div class="mx-auto w-full max-w-[220px] aspect-[9/16] rounded-xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center">
+            <canvas id="studioFinalVideoPlayer" width="270" height="480" class="w-full h-full"></canvas>
+          </div>
+          <button type="button" id="studioDownloadFinalMp4Btn" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-2"><span>⬇ ดาวน์โหลดคลิป .MP4 ลงเครื่อง</span></button>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast -->
+  <div id="mockToast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-xs font-semibold text-white shadow-2xl"></div>
+
+  <!-- API Key Modal (copied) -->
+  <div id="apiKeyModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5"><span class="text-lg">🔑</span>
+          <div><h3 class="text-sm sm:text-base font-bold text-white">หน้าจัดเก็บ API Google AI (Gemini API Key)</h3><p class="text-[11px] text-slate-400">ใช้สำหรับให้ AI คิดบทขายของ, สร้าง Header และพากย์เสียง</p></div>
+        </div>
+        <button type="button" id="closeApiKeyModalBtn" data-close class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <textarea id="geminiApiKeysInput" rows="4" placeholder="AIzaSy... (mock — ไม่ต้องใส่คีย์จริง)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-amber-200 placeholder-slate-600 focus:outline-none focus:border-amber-500"></textarea>
+        <div id="apiKeyStatusBox" class="hidden p-3 rounded-xl text-xs font-medium"></div>
+        <div class="flex items-center justify-end gap-2.5 pt-2">
+          <button type="button" id="testApiKeyBtn" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold transition">⚡ ทดสอบ API Key</button>
+          <button type="button" id="saveApiKeyBtn" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-extrabold transition shadow-lg">💾 บันทึก API Key</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RedNote Cookie Modal (copied) -->
+  <div id="xhsCookieModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-red-500/40 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5"><span class="text-lg">📕</span>
+          <div><h3 class="text-sm sm:text-base font-bold text-white">ตั้งค่า RedNote (小红书) Cookie & Proxy</h3><p id="xhsCookieStatus" class="text-[11px] text-slate-400">mock</p></div>
+        </div>
+        <button type="button" id="closeXhsCookieBtn" data-close class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">✕</button>
+      </div>
+      <div class="p-5 space-y-3">
+        <textarea id="xhsCookieInput" rows="3" placeholder="a1=...; webId=...; web_session=..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-red-200 placeholder-slate-600 focus:outline-none focus:border-red-500"></textarea>
+        <input type="text" id="xhsProxyInput" placeholder="http://127.0.0.1:7890 (เว้นว่างถ้าไม่ใช้)" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-sky-200 placeholder-slate-600 focus:outline-none focus:border-sky-500" />
+        <div class="flex items-center justify-end gap-2 pt-1">
+          <button type="button" id="clearXhsCookieBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">ล้างค่า Cookie/Proxy</button>
+          <button type="button" id="saveXhsCookieBtn" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold">บันทึกการตั้งค่า</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clip Preview Modal -->
+  <div id="previewModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+        <h3 id="previewModalTitle" class="text-sm font-bold text-white truncate">ดูคลิปต้นฉบับ</h3>
+        <button type="button" data-close class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">✕</button>
+      </div>
+      <div class="p-4"><div id="previewModalBox" class="mx-auto w-48 aspect-[9/16] rounded-xl flex items-center justify-center text-4xl"></div></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const STUDIO_TEMPLATES = [
+    { id: "clean-no-anim", name: "✨ Clean / มาตรฐาน", badge: "คลีนมินิมอล • ยอดนิยม", desc: "เต็มจอ 9:16 เรียบหรู ไม่มีอนิเมชั่นกวนตา", accent: "#fde047" },
+    { id: "slide-zoom", name: "✨ Slide Zoom Classic", badge: "เต็มจอ • ซูมสมูท", desc: "ซูมแพนภาพนุ่มนวล + คลื่นเสียงด้านล่าง", accent: "#38bdf8" },
+    { id: "tiktok-pop-sticker", name: "🔥 TikTok Pop Promo", badge: "ป้ายยาขายดี • ป๊อปอาร์ต", desc: "กรอบมนขอบนีออน + ป้าย HOT DEAL", accent: "#f43f5e" },
+    { id: "creator-kinetic-pop", name: "💎 Creator Kinetic 3D", badge: "การ์ดเรืองแสง", desc: "กรอบการ์ดไฟนีออน + วงแหวนนับฉาก", accent: "#4ade80" },
+    { id: "breaking-news-hud", name: "📺 Breaking Review", badge: "ป้าย LIVE + ตัววิ่ง", desc: "ป้าย LIVE + แถบตัววิ่งด้านล่าง", accent: "#ef4444" },
+    { id: "cyberpunk-tech-hud", name: "⚡ Cyber Scanner HUD", badge: "สแกนสินค้า • สายเทค", desc: "เลเซอร์สแกน + กรอบเรดาร์ไฮเทค", accent: "#22d3ee" },
+  ];
+  const HUES = ["#be185d", "#0369a1", "#047857", "#b45309", "#6d28d9", "#c2410c", "#4d7c0f"];
+  const SAMPLE = [
+    ["Douyin", "ไม้กันสั่น 3 แกน รีวิวถ่ายกลางคืน"], ["RedNote", "แกะกล่อง gimbal ตัวใหม่ล่าสุด"],
+    ["Bilibili", "เทียบ 3 รุ่น กันสั่นมือถือ"], ["Douyin", "ถ่าย vlog เดินถนนนิ่งมาก"],
+  ];
+
+  const S = {
+    clips: [], seq: [], t: 0, dur: 20, playing: false, timer: null,
+    origMuted: true, voiceMuted: false, aiDone: false, censoring: false,
+    tpl: "clean-no-anim", hColor: "#fde047", sColor: "#000000", nextId: 1,
+  };
+
+  function toast(msg) {
+    const el = $("mockToast"); el.textContent = msg; el.classList.remove("hidden");
+    clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.add("hidden"), 2600);
+  }
+  function addClip(source, title) {
+    const id = S.nextId++;
+    S.clips.push({ id, sourceLabel: source, title, hue: HUES[id % HUES.length], isCensored: false });
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  // ---------------- cut sequence ----------------
+  function reseq() {
+    const pace = $("studioCutPaceSelect").value;
+    const n = !S.clips.length ? 0 : pace === "auto_scenes" ? 6 : Math.max(2, Math.round(S.dur / parseFloat(pace)));
+    S.seq = Array.from({ length: n }, () => S.clips[Math.floor(Math.random() * S.clips.length)].id);
+  }
+  function curSeg() {
+    if (!S.seq.length) return null;
+    const segLen = S.dur / S.seq.length;
+    const i = Math.min(S.seq.length - 1, Math.floor(S.t / segLen));
+    return { i, clip: S.clips.find((c) => c.id === S.seq[i]), segLen };
+  }
+
+  // ---------------- render: clips ----------------
+  function renderClips() {
+    const n = S.clips.length, done = S.clips.filter((c) => c.isCensored).length, left = n - done;
+    $("studioQueueCountText").textContent = n;
+    $("studioClipCountBadge").textContent = n + " คลิป";
+    $("studioClearClipsBtn").classList.toggle("hidden", n === 0);
+    $("footageSummary").textContent = n ? `${n} คลิปในคิว • ${S.seq.length} ฉาก • ${$("studioTransitionSelect").selectedOptions[0].text}` : "ส่งมาจากหน้าหาคลิป หรือ อัปโหลดจากเครื่อง PC";
+
+    const list = $("studioClipsList");
+    if (!n) {
+      list.innerHTML = `<div class="col-span-full py-5 px-4 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400">ยังไม่มีคลิปในคิว — กดปุ่ม <strong class="text-fuchsia-400">"🎬 ส่งไปทำคลิป"</strong> จากหน้าค้นหา หรืออัปโหลดไฟล์วิดีโอจากเครื่อง PC ได้เลย</div>`;
+    } else {
+      list.innerHTML = S.clips.map((c, i) => `
+        <div class="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-950 border ${c.isCensored ? "border-slate-800" : "border-rose-500/40"}">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="relative w-12 h-12 rounded-lg border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white" style="background:${c.hue}">
+              #${i + 1}
+              <span class="absolute bottom-0 inset-x-0 text-[8px] leading-tight bg-black/50 ${c.isCensored ? "blur-[2px]" : ""}">限时优惠</span>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-slate-300">${esc(c.sourceLabel)}</span>
+                ${c.isCensored
+                  ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/40 text-[10px] text-emerald-300 font-bold">✓ เซนเซอร์แล้ว</span>`
+                  : `<span class="px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/40 text-[10px] text-rose-300 font-bold">🈲 ยังมีอักษรจีน</span>`}
+                <span class="text-[10px] ${S.origMuted ? "text-emerald-400" : "text-amber-300"} font-semibold">${S.origMuted ? "🔇" : "🔊"}</span>
+              </div>
+              <p class="text-xs font-semibold text-slate-200 truncate mt-0.5" title="${esc(c.title)}">${esc(c.title)}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button type="button" data-preview-clip="${c.id}" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-sky-300 transition" title="ดูตัวอย่างคลิปต้นฉบับ">▶ ดูคลิป</button>
+            <button type="button" data-remove-clip="${c.id}" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white text-xs flex items-center justify-center transition" title="ลบออกจากคิว">✕</button>
+          </div>
+        </div>`).join("");
+    }
+    renderCensorUI();
+    renderStrip();
+    draw();
+  }
+
+  // ---------------- render: censor hero ----------------
+  function renderCensorUI() {
+    const n = S.clips.length, done = S.clips.filter((c) => c.isCensored).length, left = n - done;
+    const allDone = n > 0 && left === 0;
+    const card = $("censorCard"), btn = $("studioBlurChineseBtn");
+    $("studioCensorCountBadge").textContent = `${done}/${n}`;
+    if (S.censoring) return;
+    btn.disabled = false;
+    if (allDone) {
+      card.className = "rounded-2xl bg-gradient-to-br from-emerald-950/70 via-slate-900 to-slate-900 border-2 border-emerald-500/60 p-4 shadow-2xl space-y-3";
+      $("censorIcon").className = "w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-xl";
+      $("censorIcon").textContent = "✅";
+      $("studioCensorStatusText").className = "text-[11px] text-emerald-300 font-semibold";
+      $("studioCensorStatusText").textContent = "เบลอตัวจีนครบทุกคลิปแล้ว";
+      $("studioCensorCountBadge").className = "px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-extrabold font-mono";
+      btn.className = "w-full py-3 px-5 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/35 border border-emerald-500/50 text-emerald-200 font-extrabold text-sm transition flex items-center justify-center gap-2";
+      btn.textContent = "🔍 เซนเซอร์จีนใหม่";
+      $("studioCensorProgressBar").style.width = "100%";
+      $("studioCensorProgressBar").className = "h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-150";
+    } else {
+      card.className = "censor-pending rounded-2xl bg-gradient-to-br from-rose-950/80 via-slate-900 to-slate-900 border-2 border-rose-500/70 p-4 shadow-2xl shadow-rose-900/30 space-y-3";
+      $("censorIcon").className = "w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/50 flex items-center justify-center text-xl";
+      $("censorIcon").textContent = "🈲";
+      $("studioCensorStatusText").className = "text-[11px] text-rose-300 font-semibold";
+      $("studioCensorStatusText").textContent = n ? `เหลือ ${left} จาก ${n} คลิปที่ยังมีตัวอักษรจีน` : "ยังไม่มีคลิปในคิว";
+      $("studioCensorCountBadge").className = "px-2.5 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs font-extrabold font-mono";
+      btn.className = "w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-rose-600 via-red-500 to-orange-500 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-rose-600/30 transition flex items-center justify-center gap-2 disabled:cursor-wait";
+      btn.textContent = left && done ? `🔍 เซนเซอร์จีน ${left} คลิปที่เหลือ` : "🔍 เซนเซอร์จีนทั้งหมด";
+      $("studioCensorProgressBar").style.width = n ? (done / n * 100) + "%" : "0%";
+      $("studioCensorProgressBar").className = "h-full bg-gradient-to-r from-rose-500 to-orange-400 transition-all duration-150";
+    }
+    $("studioCensorProgressText").textContent = allDone ? "อัปเดตพรีวิวแล้ว — ตัวจีนในทุกฉากถูกเบลอ" : "OCR สแกนทุกเฟรม → เบลอตัวจีน → อัปเดตพรีวิวให้อัตโนมัติ";
+  }
+
+  async function runChineseCensorScan() {
+    if (S.censoring) return;
+    if (!S.clips.length) { toast("เพิ่มคลิปก่อน แล้วค่อยกดเซนเซอร์จีน"); flash("secFootage"); return; }
+    let targets = S.clips.filter((c) => !c.isCensored);
+    if (!targets.length) { S.clips.forEach((c) => (c.isCensored = false)); targets = S.clips.slice(); renderClips(); }
+    S.censoring = true;
+    const btn = $("studioBlurChineseBtn"); btn.disabled = true;
+    for (let idx = 0; idx < targets.length; idx++) {
+      for (let pct = 0; pct <= 100; pct += 5) {
+        const phase = pct < 70 ? "สแกน" : "เบลอ";
+        btn.innerHTML = `<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> ⏳ ${phase} ${pct}% (${idx + 1}/${targets.length})`;
+        $("studioCensorStatusText").textContent = `กำลังเซนเซอร์: ${targets[idx].title}`;
+        $("studioCensorProgressBar").style.width = ((idx + pct / 100) / targets.length * 100) + "%";
+        $("studioCensorProgressText").textContent = pct < 70 ? "🔎 OCR หาตัวอักษรจีนทีละเฟรม..." : "🌫️ เบลอตำแหน่งที่เจอ...";
+        await new Promise((r) => setTimeout(r, 55));
+      }
+      btn.innerHTML = `⏳ อัปเดตพรีวิว (${idx + 1}/${targets.length})...`;
+      await new Promise((r) => setTimeout(r, 200));
+      targets[idx].isCensored = true;
+      renderClips();
+      S.censoring = true; // keep locked during loop
+    }
+    S.censoring = false;
+    renderClips();
+    toast(`✓ เซนเซอร์จีนเสร็จ ${targets.length} คลิป`);
+  }
+
+  // ---------------- render: strip ----------------
+  function renderStrip() {
+    const seg = curSeg(), segLen = S.seq.length ? S.dur / S.seq.length : 0;
+    $("studioCutSummaryText").textContent = `${S.seq.length} ฉากตัดสลับ (${S.dur.toFixed(1)}s)`;
+    $("studioCutPreviewStrip").innerHTML = S.seq.map((id, i) => {
+      const ci = S.clips.findIndex((c) => c.id === id) + 1;
+      const now = seg && seg.i === i;
+      return `<button type="button" data-seek-time="${(i * segLen).toFixed(2)}" class="shrink-0 px-2.5 py-1 rounded-lg ${now ? "bg-rose-600/30 border-rose-500 text-white" : "bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300"} border font-mono transition text-[11px] flex items-center gap-1"><span>✂️ ฉาก ${i + 1}</span><span class="text-slate-400 font-normal">(คลิป#${ci} • ${segLen.toFixed(1)}s)</span></button>`;
+    }).join("");
+  }
+
+  // ---------------- render: canvas preview ----------------
+  function wrapLines(ctx, text, maxW) {
+    const words = text.split(/(\s+)/), lines = []; let line = "";
+    for (const w of words) { const test = line + w; if (ctx.measureText(test).width > maxW && line.trim()) { lines.push(line.trim()); line = w; } else line = test; }
+    if (line.trim()) lines.push(line.trim()); return lines;
+  }
+  function drawFrame(cv, t) {
+    const ctx = cv.getContext("2d"), W = cv.width, H = cv.height, k = W / 1080;
+    const segLen = S.seq.length ? S.dur / S.seq.length : 1;
+    const i = S.seq.length ? Math.min(S.seq.length - 1, Math.floor(t / segLen)) : -1;
+    const clip = i >= 0 ? S.clips.find((c) => c.id === S.seq[i]) : null;
+    ctx.filter = "none";
+    if (!clip) {
+      ctx.fillStyle = "#020617"; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#64748b"; ctx.font = `600 ${44 * k}px 'IBM Plex Sans Thai'`; ctx.textAlign = "center";
+      ctx.fillText("ยังไม่มีคลิปในคิว", W / 2, H / 2); return;
+    }
+    // fake footage
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, clip.hue); g.addColorStop(1, "#0f172a");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const local = (t - i * segLen) / segLen;
+    ctx.fillStyle = "rgba(255,255,255,.12)";
+    ctx.beginPath(); ctx.arc(W * (0.3 + 0.4 * local), H * 0.45, 260 * k, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.font = `700 ${60 * k}px Inter`; ctx.textAlign = "center";
+    ctx.fillText("📦 คลิป #" + (S.clips.indexOf(clip) + 1), W / 2, H * 0.46);
+    // burned-in chinese text
+    ctx.save();
+    if (clip.isCensored) ctx.filter = `blur(${26 * k}px)`;
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(W * 0.12, H * 0.58, W * 0.76, 110 * k);
+    ctx.fillStyle = "#fff"; ctx.font = `700 ${58 * k}px sans-serif`;
+    ctx.fillText("限时优惠 全网最低价", W / 2, H * 0.58 + 76 * k);
+    ctx.restore();
+    if (!clip.isCensored) {
+      ctx.strokeStyle = "#f43f5e"; ctx.lineWidth = 6 * k; ctx.setLineDash([18 * k, 12 * k]);
+      ctx.strokeRect(W * 0.11, H * 0.575, W * 0.78, 125 * k); ctx.setLineDash([]);
+      ctx.fillStyle = "#f43f5e"; ctx.font = `700 ${30 * k}px 'IBM Plex Sans Thai'`;
+      ctx.fillText("ยังไม่เซนเซอร์", W / 2, H * 0.575 - 14 * k);
+    }
+    // template accent
+    const tpl = STUDIO_TEMPLATES.find((x) => x.id === S.tpl);
+    if (tpl.id !== "clean-no-anim") { ctx.strokeStyle = tpl.accent; ctx.lineWidth = 14 * k; ctx.strokeRect(24 * k, 24 * k, W - 48 * k, H - 48 * k); }
+    if (tpl.id === "breaking-news-hud") { ctx.fillStyle = "#ef4444"; ctx.fillRect(40 * k, 300 * k, 170 * k, 60 * k); ctx.fillStyle = "#fff"; ctx.font = `800 ${40 * k}px Inter`; ctx.fillText("LIVE", 125 * k, 345 * k); }
+    // header
+    if ($("studioToggleHeaderCheck").checked) {
+      const size = +$("studioHeaderSizeRange").value * k, stroke = +$("studioHeaderStrokeRange").value * k;
+      ctx.font = `900 ${size}px Kanit, 'IBM Plex Sans Thai'`; ctx.lineJoin = "round";
+      const lines = wrapLines(ctx, $("studioHeaderInput").value, W * 0.9);
+      lines.forEach((ln, li) => {
+        const y = 230 * k + li * size * 1.1;
+        ctx.lineWidth = stroke; ctx.strokeStyle = S.sColor; ctx.strokeText(ln, W / 2, y);
+        ctx.fillStyle = S.hColor; ctx.fillText(ln, W / 2, y);
+      });
+    }
+    // subtitles
+    const script = $("studioScriptTextarea").value.trim();
+    if ($("studioToggleSubCheck").checked && S.aiDone && script) {
+      const words = script.split(/\s+/), chunks = [];
+      for (let w = 0; w < words.length; w += 2) chunks.push(words.slice(w, w + 2).join(" "));
+      const ci = Math.min(chunks.length - 1, Math.floor(t / S.dur * chunks.length));
+      const size = +$("studioSubSizeRange").value * k, stroke = +$("studioSubStrokeRange").value * k;
+      ctx.font = `800 ${size}px 'IBM Plex Sans Thai'`;
+      const y = H * 0.82;
+      if ($("studioSubBgCheck").checked) { const w = ctx.measureText(chunks[ci]).width; ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fillRect(W / 2 - w / 2 - 24 * k, y - size, w + 48 * k, size * 1.35); }
+      ctx.lineWidth = stroke; ctx.strokeStyle = "#000"; ctx.strokeText(chunks[ci], W / 2, y);
+      ctx.fillStyle = "#fff"; ctx.fillText(chunks[ci], W / 2, y);
+    }
+  }
+  function draw() {
+    drawFrame($("studioPreviewCanvas"), S.t);
+    $("studioTimelineScrubber").max = S.dur;
+    $("studioTimelineScrubber").value = S.t;
+    $("studioTimecodeText").textContent = `${S.t.toFixed(1).padStart(4, "0")}s / ${S.dur.toFixed(1)}s`;
+    $("studioCanvasPlayOverlay").classList.toggle("hidden", S.playing);
+    $("studioPlayPauseBtn").innerHTML = S.playing ? "<span>⏸ หยุด</span>" : "<span>▶ เล่นพรีวิว</span>";
+    const seg = curSeg();
+    document.querySelectorAll("#studioCutPreviewStrip [data-seek-time]").forEach((b, i) => {
+      const now = seg && seg.i === i;
+      b.className = `shrink-0 px-2.5 py-1 rounded-lg ${now ? "bg-rose-600/30 border-rose-500 text-white" : "bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300"} border font-mono transition text-[11px] flex items-center gap-1`;
+    });
+  }
+  function togglePlay() {
+    if (S.playing) { clearInterval(S.timer); S.playing = false; }
+    else {
+      if (S.t >= S.dur) S.t = 0;
+      S.playing = true;
+      S.timer = setInterval(() => { S.t = Math.min(S.dur, S.t + 0.05); if (S.t >= S.dur) { clearInterval(S.timer); S.playing = false; } draw(); }, 50);
+    }
+    draw();
+  }
+
+  // ---------------- templates ----------------
+  function renderTemplates() {
+    $("studioTemplateGrid").innerHTML = STUDIO_TEMPLATES.map((tpl) => {
+      const sel = tpl.id === S.tpl;
+      return `<button type="button" data-tpl-id="${tpl.id}" class="text-left p-3 rounded-xl border transition flex flex-col justify-between gap-1 ${sel ? "bg-slate-800/95 border-fuchsia-500 ring-2 ring-fuchsia-500/25 shadow-lg" : "bg-slate-950/80 border-slate-800 hover:border-slate-700"}">
+        <div><div class="flex items-center justify-between gap-1"><span class="text-xs font-extrabold text-white">${tpl.name}</span><span class="w-2.5 h-2.5 rounded-full" style="background:${tpl.accent}"></span></div>
+        <span class="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-900 text-[10px] font-bold text-slate-300">${tpl.badge}</span></div>
+        <p class="text-[10px] text-slate-400 leading-snug mt-1">${tpl.desc}</p></button>`;
+    }).join("");
+    updateStyleSummary();
+  }
+  function updateStyleSummary() {
+    const tpl = STUDIO_TEMPLATES.find((x) => x.id === S.tpl);
+    const name = tpl.name.replace(/^\S+\s/, "");
+    $("styleSummary").textContent = `${name} • Header ${$("studioToggleHeaderCheck").checked ? "เปิด" : "ปิด"} • ซับ ${$("studioToggleSubCheck").checked ? "เปิด" : "ปิด"}`;
+  }
+
+  // ---------------- helpers ----------------
+  function flash(id) {
+    const el = $(id); if (el.classList.contains("acc")) el.classList.add("open");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  }
+  function setOrigAudio(muted) {
+    S.origMuted = muted;
+    $("studioOriginalAudioIcon").textContent = muted ? "🔇" : "🔊";
+    $("studioOriginalAudioText").textContent = muted ? "เสียงต้นฉบับ: ปิด 100%" : "เสียงต้นฉบับ: เปิด";
+    $("studioToggleOriginalAudioBtn").className = `px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${muted ? "bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500" : "bg-amber-500/15 border-amber-500/50 text-amber-300"}`;
+    $("studioMuteOriginalBtn").textContent = muted ? "🔇 เสียงต้นฉบับ" : "🔊 เสียงต้นฉบับ";
+    $("studioMuteOriginalBtn").className = `px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${muted ? "bg-slate-800 hover:bg-slate-700 text-slate-400" : "bg-amber-500/20 text-amber-300"}`;
+    renderClips();
+  }
+  function openModal(id) { $(id).classList.remove("hidden"); }
+
+  // ---------------- wire events ----------------
+  document.querySelectorAll(".acc-head").forEach((h) => h.addEventListener("click", (e) => {
+    if (e.target.closest("button,label,input,select")) return;
+    h.parentElement.classList.toggle("open");
+  }));
+  document.querySelectorAll(".tab-btn").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  function showTab(id) {
+    document.querySelectorAll(".tab-btn").forEach((x) => x.classList.toggle("active", x.dataset.tab === id));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== id));
+  }
+
+  $("navPage1Btn").onclick = () => { location.href = "page1-redesign.html"; };
+  $("navPage2Btn").onclick = () => toast("อยู่หน้า 2 แล้ว");
+  ["openApiKeyModalBtn", "openApiKeyModalBtnMobile"].forEach((id) => ($(id).onclick = () => openModal("apiKeyModal")));
+  ["openXhsCookieBtn", "openXhsCookieBtnMobile"].forEach((id) => ($(id).onclick = () => openModal("xhsCookieModal")));
+  document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest(".fixed").classList.add("hidden")));
+  document.querySelectorAll("#apiKeyModal,#xhsCookieModal,#previewModal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m) m.classList.add("hidden"); }));
+  $("testApiKeyBtn").onclick = () => { const b = $("apiKeyStatusBox"); b.className = "p-3 rounded-xl text-xs font-medium bg-emerald-500/10 border border-emerald-500/40 text-emerald-300"; b.textContent = "✓ (mock) คีย์ใช้งานได้"; };
+  $("saveApiKeyBtn").onclick = () => { $("apiKeyStatusDot").className = "w-2 h-2 rounded-full bg-emerald-400"; $("apiKeyModal").classList.add("hidden"); toast("💾 (mock) บันทึก API Key แล้ว"); };
+  $("saveXhsCookieBtn").onclick = () => { document.querySelectorAll(".xhs-cookie-dot").forEach((d) => (d.className = "xhs-cookie-dot w-2 h-2 rounded-full bg-emerald-400")); $("xhsCookieModal").classList.add("hidden"); toast("(mock) บันทึก Cookie แล้ว"); };
+  $("clearXhsCookieBtn").onclick = () => { $("xhsCookieInput").value = ""; $("xhsProxyInput").value = ""; document.querySelectorAll(".xhs-cookie-dot").forEach((d) => (d.className = "xhs-cookie-dot w-2 h-2 rounded-full bg-slate-500")); toast("ล้างค่าแล้ว"); };
+
+  $("studioToggleOriginalAudioBtn").onclick = (e) => { e.stopPropagation(); setOrigAudio(!S.origMuted); };
+  $("studioMuteOriginalBtn").onclick = () => setOrigAudio(!S.origMuted);
+  $("studioMuteVoiceBtn").onclick = () => {
+    S.voiceMuted = !S.voiceMuted;
+    $("studioMuteVoiceBtn").textContent = S.voiceMuted ? "🔇 เสียงพากย์" : "🔊 เสียงพากย์";
+    $("studioMuteVoiceBtn").className = `px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${S.voiceMuted ? "bg-slate-800 text-slate-500" : "bg-slate-800 hover:bg-slate-700 text-slate-200"}`;
+  };
+
+  $("studioPcVideoInput").onchange = (e) => {
+    const files = [...e.target.files];
+    files.forEach((f) => addClip("💻 PC", f.name));
+    e.target.value = ""; reseq(); renderClips();
+    if (files.length) toast(`เพิ่ม ${files.length} ไฟล์จากเครื่องแล้ว — อย่าลืมเซนเซอร์จีน`);
+  };
+  $("studioGoSearchClipsBtn").onclick = () => toast("ในแอปจริงจะสลับไปหน้า 1 ให้กด \"🎬 ส่งไปทำคลิป\"");
+  $("studioAddLinkBtn").onclick = () => {
+    const lines = $("studioLinkInput").value.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    if (!lines.length) { toast("วางลิงก์ก่อนกดโหลดเข้าคิว"); return; }
+    const b = $("studioAddLinkBtn"); b.disabled = true; b.textContent = "⏳ กำลังโหลด...";
+    setTimeout(() => {
+      lines.forEach((l) => addClip(/xhs|xiaohongshu/.test(l) ? "RedNote" : /b23|bilibili/.test(l) ? "Bilibili" : "Douyin", "ฟุตเทจจากลิงก์ " + l.slice(0, 28)));
+      $("studioLinkInput").value = ""; b.disabled = false; b.textContent = "⬇️ โหลดเข้าคิว";
+      reseq(); renderClips(); toast(`โหลด ${lines.length} ลิงก์เข้าคิวแล้ว`);
+    }, 1000);
+  };
+  $("studioClearClipsBtn").onclick = () => { S.clips = []; reseq(); S.t = 0; renderClips(); toast("ล้างคิวแล้ว"); };
+  $("studioClipsList").addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-remove-clip]"), pv = e.target.closest("[data-preview-clip]");
+    if (rm) { S.clips = S.clips.filter((c) => c.id != rm.dataset.removeClip); reseq(); renderClips(); }
+    if (pv) {
+      const c = S.clips.find((x) => x.id == pv.dataset.previewClip);
+      $("previewModalTitle").textContent = c.title; $("previewModalBox").style.background = c.hue; $("previewModalBox").textContent = "▶";
+      openModal("previewModal");
+    }
+  });
+  $("studioCutPaceSelect").onchange = () => { reseq(); renderClips(); };
+  $("studioTransitionSelect").onchange = () => renderClips();
+  $("studioReshuffleBtn").onclick = () => { if (!S.clips.length) { toast("ยังไม่มีคลิปให้สุ่ม"); return; } reseq(); renderClips(); toast("🔀 สุ่มสลับตำแหน่งใหม่แล้ว"); };
+  $("studioCutPreviewStrip").addEventListener("click", (e) => { const b = e.target.closest("[data-seek-time]"); if (b) { S.t = +b.dataset.seekTime + 0.01; draw(); } });
+
+  $("studioBlurChineseBtn").onclick = runChineseCensorScan;
+
+  $("studioPasteShopeeBtn").onclick = () => { $("studioShopeeUrlInput").value = "https://s.shopee.co.th/mockDemo123"; };
+  $("studioFetchShopeeBtn").onclick = () => {
+    if (!$("studioShopeeUrlInput").value.trim()) { toast("วางลิงก์ Shopee ก่อน"); return; }
+    const b = $("studioFetchShopeeBtn"); b.innerHTML = "<span>⏳ กำลังดึง...</span>";
+    setTimeout(() => {
+      $("studioProductTitle").value = "ไม้กันสั่นมือถือ 3 แกน มีไฟเติมแสง + รีโมทไร้สาย";
+      $("studioProductDesc").value = "• กันสั่น 3 แกน ถ่ายเดินนิ่ง\n• ไฟ LED ในตัว ปรับได้ 3 ระดับ\n• ติดตามใบหน้า AI\n• พับเก็บได้ พกง่าย";
+      $("studioShopeeSyncBadge").classList.remove("hidden");
+      b.innerHTML = "<span>📥 ดึงชื่อ & รายละเอียดสินค้า</span>"; toast("ดึงข้อมูลสินค้าแล้ว");
+    }, 900);
+  };
+  $("studioTargetDuration").onchange = () => { S.dur = +$("studioTargetDuration").value; S.t = Math.min(S.t, S.dur); reseq(); renderClips(); };
+  $("studioGenerateAllBtn").onclick = () => {
+    if (!$("studioProductTitle").value.trim()) { toast("ใส่ชื่อสินค้า หรือกดดึงจาก Shopee ก่อน"); return; }
+    const b = $("studioGenerateAllBtn"); b.disabled = true; $("studioGenSpinner").classList.remove("hidden");
+    const steps = ["🧠 AI กำลังคิดบท...", "🅷 สร้าง Header...", "🎙️ พากย์เสียง Puck...", "💬 ซิงค์ซับไตเติ้ล..."];
+    steps.forEach((s, i) => setTimeout(() => ($("studioGenBtnText").textContent = s), i * 550));
+    setTimeout(() => {
+      S.aiDone = true; b.disabled = false; $("studioGenSpinner").classList.add("hidden");
+      $("studioGenBtnText").textContent = "✨ สร้างบทใหม่อีกครั้ง";
+      $("studioHeaderInput").value = "กันสั่นนิ่งกริบ ไฟในตัว!";
+      $("studioScriptTextarea").value = "ใครถ่ายคลิปแล้วมือสั่น ต้องดูตัวนี้ ไม้กันสั่นสามแกน นิ่งมาก มีไฟในตัว ถ่ายกลางคืนก็สวย กดตะกร้าเลย ตอนนี้ลดเยอะ";
+      const vo = $("studioVoiceSelect").value, sp = $("studioVoiceSpeed").selectedOptions[0].text.split(" ")[0];
+      $("aiSummary").textContent = `✓ สร้างบทแล้ว • ${S.dur} วินาที • เสียง ${vo} ${sp} — กดหัวการ์ดเพื่อแก้ไข`;
+      $("secAi").classList.remove("open"); $("secStyle").classList.add("open"); showTab("tabScript");
+      draw(); toast("✓ AI สร้างบท + Header + เสียง + ซับเรียบร้อย กดเล่นพรีวิวได้เลย");
+    }, steps.length * 550 + 200);
+  };
+
+  $("studioTemplateGrid").addEventListener("click", (e) => { const b = e.target.closest("[data-tpl-id]"); if (b) { S.tpl = b.dataset.tplId; renderTemplates(); draw(); } });
+  const syncRanges = () => {
+    $("studioHeaderSizeVal").textContent = $("studioHeaderSizeRange").value;
+    $("studioHeaderStrokeVal").textContent = $("studioHeaderStrokeRange").value;
+    $("studioSubSizeVal").textContent = $("studioSubSizeRange").value;
+    $("studioSubStrokeVal").textContent = $("studioSubStrokeRange").value;
+    draw();
+  };
+  ["studioHeaderInput", "studioHeaderSizeRange", "studioHeaderStrokeRange", "studioSubSizeRange", "studioSubStrokeRange", "studioScriptTextarea"].forEach((id) => $(id).addEventListener("input", syncRanges));
+  ["studioToggleHeaderCheck", "studioToggleSubCheck", "studioSubBgCheck"].forEach((id) => $(id).addEventListener("change", () => { updateStyleSummary(); draw(); }));
+  $("studioHeaderColor").addEventListener("input", (e) => { S.hColor = e.target.value; draw(); });
+  $("studioHeaderStrokeColor").addEventListener("input", (e) => { S.sColor = e.target.value; draw(); });
+  document.querySelectorAll(".hdr-color-preset").forEach((b) => (b.onclick = () => { S.hColor = b.dataset.hcolor; $("studioHeaderColor").value = S.hColor; draw(); }));
+  document.querySelectorAll(".hdr-stroke-preset").forEach((b) => (b.onclick = () => { S.sColor = b.dataset.scolor; $("studioHeaderStrokeColor").value = S.sColor; draw(); }));
+  $("studioRevoiceBtn").onclick = () => {
+    const b = $("studioRevoiceBtn"); b.innerHTML = "<span>⏳ กำลังพากย์ใหม่...</span>";
+    setTimeout(() => { S.aiDone = true; b.innerHTML = "<span>🔄 พากย์เสียง & ซิงค์ซับตามบทที่แก้</span>"; draw(); toast("พากย์ใหม่ + ซิงค์ซับแล้ว"); }, 1000);
+  };
+
+  $("studioPreviewCanvas").onclick = togglePlay;
+  $("studioCanvasPlayOverlay").onclick = togglePlay;
+  $("studioPlayPauseBtn").onclick = togglePlay;
+  $("studioRestartBtn").onclick = () => { S.t = 0; if (!S.playing) togglePlay(); else draw(); };
+  $("studioTimelineScrubber").addEventListener("input", (e) => { S.t = +e.target.value; draw(); });
+
+  $("studioExportMp4Btn").onclick = () => {
+    if (!S.clips.length) { toast("ยังไม่มีคลิปให้เรนเดอร์"); flash("secFootage"); return; }
+    const b = $("studioExportMp4Btn"); b.disabled = true;
+    $("studioExportProgressWrap").classList.remove("hidden"); $("studioFinalMp4Card").classList.add("hidden");
+    let p = 0;
+    const iv = setInterval(() => {
+      p += 2;
+      $("studioExportProgressBar").style.width = p + "%"; $("studioExportPctText").textContent = p + "%";
+      $("studioExportProgressText").textContent = p < 90 ? `กำลังเรนเดอร์ ${$("studioResolutionSelect").value}...` : "กำลังรวมเสียงพากย์...";
+      if (p >= 100) {
+        clearInterval(iv); b.disabled = false; $("studioExportProgressText").textContent = "✓ เรนเดอร์เสร็จ";
+        $("studioFinalMp4Card").classList.remove("hidden"); drawFrame($("studioFinalVideoPlayer"), S.dur * 0.3);
+        $("studioFinalMp4Card").scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 50);
+  };
+  $("studioDownloadFinalMp4Btn").onclick = () => toast(`⬇ (mock) ดาวน์โหลด studio_${$("studioResolutionSelect").value}.mp4`);
+
+  // init
+  SAMPLE.slice(0, 3).forEach((s) => addClip(s[0], s[1]));
+  reseq(); renderTemplates(); renderClips();
+  document.fonts && document.fonts.ready.then(draw);
+})();
+</script>
+<script>
+/* ===== Layout variant switcher (mock only) ===== */
+(() => {
+  const ids = ["secFootage", "secAi", "secStyle", "censorCard", "previewCard", "exportCard", "studioFinalMp4Card"];
+  const P = Object.fromEntries(ids.map((i) => [i, document.getElementById(i)]));
+  const root = document.getElementById("layoutRoot");
+  const TABS = [["secFootage", "🎞️", "ฟุตเทจ"], ["secAi", "✨", "AI บท+เสียง"], ["secStyle", "🎨", "สไตล์"]];
+  let V = "A", tab = "secFootage";
+  try { V = localStorage.getItem("p2v") || "A"; } catch (e) {}
+
+  const el = (cls, kids = []) => { const d = document.createElement("div"); d.className = cls; kids.forEach((k) => k && d.appendChild(k)); return d; };
+  function tabBar() {
+    const bar = el("flex gap-1.5 p-1 rounded-2xl bg-slate-900/90 border border-slate-800 max-w-xl mx-auto");
+    TABS.forEach(([id, ic, label]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${tab === id ? "bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white shadow" : "text-slate-400 hover:text-white hover:bg-slate-800"}`;
+      b.textContent = `${ic} ${label}`;
+      b.onclick = () => { tab = id; apply(); };
+      bar.appendChild(b);
+    });
+    return bar;
+  }
+  function rail() {
+    const r = el("lg:sticky lg:top-20 flex lg:flex-col gap-1.5 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800");
+    TABS.forEach(([id, ic, label]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `flex-1 lg:flex-none flex flex-col items-center gap-0.5 px-1 py-2.5 rounded-xl text-[10px] font-bold transition ${tab === id ? "bg-slate-800 text-white ring-1 ring-fuchsia-500" : "text-slate-400 hover:text-white hover:bg-slate-800"}`;
+      b.innerHTML = `<span class="text-xl">${ic}</span><span>${label}</span>`;
+      b.onclick = () => { tab = id; apply(); };
+      r.appendChild(b);
+    });
+    const cz = document.createElement("button");
+    cz.type = "button";
+    cz.className = "flex-1 lg:flex-none flex flex-col items-center gap-0.5 px-1 py-2.5 rounded-xl text-[10px] font-extrabold bg-rose-600/25 border border-rose-500/60 text-rose-200 hover:bg-rose-600/40 lg:mt-2";
+    cz.innerHTML = `<span class="text-xl">🈲</span><span>เซนเซอร์</span>`;
+    cz.title = "ไปที่การ์ดเซนเซอร์จีน";
+    cz.onclick = () => document.getElementById("studioBlurChineseBtn").click();
+    r.appendChild(cz);
+    return r;
+  }
+
+  const tabbed = () => TABS.map(([id]) => P[id]);
+  function apply() {
+    document.body.dataset.v = V;
+    // keep every section in the DOM (studio code reads their inputs); hide inactive tabs instead
+    TABS.forEach(([id]) => P[id].classList.toggle("hidden", (V === "C" || V === "D") && id !== tab));
+    root.innerHTML = "";
+    const { secFootage: F, secAi: AI, secStyle: ST, censorCard: CZ, previewCard: PV, exportCard: EX, studioFinalMp4Card: FIN } = P;
+    if (V === "A") {
+      root.append(el("grid grid-cols-1 lg:grid-cols-12 gap-6 items-start", [
+        el("lg:col-span-7 space-y-5", [F, AI, ST]),
+        el("lg:col-span-5 lg:sticky lg:top-20 space-y-4", [CZ, PV, EX, FIN]),
+      ]));
+    } else if (V === "B") {
+      root.append(el("grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px_minmax(0,1fr)] gap-5 items-start", [
+        el("space-y-4", [CZ, F]),
+        el("xl:sticky xl:top-20 space-y-4", [PV]),
+        el("space-y-4", [AI, ST, EX, FIN]),
+      ]));
+    } else if (V === "C") {
+      root.append(
+        el("grid grid-cols-1 lg:grid-cols-12 gap-5 items-start", [
+          el("lg:col-span-6 lg:col-start-2", [PV]),
+          el("lg:col-span-4 space-y-4", [CZ, EX, FIN]),
+        ]),
+        el("space-y-4 mt-6", [tabBar(), el("max-w-5xl mx-auto", tabbed())])
+      );
+    } else if (V === "D") {
+      root.append(el("grid grid-cols-1 lg:grid-cols-[84px_minmax(0,1fr)_380px] gap-5 items-start", [
+        rail(),
+        el("space-y-4", tabbed()),
+        el("lg:sticky lg:top-20 space-y-4", [CZ, PV, EX, FIN]),
+      ]));
+    }
+    document.querySelectorAll(".vbtn").forEach((b) => b.classList.toggle("active", b.dataset.v === V));
+  }
+
+  document.querySelectorAll(".vbtn").forEach((b) => (b.onclick = () => {
+    V = b.dataset.v; try { localStorage.setItem("p2v", V); } catch (e) {}
+    apply(); window.scrollTo(0, 0);
+  }));
+  // tabbed layouts: after AI finishes, jump to the style tab
+  document.getElementById("studioGenerateAllBtn").addEventListener("click", () => {
+    setTimeout(() => { if ((V === "C" || V === "D") && !document.getElementById("studioGenerateAllBtn").disabled) { tab = "secStyle"; apply(); } }, 2600);
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

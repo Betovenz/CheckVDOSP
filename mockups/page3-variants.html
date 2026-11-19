@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MOCK หน้า 3 — ทำหลายคลิป (เลือก 4 แบบ)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Kanit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'IBM Plex Sans Thai', 'Inter', sans-serif; }
+    .kanit { font-family: 'Kanit', sans-serif; }
+    .vbtn.active { background:#f59e0b; color:#0f172a; }
+    .step.active { background:linear-gradient(135deg,rgba(244,63,94,.25),rgba(99,102,241,.25)); border-color:rgba(244,63,94,.6); color:#fff; }
+    .row-sel { background: rgba(99,102,241,.12); }
+    .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .sw { width:34px; height:19px; border-radius:999px; background:#334155; position:relative; transition:.2s; flex-shrink:0; }
+    .sw::after { content:""; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:999px; background:#fff; transition:.2s; }
+    .sw.on { background:#e11d48; }
+    .sw.on::after { left:17px; }
+    .shimmer { background: linear-gradient(90deg, rgba(99,102,241,.15), rgba(244,63,94,.35), rgba(99,102,241,.15)); background-size:200% 100%; animation: sh 1.4s linear infinite; }
+    @keyframes sh { 0% { background-position:200% 0 } 100% { background-position:-200% 0 } }
+    ::-webkit-scrollbar { width:8px; height:8px } ::-webkit-scrollbar-thumb { background:#334155; border-radius:8px }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <!-- Mock-only variant switcher -->
+  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 p-1.5 rounded-2xl bg-slate-900/95 border border-amber-500/50 shadow-2xl backdrop-blur">
+    <span class="px-2 text-[11px] font-bold text-amber-300">เลือกแบบ:</span>
+    <button class="vbtn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-200" data-v="A">A · การ์ด</button>
+    <button class="vbtn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-200" data-v="B">B · ตาราง</button>
+    <button class="vbtn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-200" data-v="C">C · รายการ + แก้ไข</button>
+    <button class="vbtn px-3 py-1.5 rounded-xl text-xs font-bold text-slate-200" data-v="D">D · ทีละขั้น</button>
+  </div>
+
+  <!-- Header (same as real app, plus page 3 tab) -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/80">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-fuchsia-500 to-sky-500 p-[2px]">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold text-lg"><span class="text-rose-400">D</span><span class="text-sky-400">B</span></div>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg">Douyin & Bilibili</h1>
+          <p class="text-xs text-slate-400">ค้นหาโหลดคลิปไร้ลายน้ำ & สตูดิโอตัดต่อทำคลิปรีวิว AI</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="inline-flex p-1 rounded-2xl bg-slate-900 border border-slate-800">
+          <button class="px-3 py-2 rounded-xl text-xs font-bold text-slate-300">🔍 หน้า 1: ค้นหาคลิป</button>
+          <button class="px-3 py-2 rounded-xl text-xs font-bold text-slate-300">🎬 หน้า 2: ทำคลิป AI</button>
+          <button class="px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-500 via-indigo-500 to-sky-500 text-white shadow-md flex items-center gap-1.5">🏭 หน้า 3: ทำหลายคลิป <span id="navCount" class="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px]">10</span></button>
+        </div>
+        <button class="px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold">🔑 ตั้งค่า API <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 ml-1"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="root" class="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 pb-28 space-y-4"></main>
+
+  <!-- Preview modal -->
+  <div id="pvModal" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4 w-full max-w-3xl max-h-[94vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-[300px_1fr] gap-4 items-start">
+      <div id="pvPlayer" class="sm:sticky sm:top-0"></div>
+      <div class="space-y-3 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <div><div class="text-[11px] text-slate-400">พรีวิวโปรเจค</div><div id="pvTitle" class="font-bold"></div></div>
+          <button onclick="closePv()" class="text-slate-400 hover:text-white text-xl leading-none">×</button>
+        </div>
+        <div id="pvBody" class="space-y-3"></div>
+        <div class="flex gap-2 pt-1">
+          <button onclick="pvStep(-1)" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold">◀ โปรเจคก่อนหน้า</button>
+          <button onclick="pvStep(1)" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold">โปรเจคถัดไป ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save scope popup -->
+  <div id="saveModal" class="hidden fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-sky-600 flex items-center justify-center text-2xl">💾</div>
+        <div class="font-bold">บันทึกการตั้งค่านี้</div>
+        <div class="text-[11px] text-slate-400">ตำแหน่ง และการเปิด/ปิด Header · Subtitle</div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button onclick="doSave(false)" class="rounded-xl border border-slate-700 hover:border-sky-400 bg-slate-950 hover:bg-sky-500/10 p-3 text-left space-y-1 transition">
+          <div class="text-xl">📄</div><div class="text-sm font-bold">ใช้แค่โปรเจคนี้</div><div class="text-[10px] text-slate-400">โปรเจคอื่นไม่เปลี่ยน</div>
+        </button>
+        <button onclick="doSave(true)" class="rounded-xl border border-emerald-500/50 hover:border-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 p-3 text-left space-y-1 transition">
+          <div class="text-xl">📚</div><div class="text-sm font-bold">ใช้กับทุกโปรเจค</div><div class="text-[10px] text-slate-400">ทั้ง 10 โปรเจค + โปรเจคที่สร้างใหม่</div>
+        </button>
+      </div>
+      <button onclick="document.getElementById('saveModal').classList.add('hidden')" class="w-full text-[11px] text-slate-400 hover:text-white">ยกเลิก</button>
+    </div>
+  </div>
+  <div id="toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-[70] px-4 py-2 rounded-xl bg-slate-800 border border-emerald-500/50 text-xs font-bold shadow-2xl"></div>
+
+  <!-- Add projects modal -->
+  <div id="addModal" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-xl space-y-3">
+      <div class="flex items-center justify-between"><div class="font-bold">➕ สร้างหลายโปรเจคจากลิงก์ Shopee</div><button onclick="toggleAdd(false)" class="text-slate-400 text-xl">×</button></div>
+      <p class="text-xs text-slate-400">วางลิงก์สินค้า Shopee บรรทัดละ 1 ลิงก์ → ได้ 1 โปรเจคต่อลิงก์ ดึงชื่อ & รายละเอียดสินค้าให้อัตโนมัติ</p>
+      <textarea rows="6" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono" placeholder="https://s.shopee.co.th/...&#10;https://s.shopee.co.th/...&#10;https://s.shopee.co.th/..."></textarea>
+      <div class="flex items-center justify-between text-xs">
+        <label class="flex items-center gap-2 text-slate-300"><input type="checkbox" checked class="accent-rose-500"> ใช้ค่าเริ่มต้น (เสียง/ความยาว/มุมขาย/Template)</label>
+        <button onclick="toggleAdd(false)" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 font-bold">📥 สร้างโปรเจค</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  // ---------------------------------------------------------------- mock data
+  const VOICES = ["Puck · ชาย สดใส", "Charon · ชาย ทุ้ม", "Fenrir · ชาย พลังสูง", "Orus · ชาย นุ่ม", "Kore · หญิง ชัดเจน", "Aoede · หญิง สบายๆ", "Leda · หญิง วัยรุ่น", "Zephyr · หญิง สดใส"];
+  const ANGLES = ["ป้ายยา ตื่นเต้น", "รีวิวจริงใจ", "แก้ปัญหา Pain point", "ของมันต้องมี", "เทียบราคาคุ้ม", "ตลก เล่าเรื่อง"];
+  const DURS = ["15 วิ", "20 วิ", "30 วิ", "45 วิ"];
+  const TPLS = ["Clean", "Bold Pop", "Podcast Wave", "Neon"];
+  const GRADS = ["from-rose-500 to-orange-400","from-sky-500 to-indigo-500","from-emerald-500 to-teal-400","from-fuchsia-500 to-pink-400","from-amber-500 to-yellow-300","from-violet-500 to-purple-400","from-cyan-500 to-sky-400","from-lime-500 to-emerald-400","from-red-500 to-rose-400","from-indigo-500 to-blue-400"];
+  const EMO = ["🎧","🧴","📱","🍳","👟","🧸","💡","🎒","⌚","🪴"];
+  const P = [
+    ["หูฟังบลูทูธ ตัดเสียงรบกวน ANC", "ตัดเสียงเงียบกริบ!", "ใครนั่งรถไฟฟ้าทุกวันต้องฟัง หูฟังตัวนี้ตัดเสียงรอบข้างเงียบกริบ แบตอึดทั้งวัน ราคาไม่ถึงพันด้วยนะ"],
+    ["เซรั่มวิตามินซี หน้าใส 30ml", "หน้าใสใน 7 วัน", "หน้าหมองมาทางนี้ เซรั่มวิตซีตัวนี้ซึมไว ไม่เหนียว ทาเช้าเย็น หน้าดูใสขึ้นจริง"],
+    ["ขาตั้งมือถือ ไลฟ์สด หมุน 360°", "ไลฟ์ขายของต้องมี", "แม่ค้าออนไลน์ต้องมี ขาตั้งหมุนได้รอบทิศ ปรับสูงได้ ไฟวงแหวนในตัว"],
+    ["หม้อทอดไร้น้ำมัน 5 ลิตร", "ทอดไม่ใช้น้ำมัน", "อยากกินของทอดแต่กลัวอ้วน หม้อทอดไร้น้ำมันใบนี้ กรอบนอกนุ่มใน ล้างง่ายมาก"],
+    ["รองเท้าผ้าใบ เบาพิเศษ", "เบาเหมือนไม่ได้ใส่", "เดินทั้งวันไม่ปวดเท้า รองเท้าตัวนี้เบาหวิว พื้นนุ่มเด้ง ใส่ได้ทุกชุด"],
+    ["ตุ๊กตาหมีนุ่มนิ่ม 60cm", "กอดแล้วหลับปุ๋ย", "ของขวัญที่ใครได้ก็ยิ้ม ตุ๊กตาหมีตัวใหญ่ ผ้านุ่มมาก ซักเครื่องได้"],
+    ["ไฟเซ็นเซอร์ติดผนัง ชาร์จ USB", "ไม่ต้องคลำหาสวิตช์", "เดินเข้าห้องมืดๆ ไฟติดเอง ติดตั้งง่ายแค่แปะ ชาร์จทีใช้ได้เป็นเดือน"],
+    ["กระเป๋าเป้กันน้ำ ใส่โน้ตบุ๊ก", "ฝนตกก็ไม่หวั่น", "สายเดินทางต้องดู เป้กันน้ำใส่โน้ตบุ๊ก 15 นิ้วได้ มีช่องชาร์จ USB ด้วย"],
+    ["สมาร์ทวอทช์ วัดหัวใจ", "นาฬิกาเกินราคา", "ฟีเจอร์เยอะเกินราคา วัดหัวใจ นับก้าว แจ้งเตือนไลน์ จอสวยคมชัด"],
+    ["กระถางรดน้ำอัตโนมัติ", "ไม่อยู่บ้านต้นไม่ตาย", "ไปเที่ยวหลายวันก็ไม่ต้องห่วง กระถางนี้ดูดน้ำเลี้ยงต้นไม้เองได้ถึง 2 สัปดาห์"],
+  ];
+  // status per step: 0 pending · 1 working · 2 done · 3 error
+  const SEED = [
+    [2,2,2,2,2],[2,2,2,0,2],[2,2,3,0,0],[2,2,2,2,1],[2,2,2,0,0],
+    [2,1,0,0,0],[2,0,0,0,0],[1,0,0,0,0],[0,0,0,0,0],[2,2,2,2,0],
+  ];
+  const projects = P.map((p, i) => ({
+    id: i + 1, title: p[0], header: p[1], script: SEED[i][1] >= 2 ? p[2] : "",
+    voice: VOICES[i % VOICES.length], angle: ANGLES[i % ANGLES.length], dur: DURS[(i % 3) + 1], tpl: TPLS[i % TPLS.length],
+    clips: SEED[i][0] === 0 ? 0 : 2 + (i % 4), clipLoading: SEED[i][0] === 1,
+    censor: i % 3 !== 1, st: { foot: SEED[i][0], script: SEED[i][1], voice: SEED[i][2], censor: SEED[i][3], render: SEED[i][4] },
+    sel: i < 6, grad: GRADS[i], emo: EMO[i], renderPct: SEED[i][4] === 1 ? 46 : 0,
+    voiceErr: SEED[i][2] === 3,
+    shopee: i === 8 ? "" : `https://s.shopee.co.th/8Abc${i + 1}xyZ`,
+    showHeader: true, showSub: true, headerY: 13.5, subY: 77, czView: "after", czPct: null,
+  }));
+  projects[8].title = "";
+  projects.forEach((p) => { if (!p.censor) p.st.censor = 4; }); // 4 = skipped
+
+  let V = "A"; try { V = localStorage.getItem("p3v") || "A"; } catch (e) {}
+  let current = 3;     // selected project (C/D)
+  let step = "script"; // wizard step (D)
+  let pvIdx = 0;
+
+  // ---------------------------------------------------------------- helpers
+  const h = (s) => s;
+  const STEPS = [["foot","ฟุตเทจ","🎞️"],["script","บท","📝"],["voice","เสียง","🎙️"],["censor","เซนเซอร์","🀄"],["render","เรนเดอร์","🎬"]];
+  function chip(p, key, label, icon, small) {
+    const s = p.st[key];
+    const map = {
+      0: "bg-slate-800/80 text-slate-500 border-slate-700",
+      1: "shimmer text-white border-indigo-400/60",
+      2: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+      3: "bg-rose-500/20 text-rose-300 border-rose-500/60",
+      4: "bg-slate-900 text-slate-600 border-slate-800 line-through",
+    };
+    const mark = { 0: "", 1: "…", 2: "✓", 3: "!", 4: "" }[s];
+    return `<span title="${label}" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${map[s]}">${icon}${small ? "" : " " + label} ${mark}</span>`;
+  }
+  const chips = (p, small) => `<div class="flex flex-wrap gap-1">${STEPS.map(([k,l,i]) => chip(p,k,l,i,small)).join("")}</div>`;
+  function thumb(p, cls = "w-16") {
+    return `<div class="${cls} aspect-[9/16] rounded-lg bg-gradient-to-br ${p.grad} relative overflow-hidden shrink-0 cursor-pointer group" onclick="openPv(${p.id - 1})">
+      <div class="absolute inset-0 flex items-center justify-center text-2xl">${p.emo}</div>
+      <div class="absolute top-1 inset-x-1 text-[7px] leading-tight font-black text-yellow-300 text-center kanit" style="-webkit-text-stroke:.4px #000">${p.header}</div>
+      <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition"><span class="opacity-0 group-hover:opacity-100 text-white text-lg">▶</span></div>
+      ${p.st.render === 2 ? '<div class="absolute bottom-1 right-1 text-[8px] px-1 rounded bg-emerald-500 text-black font-bold">MP4</div>' : ""}
+    </div>`;
+  }
+  const opt = (arr, v) => arr.map((x) => `<option ${x === v ? "selected" : ""}>${x}</option>`).join("");
+  const sel = (arr, v, f, i, cls = "") => `<select onchange="setF(${i},'${f}',this.value)" class="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-white focus:outline-none focus:border-orange-500 ${cls}">${opt(arr, v)}</select>`;
+  const sw = (p) => `<button onclick="togCensor(${p.id - 1})" class="sw ${p.censor ? "on" : ""}" title="เซนเซอร์ภาษาจีน"></button>`;
+  const cb = (p) => `<input type="checkbox" ${p.sel ? "checked" : ""} onchange="togSel(${p.id - 1})" class="w-4 h-4 accent-rose-500 cursor-pointer">`;
+  const selCount = () => projects.filter((p) => p.sel).length;
+  function clipStrip(p, max = 5) {
+    if (p.clipLoading) return `<div class="flex items-center gap-2 text-[11px] text-indigo-300"><div class="w-24 h-1.5 rounded bg-slate-800 overflow-hidden"><div class="h-full w-2/3 shimmer"></div></div>โหลดคลิป 2/4…</div>`;
+    if (!p.clips) return `<button class="px-2 py-1 rounded-lg border border-dashed border-slate-600 text-[11px] text-slate-400 hover:border-fuchsia-500 hover:text-fuchsia-300">＋ ใส่ฟุตเทจ (ลิงก์ / จากเครื่อง / หน้า 1)</button>`;
+    let s = "";
+    for (let k = 0; k < Math.min(max, p.clips); k++) s += `<div class="w-6 h-9 rounded bg-gradient-to-b from-slate-600 to-slate-800 border border-slate-600 text-[8px] flex items-end justify-center pb-0.5 text-slate-300">${["抖","红","B"][k % 3]}</div>`;
+    return `<div class="flex items-center gap-1">${s}${p.clips > max ? `<span class="text-[10px] text-slate-400">+${p.clips - max}</span>` : ""}<button class="w-6 h-9 rounded border border-dashed border-slate-600 text-slate-500 hover:text-fuchsia-300 hover:border-fuchsia-500 text-xs">＋</button><span class="text-[10px] text-slate-500 ml-1">${p.clips} คลิป</span></div>`;
+  }
+  const voiceErr = (p) => p.voiceErr ? `<div class="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-md px-2 py-1">⚠️ พากย์ไม่สำเร็จ (429 โควต้าเต็ม) — ลองเปลี่ยนเสียง หรือกดพากย์ใหม่</div>` : "";
+  const audioBar = (p) => p.st.voice === 2
+    ? `<div class="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-950 border border-slate-800"><button class="w-6 h-6 rounded-full bg-indigo-600 text-[10px]">▶</button><div class="flex-1 flex items-end gap-[2px] h-4">${Array.from({length: 26}, (_, k) => `<div class="flex-1 bg-indigo-400/60 rounded-sm" style="height:${20 + ((k * 37 + p.id * 11) % 80)}%"></div>`).join("")}</div><span class="text-[10px] text-slate-400">0:${p.dur.slice(0,2)}</span></div>`
+    : "";
+
+  // ---------------------------------------------------------------- shared blocks
+  function defaultsBar(compact) {
+    return `<section class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3">
+      <div class="flex flex-wrap items-end gap-2.5">
+        <div class="text-xs font-bold text-slate-300 mr-1 self-center">⚙️ ค่าเริ่มต้นทุกโปรเจค</div>
+        <label class="text-[10px] text-slate-400 space-y-0.5"><div>เสียงพากย์</div><select class="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-white">${opt(VOICES, VOICES[0])}</select></label>
+        <label class="text-[10px] text-slate-400 space-y-0.5"><div>ความเร็ว</div><select class="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-white"><option>1.0x</option><option selected>1.15x เร็ว</option><option>1.3x</option></select></label>
+        <label class="text-[10px] text-slate-400 space-y-0.5"><div>ความยาว</div><select class="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-white">${opt(DURS, "30 วิ")}</select></label>
+        <label class="text-[10px] text-slate-400 space-y-0.5"><div>มุมขาย</div><select class="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-white">${opt(ANGLES, ANGLES[0])}</select></label>
+        ${compact ? "" : `<label class="text-[10px] text-slate-400 space-y-0.5"><div>Template</div><select class="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px] text-white">${opt(TPLS, TPLS[0])}</select></label>`}
+        <label class="flex items-center gap-1.5 text-[11px] text-slate-300 self-center"><input type="checkbox" checked class="accent-rose-500">🎲 สุ่มเสียง/มุมขายไม่ให้ซ้ำกัน</label>
+        <button class="ml-auto px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold border border-slate-700">↧ ใช้กับที่เลือก (${selCount()})</button>
+      </div>
+    </section>`;
+  }
+  function actionBar() {
+    const n = selCount();
+    return `<section class="rounded-2xl bg-slate-900/90 border border-orange-500/30 p-3 flex flex-wrap items-center gap-2">
+      <label class="flex items-center gap-2 text-xs text-slate-300 pr-2 border-r border-slate-700"><input type="checkbox" ${n === projects.length ? "checked" : ""} onchange="selAll(this.checked)" class="w-4 h-4 accent-rose-500">เลือก <b class="text-white">${n}</b>/${projects.length}</label>
+      <button onclick="toggleAdd(true)" class="px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold">➕ เพิ่มโปรเจค (วางลิงก์ Shopee หลายลิงก์)</button>
+      <div class="flex-1"></div>
+      <button onclick="runGen()" class="px-3 py-2 rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 text-xs font-extrabold shadow-lg shadow-rose-500/20">✨ เจนบท + เสียง (${n})</button>
+      <button class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-rose-500/40 text-rose-200 text-xs font-bold">🀄 เซนเซอร์ที่เปิดไว้ (${projects.filter((p) => p.sel && p.censor).length})</button>
+      <button onclick="runRender()" class="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-600 text-xs font-extrabold">🎬 เรนเดอร์ทั้งหมด (${n})</button>
+    </section>`;
+  }
+  function folderBar() {
+    return `<div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+      <span>📁 เซฟไฟล์ไปที่</span>
+      <code class="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-emerald-300">D:\\คลิปขาย\\2026-11-19</code>
+      <button class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold">เปลี่ยนโฟลเดอร์…</button>
+      <span class="text-slate-500">ชื่อไฟล์: <code>01_หูฟังบลูทูธ.mp4</code></span>
+      <span class="text-slate-500">· ความละเอียด</span><select class="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-white"><option>720p</option><option>1080p</option></select>
+    </div>`;
+  }
+  function renderQueue() {
+    const q = projects.filter((p) => p.st.render === 1 || (p.sel && p.st.render === 0)).slice(0, 5);
+    const done = projects.filter((p) => p.st.render === 2).length;
+    return `<section class="rounded-2xl bg-slate-900/90 border border-emerald-500/30 p-3 space-y-2">
+      <div class="flex items-center justify-between"><div class="text-xs font-bold">🎬 คิวเรนเดอร์ <span class="text-slate-400 font-normal">(ทีละโปรเจค · เสร็จ ${done}/${projects.length})</span></div>
+      <div class="flex gap-1.5"><button class="px-2 py-1 rounded-lg bg-slate-800 text-[10px] font-bold">⏸ หยุดหลังอันนี้</button><button class="px-2 py-1 rounded-lg bg-slate-800 text-[10px] font-bold">📂 เปิดโฟลเดอร์</button></div></div>
+      <div class="space-y-1.5">${q.map((p, k) => `<div class="flex items-center gap-2 text-[11px]">
+        <span class="w-5 text-slate-500">${String(p.id).padStart(2, "0")}</span><span class="flex-1 truncate">${p.title}</span>
+        ${p.st.render === 1 ? `<div class="w-28 h-1.5 rounded bg-slate-800 overflow-hidden"><div class="h-full bg-emerald-400" style="width:${p.renderPct}%"></div></div><span class="w-16 text-right text-emerald-300">${p.renderPct}% · 0:16</span>` : `<span class="text-slate-500">รอคิว #${k}</span>`}
+      </div>`).join("")}</div>
+      <div class="text-[10px] text-slate-500">⏱️ คาดว่าเสร็จทั้งหมดใน ~7 นาที · ย่อหน้าต่างได้ แต่อย่าปิดแอป</div>
+    </section>`;
+  }
+  function moreMenu(p) {
+    return `<div class="relative group/m"><button class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px]">⋯</button>
+      <div class="hidden group-hover/m:block absolute right-0 top-full z-20 w-44 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl p-1 text-[11px]">
+        <button class="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800">🛠️ เปิดแก้ละเอียดในหน้า 2</button>
+        <button class="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800">📑 ทำซ้ำ (เปลี่ยนมุมขาย)</button>
+        <button class="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800">🔀 สุ่มตัดฉากใหม่</button>
+        <button class="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800 text-rose-300">🗑️ ลบโปรเจค</button>
+      </div></div>`;
+  }
+  const regenBtns = (p) => `<button class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px]" title="ให้ AI เขียนบทใหม่ + พากย์ใหม่">🔁 เจนบทใหม่</button>
+    <button class="px-2 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[11px] font-bold" title="พากย์ใหม่จากบทที่แก้">🎙️ พากย์ใหม่</button>`;
+
+  // ---------------------------------------------------------------- A: card grid
+  function shopeeRow(p) {
+    const i = p.id - 1;
+    return `<div class="flex items-center gap-2 p-1.5 rounded-xl bg-slate-950/70 border ${p.shopee ? "border-orange-500/30" : "border-dashed border-orange-500/50"}">
+      ${p.shopee
+        ? `<div class="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-xl shrink-0" title="รูปสินค้าจาก Shopee">${p.emo}</div>`
+        : `<div class="w-9 h-9 rounded-lg border border-dashed border-slate-600 flex items-center justify-center text-base text-slate-500 shrink-0">🛒</div>`}
+      <input value="${p.shopee}" placeholder="วางลิงก์สินค้า Shopee" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-orange-500">
+      <button onclick="fetchShopee(${i})" class="px-2.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-[11px] font-bold shrink-0">${p.fetching ? "⏳" : "📥 ดึง"}</button>
+    </div>`;
+  }
+  function cardA(p) {
+    return `<div class="rounded-2xl bg-slate-900/90 border ${p.sel ? "border-indigo-500/50" : "border-slate-800"} p-3 space-y-2.5 flex flex-col">
+      <div class="flex items-start gap-2.5">
+        ${thumb(p, "w-20")}
+        <div class="flex-1 min-w-0 space-y-1.5">
+          <div class="flex items-center gap-2">${cb(p)}<span class="text-[10px] text-slate-500 font-mono">#${String(p.id).padStart(2,"0")}</span>${p.shopee ? `<span class="text-[10px] px-1.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" title="ชื่อ + รายละเอียดสินค้าถูกเก็บไว้ใช้เจนบท (ไม่แสดง)">✓ ดึงรายละเอียดแล้ว</span>` : ""}</div>
+          <div class="text-xs font-bold line-clamp-2">${p.title || '<span class="text-slate-500 font-normal">ยังไม่มีสินค้า — วางลิงก์ Shopee ด้านล่าง</span>'}</div>
+          <div class="text-[11px] text-yellow-300 font-bold kanit truncate">🅷 ${p.header}</div>
+          ${chips(p, true)}
+        </div>
+      </div>
+      ${shopeeRow(p)}
+      ${clipStrip(p)}
+      <div class="grid grid-cols-2 gap-1.5">${sel(VOICES, p.voice, "voice", p.id - 1)}${sel(ANGLES, p.angle, "angle", p.id - 1)}</div>
+      ${p.script ? `<textarea rows="3" class="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-200 leading-relaxed resize-none focus:outline-none focus:border-indigo-500">${p.script}</textarea>` : `<div class="text-[11px] text-slate-500 italic px-2 py-3 rounded-lg border border-dashed border-slate-800 text-center">${p.st.script === 1 ? "✍️ AI กำลังเขียนบท…" : "ยังไม่มีบท — กด ✨ เจนบท + เสียง"}</div>`}
+      ${voiceErr(p)}${audioBar(p)}
+      <div class="flex items-center gap-1.5 mt-auto pt-1">
+        <label class="flex items-center gap-1.5 text-[11px] text-slate-300 mr-auto">${sw(p)} เซนเซอร์จีน</label>
+        ${regenBtns(p)}${moreMenu(p)}
+      </div>
+    </div>`;
+  }
+  function viewA() {
+    return defaultsBar() + actionBar() + `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
+      <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">${projects.map(cardA).join("")}
+        <button onclick="toggleAdd(true)" class="rounded-2xl border-2 border-dashed border-slate-700 hover:border-orange-500 text-slate-500 hover:text-orange-300 min-h-[200px] flex flex-col items-center justify-center gap-1"><span class="text-3xl">＋</span><span class="text-xs font-bold">เพิ่มโปรเจค</span></button>
+      </div>
+      <div class="xl:sticky xl:top-20 space-y-3">${renderQueue()}<div class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3">${folderBar()}</div></div>
+    </div>`;
+  }
+
+  // ---------------------------------------------------------------- B: table rows
+  function viewB() {
+    const rows = projects.map((p) => `<tr class="border-t border-slate-800 ${p.sel ? "row-sel" : ""} align-top">
+      <td class="p-2">${cb(p)}</td>
+      <td class="p-2">${thumb(p, "w-12")}</td>
+      <td class="p-2 min-w-[200px]"><div class="text-xs font-bold line-clamp-2">${p.title}</div><div class="text-[11px] text-yellow-300 kanit truncate mt-0.5">🅷 ${p.header}</div><div class="mt-1.5">${clipStrip(p, 4)}</div></td>
+      <td class="p-2 space-y-1.5 w-40">${sel(VOICES, p.voice, "voice", p.id - 1, "w-full")}${sel(ANGLES, p.angle, "angle", p.id - 1, "w-full")}${sel(DURS, p.dur, "dur", p.id - 1, "w-full")}</td>
+      <td class="p-2 min-w-[260px]">${p.script ? `<div class="text-[11px] text-slate-300 line-clamp-3 cursor-text hover:bg-slate-800/60 rounded p-1" title="คลิกเพื่อแก้บท">${p.script}</div>` : `<div class="text-[11px] text-slate-500 italic p-1">${p.st.script === 1 ? "✍️ กำลังเขียนบท…" : "— ยังไม่มีบท —"}</div>`}${voiceErr(p)}<div class="mt-1">${audioBar(p)}</div></td>
+      <td class="p-2 text-center">${sw(p)}</td>
+      <td class="p-2 w-[150px]">${chips(p, true)}${p.st.render === 1 ? `<div class="mt-1.5 h-1.5 rounded bg-slate-800 overflow-hidden"><div class="h-full bg-emerald-400" style="width:${p.renderPct}%"></div></div>` : ""}</td>
+      <td class="p-2"><div class="flex gap-1"><button onclick="openPv(${p.id - 1})" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px]">▶</button>${regenBtns(p).replace(/ เจนบทใหม่| พากย์ใหม่/g, "")}${moreMenu(p)}</div></td>
+    </tr>`).join("");
+    return defaultsBar() + actionBar() + `<section class="rounded-2xl bg-slate-900/90 border border-slate-800 overflow-x-auto">
+      <table class="w-full text-left">
+        <thead class="text-[10px] uppercase text-slate-400 bg-slate-950/60"><tr>
+          <th class="p-2"></th><th class="p-2">ปก</th><th class="p-2">สินค้า / ฟุตเทจ</th><th class="p-2">เสียง · มุมขาย · ความยาว</th><th class="p-2">บทพากย์</th><th class="p-2 text-center">เซนเซอร์</th><th class="p-2">สถานะ</th><th class="p-2"></th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      <button onclick="toggleAdd(true)" class="w-full py-2.5 border-t border-slate-800 text-xs text-slate-400 hover:text-orange-300 hover:bg-slate-800/40 font-bold">＋ เพิ่มโปรเจค</button>
+    </section>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">${renderQueue()}<div class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3 self-start">${folderBar()}</div></div>`;
+  }
+
+  // ---------------------------------------------------------------- C: master–detail
+  function bigPlayer(p, cls = "", live = false) {
+    const czDone = p.st.censor === 2;
+    const showCz = czDone && p.czView !== "before";
+    const dragCls = live ? "cursor-ns-resize rounded hover:outline hover:outline-1 hover:outline-dashed hover:outline-white/70" : "pointer-events-none";
+    return `<div class="${cls} aspect-[9/16] rounded-2xl bg-gradient-to-br ${p.grad} relative overflow-hidden border border-slate-700 shadow-2xl select-none" ${live ? 'id="pvStage"' : ""}>
+      <div class="absolute inset-0 flex items-center justify-center text-7xl">${p.emo}</div>
+      <div class="absolute top-[30%] left-[14%] text-[13px] font-bold text-white" style="text-shadow:0 1px 3px #000">限时特价 包邮到家</div>
+      ${showCz ? '<div class="absolute top-[29%] left-[12%] w-[52%] h-6 rounded bg-white/25 backdrop-blur-md border border-white/40"></div>' : ""}
+      ${p.showHeader ? `<div data-drag="headerY" class="absolute inset-x-3 -translate-y-1/2 text-center text-2xl font-black text-yellow-300 kanit leading-tight ${dragCls}" style="top:${p.headerY}%;-webkit-text-stroke:1.2px #000;paint-order:stroke">${p.header}</div>` : ""}
+      ${p.showSub ? `<div data-drag="subY" class="absolute inset-x-3 -translate-y-1/2 text-center text-base font-bold text-white kanit leading-snug ${dragCls}" style="top:${p.subY}%;-webkit-text-stroke:.8px #000;paint-order:stroke">${(p.script || "ยังไม่มีบท").split(" ").slice(0,2).join(" ")}</div>` : ""}
+      ${czDone ? `<div class="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded ${showCz ? "bg-rose-600" : "bg-slate-700"} font-bold">${showCz ? "🀄 หลังเซนเซอร์" : "ก่อนเซนเซอร์"}</div>` : ""}
+      ${p.czPct != null ? `<div class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2"><div class="text-3xl">🀄</div><div class="text-sm font-bold">กำลังสแกนและเซนเซอร์… ${p.czPct}%</div><div class="w-2/3 h-1.5 rounded bg-white/20 overflow-hidden"><div class="h-full bg-rose-500" style="width:${p.czPct}%"></div></div></div>` : ""}
+      <div class="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/80 to-transparent flex items-center gap-2"><button class="w-8 h-8 rounded-full bg-white text-black text-xs">▶</button><div class="flex-1 h-1 rounded bg-white/30"><div class="h-full w-1/3 bg-white rounded"></div></div><span class="text-[10px]">0:09 / 0:${p.dur.slice(0,2)}</span></div>
+    </div>`;
+  }
+  function viewC() {
+    const p = projects[current];
+    const list = projects.map((q, i) => `<div onclick="pick(${i})" class="flex items-center gap-2 p-2 rounded-xl cursor-pointer border ${i === current ? "bg-indigo-500/15 border-indigo-500/60" : "border-transparent hover:bg-slate-800/70"}">
+      <span onclick="event.stopPropagation()">${cb(q)}</span>
+      <div class="w-8 aspect-[9/16] rounded bg-gradient-to-br ${q.grad} flex items-center justify-center text-sm shrink-0">${q.emo}</div>
+      <div class="flex-1 min-w-0"><div class="text-[11px] font-bold truncate">${String(q.id).padStart(2,"0")} · ${q.title}</div><div class="mt-1">${chips(q, true)}</div></div>
+    </div>`).join("");
+    const detail = `<div class="space-y-3">
+      <div class="flex items-start justify-between gap-2"><div class="min-w-0"><div class="text-[11px] text-slate-400">โปรเจค #${String(p.id).padStart(2,"0")}</div><input value="${p.title}" class="w-full bg-transparent text-base font-bold focus:outline-none border-b border-transparent focus:border-slate-600"></div>${moreMenu(p)}</div>
+      <div class="flex gap-2"><input value="https://s.shopee.co.th/8Abc${p.id}xyZ" class="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs"><button class="px-3 py-2 rounded-xl bg-orange-600 text-xs font-bold">📥 ดึงข้อมูล</button></div>
+      <div class="rounded-xl bg-slate-950/60 border border-slate-800 p-2.5 space-y-2"><div class="flex items-center justify-between text-[11px]"><span class="font-bold text-slate-300">🎞️ ฟุตเทจที่ยำรวมกัน</span><span class="text-slate-500">วางลิงก์ / ลากไฟล์มาวาง</span></div>${clipStrip(p, 8)}
+        <div class="flex gap-2"><textarea rows="1" placeholder="วางลิงก์ Douyin / XHS / Bilibili ได้หลายลิงก์" class="flex-1 px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[11px]"></textarea><button class="px-3 rounded-lg bg-fuchsia-600 text-[11px] font-bold">⬇️ โหลด</button></div></div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-slate-400">
+        <label class="space-y-0.5"><div>เสียงพากย์</div>${sel(VOICES, p.voice, "voice", current, "w-full")}</label>
+        <label class="space-y-0.5"><div>มุมขาย</div>${sel(ANGLES, p.angle, "angle", current, "w-full")}</label>
+        <label class="space-y-0.5"><div>ความยาว</div>${sel(DURS, p.dur, "dur", current, "w-full")}</label>
+        <label class="space-y-0.5"><div>Template</div>${sel(TPLS, p.tpl, "tpl", current, "w-full")}</label>
+      </div>
+      <div class="space-y-1.5"><div class="flex items-center justify-between"><span class="text-[11px] font-bold text-slate-300">📝 บทพากย์ <span class="text-yellow-300 kanit">🅷 ${p.header}</span></span><div class="flex gap-1.5">${regenBtns(p)}</div></div>
+        <textarea rows="4" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs leading-relaxed">${p.script}</textarea>${voiceErr(p)}${audioBar(p)}</div>
+      <label class="flex items-center gap-2 text-xs text-slate-300">${sw(p)} 🀄 เซนเซอร์ตัวหนังสือจีนในคลิปนี้</label>
+    </div>`;
+    return actionBar() + `<div class="grid grid-cols-1 lg:grid-cols-[290px_minmax(0,1fr)_300px] gap-4 items-start">
+      <section class="rounded-2xl bg-slate-900/90 border border-slate-800 p-2 lg:sticky lg:top-20 max-h-[calc(100vh-110px)] overflow-y-auto space-y-1">
+        <div class="flex items-center justify-between px-1 pb-1"><span class="text-xs font-bold">📋 โปรเจค (${projects.length})</span><button onclick="toggleAdd(true)" class="text-[11px] text-orange-300 font-bold">＋ เพิ่ม</button></div>${list}
+      </section>
+      <section class="rounded-2xl bg-slate-900/90 border border-slate-800 p-4">${detail}</section>
+      <div class="lg:sticky lg:top-20 space-y-3">${bigPlayer(p, "w-full")}${renderQueue()}<div class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3">${folderBar()}</div></div>
+    </div>` + `<div class="text-[11px] text-slate-500 text-center">ค่าเริ่มต้นทุกโปรเจคอยู่ในปุ่ม ⚙️ ด้านบนของรายการ (ซ่อนไว้ให้หน้าโล่ง)</div>`;
+  }
+
+  // ---------------------------------------------------------------- D: step wizard
+  function viewD() {
+    const count = (k) => projects.filter((p) => p.st[k] === 2 || p.st[k] === 4).length;
+    const tabs = STEPS.map(([k, l, i], n) => `<button onclick="goStep('${k}')" class="step flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-900/80 text-left ${step === k ? "active" : "text-slate-400"}">
+      <div class="text-[10px]">ขั้นที่ ${n + 1}</div><div class="text-sm font-bold">${i} ${l}</div><div class="mt-1 h-1 rounded bg-slate-800 overflow-hidden"><div class="h-full bg-emerald-400" style="width:${count(k) * 10}%"></div></div><div class="text-[10px] mt-0.5">${count(k)}/${projects.length} เสร็จ</div>
+    </button>`).join(`<div class="hidden md:flex items-center text-slate-600">›</div>`);
+    let body = "";
+    if (step === "foot") {
+      body = `<div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">${projects.map((p) => `<div class="rounded-xl bg-slate-900/90 border border-slate-800 p-2.5 space-y-2"><div class="flex items-center gap-2">${cb(p)}<span class="text-xs font-bold truncate flex-1">${String(p.id).padStart(2,"0")} · ${p.title}</span>${chip(p, "foot", "ฟุตเทจ", "🎞️", true)}</div>${clipStrip(p, 7)}<textarea rows="1" placeholder="วางลิงก์ Douyin / XHS / Bilibili (หลายลิงก์ได้)" class="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-[11px]"></textarea></div>`).join("")}</div>`;
+    } else if (step === "script" || step === "voice") {
+      body = `<div class="space-y-2">${projects.map((p) => `<div class="rounded-xl bg-slate-900/90 border ${p.voiceErr ? "border-rose-500/50" : "border-slate-800"} p-2.5 grid grid-cols-1 md:grid-cols-[auto_minmax(0,1fr)_200px_auto] gap-3 items-start">
+        <div class="flex items-center gap-2">${cb(p)}${thumb(p, "w-10")}</div>
+        <div class="min-w-0 space-y-1"><div class="text-xs font-bold truncate">${String(p.id).padStart(2,"0")} · ${p.title} <span class="text-yellow-300 kanit">· 🅷 ${p.header}</span></div>
+          ${p.script ? `<textarea rows="2" class="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] leading-relaxed">${p.script}</textarea>` : `<div class="text-[11px] text-slate-500 italic">${p.st.script === 1 ? "✍️ AI กำลังเขียนบท…" : "— รอเจนบท —"}</div>`}${voiceErr(p)}${audioBar(p)}</div>
+        <div class="space-y-1.5">${sel(VOICES, p.voice, "voice", p.id - 1, "w-full")}${sel(ANGLES, p.angle, "angle", p.id - 1, "w-full")}</div>
+        <div class="flex md:flex-col gap-1.5">${regenBtns(p)}</div>
+      </div>`).join("")}</div>`;
+    } else if (step === "censor") {
+      body = `<div class="flex items-center gap-2 mb-2 text-xs"><button class="px-3 py-1.5 rounded-lg bg-slate-800 font-bold">เปิดทั้งหมด</button><button class="px-3 py-1.5 rounded-lg bg-slate-800 font-bold">ปิดทั้งหมด</button><span class="text-slate-500">คลิปที่เซนเซอร์แล้วจะไม่ทำซ้ำ</span></div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">${projects.map((p) => `<div class="rounded-xl bg-slate-900/90 border ${p.censor ? "border-rose-500/50" : "border-slate-800"} p-2 space-y-2">${bigPlayer(p, "w-full")}<div class="flex items-center justify-between gap-1"><span class="text-[11px] font-bold truncate">${String(p.id).padStart(2,"0")} · ${p.title}</span>${sw(p)}</div><div class="text-[10px] ${p.censor ? "text-rose-300" : "text-slate-500"}">${p.censor ? (p.st.censor === 2 ? "✓ เซนเซอร์แล้ว 3 จุด" : "รอเซนเซอร์") : "ไม่เซนเซอร์"}</div></div>`).join("")}</div>`;
+    } else {
+      body = `<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start"><div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">${projects.map((p) => `<div class="space-y-1.5"><div class="relative cursor-pointer" onclick="openPv(${p.id - 1})">${bigPlayer(p, "w-full")}${p.st.render === 1 ? `<div class="absolute inset-0 bg-black/55 rounded-2xl flex flex-col items-center justify-center gap-1"><div class="text-lg font-bold text-emerald-300">${p.renderPct}%</div><div class="text-[10px]">กำลังเรนเดอร์</div></div>` : ""}</div><div class="flex items-center gap-1.5">${cb(p)}<span class="text-[11px] truncate flex-1">${String(p.id).padStart(2,"0")} · ${p.title}</span>${chip(p, "render", "", "🎬", true)}</div></div>`).join("")}</div>
+        <div class="xl:sticky xl:top-20 space-y-3">${renderQueue()}<div class="rounded-2xl bg-slate-900/90 border border-slate-800 p-3">${folderBar()}</div></div></div>`;
+    }
+    const idx = STEPS.findIndex((s) => s[0] === step);
+    const mainBtn = { foot: "⬇️ โหลดฟุตเทจทั้งหมด", script: "✨ เจนบท + เสียงที่เลือก", voice: "🎙️ พากย์ใหม่ที่เลือก", censor: "🀄 เริ่มเซนเซอร์ที่เปิดไว้", render: "🎬 เรนเดอร์ที่เลือก" }[step];
+    return `<div class="flex flex-wrap md:flex-nowrap gap-2">${tabs}</div>${defaultsBar(true)}
+      <div class="flex flex-wrap items-center gap-2"><label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" onchange="selAll(this.checked)" class="w-4 h-4 accent-rose-500">เลือกทั้งหมด (${selCount()}/${projects.length})</label><button onclick="toggleAdd(true)" class="px-3 py-1.5 rounded-lg bg-orange-600 text-[11px] font-bold">➕ เพิ่มโปรเจค</button><div class="flex-1"></div>
+      <button onclick="${step === "render" ? "runRender()" : "runGen()"}" class="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 text-xs font-extrabold">${mainBtn} (${selCount()})</button>
+      ${idx < STEPS.length - 1 ? `<button onclick="goStep('${STEPS[idx + 1][0]}')" class="px-3 py-2 rounded-xl bg-slate-800 text-xs font-bold">ขั้นถัดไป ›</button>` : ""}</div>
+      ${body}`;
+  }
+
+  // ---------------------------------------------------------------- notes per variant
+  const NOTES = {
+    A: ["A · การ์ด", "เห็นทุกอย่างของแต่ละโปรเจคในการ์ดใบเดียว แก้บท เปลี่ยนเสียง ฟังเสียง และสวิตช์เซนเซอร์ได้ในการ์ด คิวเรนเดอร์อยู่ด้านขวาตลอด", "ดูภาพรวมง่าย ใช้ง่ายที่สุด เหมาะกับงาน 5–15 โปรเจค"],
+    B: ["B · ตาราง", "1 แถวต่อ 1 โปรเจคแบบสเปรดชีต แน่นที่สุด ไล่ดูหลายสิบโปรเจคได้โดยเลื่อนน้อย", "เหมาะถ้าทำครั้งละ 20+ คลิป แต่บนจอเล็กต้องเลื่อนซ้ายขวา"],
+    C: ["C · รายการ + แก้ไข", "รายการโปรเจคอยู่ซ้าย ตรงกลางแก้โปรเจคที่เลือกได้ละเอียด ขวาเป็นพรีวิว 9:16 ขนาดใหญ่", "แก้รายตัวสบายที่สุดและพรีวิวชัดสุด แต่เห็นทีละโปรเจค"],
+    D: ["D · ทีละขั้น", "แบ่งเป็น 5 ขั้น ฟุตเทจ → บท → เสียง → เซนเซอร์ → เรนเดอร์ แต่ละขั้นโชว์ทุกโปรเจคเฉพาะส่วนที่ต้องทำในขั้นนั้น", "ไม่หลง รู้ว่าค้างขั้นไหน ขั้นสุดท้ายเห็นพรีวิว 10 จอพร้อมกัน แต่ต้องกดสลับขั้น"],
+  };
+  function noteBar() {
+    const n = NOTES[V];
+    return `<div class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100"><b class="text-amber-300">MOCK ${n[0]}</b> — ${n[1]} <span class="text-amber-300/80">· ${n[2]}</span></div>`;
+  }
+
+  // ---------------------------------------------------------------- render + actions
+  function apply() {
+    const root = document.getElementById("root");
+    root.innerHTML = noteBar() + ({ A: viewA, B: viewB, C: viewC, D: viewD }[V])();
+    document.querySelectorAll(".vbtn").forEach((b) => b.classList.toggle("active", b.dataset.v === V));
+  }
+  window.setF = (i, f, v) => { projects[i][f] = v; if (f === "voice" && projects[i].voiceErr) { projects[i].voiceErr = false; projects[i].st.voice = 0; apply(); } };
+  window.togCensor = (i) => { const p = projects[i]; p.censor = !p.censor; p.st.censor = p.censor ? 0 : 4; apply(); };
+  window.togSel = (i) => { projects[i].sel = !projects[i].sel; apply(); };
+  window.selAll = (on) => { projects.forEach((p) => (p.sel = on)); apply(); };
+  window.pick = (i) => { current = i; apply(); };
+  window.goStep = (k) => { step = k; apply(); window.scrollTo(0, 0); };
+  window.toggleAdd = (on) => document.getElementById("addModal").classList.toggle("hidden", !on);
+  // ---- preview popup: player + on-screen text + censor-now + save
+  function pvPlayerOnly() {
+    document.getElementById("pvPlayer").innerHTML = bigPlayer(projects[pvIdx], "w-full", true);
+  }
+  function textRow(p, key, posKey, label, min, max) {
+    return `<div class="flex items-center gap-2">
+      <span class="w-20 text-[11px] font-bold">${label}</span>
+      <button onclick="pvTog('${key}')" class="sw ${p[key] ? "on" : ""}" title="เปิด/ปิด"></button>
+      <input type="range" min="${min}" max="${max}" step="0.5" value="${p[posKey]}" ${p[key] ? "" : "disabled"} oninput="pvPos('${posKey}',this.value)" id="rng_${posKey}" class="flex-1 accent-rose-500 disabled:opacity-30">
+      <span id="val_${posKey}" class="w-10 text-right text-[10px] text-slate-400">${Math.round(p[posKey])}%</span>
+    </div>`;
+  }
+  function censorBlock(p) {
+    const done = p.st.censor === 2;
+    let action;
+    if (p.czPct != null) action = `<div class="flex-1 text-[11px] text-rose-300">⏳ กำลังเซนเซอร์ ${p.czPct}%</div>`;
+    else if (done) action = `<div class="inline-flex p-0.5 rounded-lg bg-slate-900 border border-slate-700 text-[11px]">
+        <button onclick="pvCz('before')" class="px-2 py-1 rounded-md ${p.czView === "before" ? "bg-slate-700 text-white" : "text-slate-400"}">ก่อน</button>
+        <button onclick="pvCz('after')" class="px-2 py-1 rounded-md ${p.czView !== "before" ? "bg-rose-600 text-white" : "text-slate-400"}">หลัง</button></div>
+        <span class="text-[10px] text-emerald-300">✓ เบลอแล้ว 3 จุด</span>
+        <button onclick="censorNow()" class="ml-auto text-[10px] text-slate-400 hover:text-white underline">สแกนใหม่</button>`;
+    else action = `<button onclick="censorNow()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-[11px] font-bold">🀄 เซนเซอร์เลย (ดูผลทันที)</button>`;
+    return `<div class="rounded-xl bg-slate-950/60 border border-rose-500/30 p-2.5 space-y-2">
+      <div class="flex items-center gap-2"><span class="text-[11px] font-bold">🀄 เซนเซอร์ภาษาจีน</span>
+        <label class="ml-auto flex items-center gap-1.5 text-[10px] text-slate-400">ใช้ตอนเรนเดอร์ ${sw(p).replace("togCensor", "pvCensorSw")}</label></div>
+      <div class="flex flex-wrap items-center gap-2">${action}</div>
+    </div>`;
+  }
+  function pvRender() {
+    const p = projects[pvIdx], i = pvIdx;
+    pvPlayerOnly();
+    document.getElementById("pvTitle").textContent = `#${String(p.id).padStart(2,"0")} · ${p.title || "(ยังไม่มีสินค้า)"}`;
+    document.getElementById("pvBody").innerHTML = `${chips(p)}
+      <div class="rounded-xl bg-slate-950/60 border border-slate-800 p-2.5 space-y-2">
+        <div class="flex items-center justify-between"><span class="text-[11px] font-bold">✏️ ข้อความบนจอ</span><span class="text-[10px] text-slate-500">ลากข้อความบนจอขึ้น-ลงได้เลย</span></div>
+        <input value="${p.header}" oninput="projects[${i}].header=this.value;pvPlayerOnly()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-yellow-300 font-bold kanit focus:outline-none focus:border-yellow-400" placeholder="ข้อความ Header">
+        ${textRow(p, "showHeader", "headerY", "🅷 Header", 3, 50)}
+        ${textRow(p, "showSub", "subY", "💬 Subtitle", 40, 92)}
+      </div>
+      ${censorBlock(p)}
+      <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-400"><label>เสียง${sel(VOICES, p.voice, "voice", i, "w-full mt-0.5")}</label><label>มุมขาย${sel(ANGLES, p.angle, "angle", i, "w-full mt-0.5")}</label></div>
+      <textarea rows="3" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs leading-relaxed" placeholder="ยังไม่มีบท">${p.script}</textarea>${voiceErr(p)}
+      <div class="flex flex-wrap items-center gap-1.5">${regenBtns(p)}
+        <button onclick="openSave()" class="ml-auto px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-sky-600 text-[11px] font-extrabold">💾 Save</button></div>`;
+  }
+  window.pvPlayerOnly = pvPlayerOnly;
+  window.projects = projects;
+  window.openPv = (i) => { pvIdx = i; pvRender(); document.getElementById("pvModal").classList.remove("hidden"); };
+  window.pvTog = (k) => { projects[pvIdx][k] = !projects[pvIdx][k]; pvRender(); };
+  window.pvPos = (k, v) => { projects[pvIdx][k] = Number(v); document.getElementById("val_" + k).textContent = Math.round(v) + "%"; pvPlayerOnly(); };
+  window.pvCz = (v) => { projects[pvIdx].czView = v; pvRender(); };
+  window.pvCensorSw = () => { const p = projects[pvIdx]; p.censor = !p.censor; if (!p.censor && p.st.censor !== 2) p.st.censor = 4; else if (p.censor && p.st.censor === 4) p.st.censor = 0; pvRender(); apply(); };
+  window.censorNow = () => {
+    const p = projects[pvIdx]; if (p.czPct != null) return;
+    p.czPct = 0; p.st.censor = 1; pvRender();
+    const t = setInterval(() => {
+      p.czPct = Math.min(100, p.czPct + 8);
+      if (p.czPct >= 100) { clearInterval(t); p.czPct = null; p.st.censor = 2; p.censor = true; p.czView = "after"; apply(); }
+      if (projects[pvIdx] === p && !document.getElementById("pvModal").classList.contains("hidden")) pvRender();
+    }, 220);
+  };
+  // drag header / subtitle on the stage
+  document.getElementById("pvPlayer").addEventListener("pointerdown", (e) => {
+    const el = e.target.closest("[data-drag]"); if (!el) return;
+    const key = el.dataset.drag, stage = document.getElementById("pvStage");
+    const move = (ev) => {
+      const r = stage.getBoundingClientRect();
+      const [lo, hi] = key === "headerY" ? [3, 50] : [40, 92];
+      const v = Math.max(lo, Math.min(hi, ((ev.clientY - r.top) / r.height) * 100));
+      projects[pvIdx][key] = v; pvPlayerOnly();
+      const rng = document.getElementById("rng_" + key); if (rng) rng.value = v;
+      const lab = document.getElementById("val_" + key); if (lab) lab.textContent = Math.round(v) + "%";
+    };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+    e.preventDefault();
+  });
+  window.openSave = () => document.getElementById("saveModal").classList.remove("hidden");
+  window.doSave = (all) => {
+    const src = projects[pvIdx];
+    if (all) projects.forEach((p) => Object.assign(p, { showHeader: src.showHeader, showSub: src.showSub, headerY: src.headerY, subY: src.subY }));
+    document.getElementById("saveModal").classList.add("hidden");
+    toast(all ? `✅ บันทึกแล้ว · ใช้กับทุกโปรเจค (${projects.length}) + โปรเจคใหม่` : `✅ บันทึกแล้ว · เฉพาะโปรเจค #${String(src.id).padStart(2,"0")}`);
+    apply();
+  };
+  function toast(msg) {
+    const t = document.getElementById("toast"); t.textContent = msg; t.classList.remove("hidden");
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.add("hidden"), 2600);
+  }
+  window.fetchShopee = (i) => {
+    const p = projects[i]; p.fetching = true; apply();
+    setTimeout(() => { p.fetching = false; p.shopee = p.shopee || `https://s.shopee.co.th/8Abc${i + 1}xyZ`; p.title = P[i][0]; apply(); toast("📥 ดึงรูป ชื่อ และรายละเอียดสินค้าแล้ว (รายละเอียดเก็บไว้ใช้เจนบท)"); }, 900);
+  };
+  window.closePv = () => document.getElementById("pvModal").classList.add("hidden");
+  window.pvStep = (d) => openPv((pvIdx + d + projects.length) % projects.length);
+  window.runGen = () => {
+    projects.forEach((p) => { if (p.sel && p.st.foot === 2 && p.st.voice !== 2) { p.st.script = 1; p.voiceErr = false; } });
+    apply();
+    setTimeout(() => { projects.forEach((p, k) => { if (p.st.script === 1) { p.st.script = 2; p.st.voice = 2; p.script = P[k][2]; } }); apply(); }, 1800);
+  };
+  let rt = null;
+  window.runRender = () => {
+    if (rt) return;
+    rt = setInterval(() => {
+      let cur = projects.find((p) => p.st.render === 1);
+      if (!cur) { cur = projects.find((p) => p.sel && p.st.render === 0 && p.st.voice === 2); if (!cur) { clearInterval(rt); rt = null; return apply(); } cur.st.render = 1; cur.renderPct = 0; }
+      cur.renderPct = Math.min(100, cur.renderPct + 9);
+      if (cur.renderPct >= 100) cur.st.render = 2;
+      apply();
+    }, 350);
+  };
+  document.querySelectorAll(".vbtn").forEach((b) => (b.onclick = () => { V = b.dataset.v; try { localStorage.setItem("p3v", V); } catch (e) {} apply(); window.scrollTo(0, 0); }));
+  document.getElementById("pvModal").addEventListener("click", (e) => { if (e.target.id === "pvModal") closePv(); });
+  apply();
+})();
+</script>
+</body>
+</html>

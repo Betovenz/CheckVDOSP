@@ -17,7 +17,7 @@ from urllib.parse import quote
 
 import httpx
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+from services.paths import DATA_DIR
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 STUDIO_CONFIG_PATH = DATA_DIR / "studio_config.json"
 CLIP_CACHE_DIR = DATA_DIR / "clip_cache"
@@ -56,6 +56,66 @@ VOICE_CATALOG = [
         "gender": "Male",
         "engine": "gemini",
     },
+    {
+        "id": "th-TH-NiwatNeural",
+        "name": "🎙️ คุณนิวัฒน์ (ชาย • นุ่มลึก • Edge TTS) (ฟรี)",
+        "gender": "Male",
+        "engine": "edge",
+    },
+    {
+        "id": "th-TH-PremwadeeNeural",
+        "name": "🎙️ คุณเปรมวดี (หญิง • ชัดเจน • Edge TTS) (ฟรี)",
+        "gender": "Female",
+        "engine": "edge",
+    },
+    {
+        "id": "gtts-th",
+        "name": "🔊 Google Thai (หญิง • เสียงพื้นฐาน) (ฟรี)",
+        "gender": "Female",
+        "engine": "gtts",
+    },
+    {
+        "id": "or-heygen-vincent",
+        "name": "🎬 Vincent • ชาย (Router API Heygen)",
+        "gender": "Male",
+        "engine": "openrouter",
+    },
+    {
+        "id": "or-heygen-lucian",
+        "name": "🎬 Lucian • ชาย (Router API Heygen)",
+        "gender": "Male",
+        "engine": "openrouter",
+    },
+    {
+        "id": "or-heygen-weston",
+        "name": "🎬 Weston • ชาย (Router API Heygen)",
+        "gender": "Male",
+        "engine": "openrouter",
+    },
+    {
+        "id": "or-heygen-sabrina",
+        "name": "🎬 Sabrina • หญิง (Router API Heygen)",
+        "gender": "Female",
+        "engine": "openrouter",
+    },
+    {
+        "id": "or-heygen-nadine",
+        "name": "🎬 Nadine • หญิง (Router API Heygen)",
+        "gender": "Female",
+        "engine": "openrouter",
+    },
+    {
+        "id": "or-heygen-noelle",
+        "name": "🎬 Noelle • หญิง (Router API Heygen)",
+        "gender": "Female",
+        "engine": "openrouter",
+    },
+    {
+        "id": "or-fish-s21",
+        "name": "🐟 Fish Audio S2.1 Pro (Router API Fish)",
+        "gender": "Male",
+        "engine": "openrouter",
+    },
 ]
 
 # Map raw keywords/patterns to simple, everyday spoken Thai product nouns
@@ -69,6 +129,10 @@ SIMPLE_PRODUCT_NOUN_PATTERNS: List[Tuple[List[str], str]] = [
     (["กาต้มน้ำ", "กาน้ำร้อน"], "กาต้มน้ำไฟฟ้า"),
     (["เครื่องปั่น"], "เครื่องปั่น"),
     (["เครื่องชงกาแฟ"], "เครื่องชงกาแฟ"),
+    (["เต็นท์", "เต้นท์", "เต็นต์", "เต๊นท์", "tent"], "เต็นท์"),
+    (["ถุงนอน"], "ถุงนอน"),
+    (["ทาร์ป", "ฟลายชีท", "ฟรายชีท"], "ทาร์ปกันแดดกันฝน"),
+    (["เก้าอี้สนาม", "เก้าอี้แคมป์ปิ้ง", "เก้าอี้พับ"], "เก้าอี้พับ"),
     (["กระเป๋าสะพาย", "กระเป๋าถือ", "กระเป๋าเป้", "กระเป๋าเดินทาง", "กระเป๋าตังค์", "กระเป๋า"], "กระเป๋า"),
     (["ไม้กันสั่น", "กิมบอล", "stabilizer", "osmo mobile"], "ไม้กันสั่นมือถือ"),
     (["ขาตั้งกล้อง", "ขาตั้งมือถือ", "ไม้เซลฟี่", "tripod"], "ขาตั้งมือถือ"),
@@ -123,10 +187,14 @@ def load_studio_config() -> Dict[str, Any]:
         try:
             data = json.loads(STUDIO_CONFIG_PATH.read_text(encoding="utf-8"))
             if isinstance(data, dict):
+                data.setdefault("gemini_api_keys", [])
+                data.setdefault("openrouter_api_keys", [])
+                data.setdefault("default_voice", "Puck")
+                data.setdefault("preferences", {})
                 return data
         except Exception:
             pass
-    return {"gemini_api_keys": [], "default_voice": "Puck"}
+    return {"gemini_api_keys": [], "openrouter_api_keys": [], "default_voice": "Puck", "preferences": {}}
 
 
 _KEY_JUNK_RE = re.compile(r"[\s ​-‍⁠﻿]+")
@@ -151,15 +219,85 @@ def parse_gemini_keys(raw: str | List[str]) -> List[str]:
     return keys
 
 
-def save_studio_config(gemini_keys_raw: str | List[str], default_voice: str = "Puck") -> Dict[str, Any]:
-    cleaned = parse_gemini_keys(gemini_keys_raw)
+def parse_openrouter_keys(raw: str | List[str]) -> List[str]:
+    parts = re.split(r"[\r\n,;]+", raw) if isinstance(raw, str) else [str(x) for x in raw]
+    keys: List[str] = []
+    for part in parts:
+        compact = _KEY_JUNK_RE.sub("", part or "")
+        if not compact or compact.lower().startswith("http"):
+            continue
+        pieces = [p for p in re.split(r"(?=sk-or-)", compact) if p] if compact.count("sk-or-") > 1 else [compact]
+        for k in pieces:
+            if k and k not in keys:
+                keys.append(k)
+    return keys
 
+
+def save_studio_config(
+    gemini_keys_raw: str | List[str] | None = None,
+    default_voice: str | None = None,
+    openrouter_keys_raw: str | List[str] | None = None,
+    preferences: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     cfg = load_studio_config()
-    cfg["gemini_api_keys"] = cleaned
+    if gemini_keys_raw is not None:
+        cfg["gemini_api_keys"] = parse_gemini_keys(gemini_keys_raw)
+    if openrouter_keys_raw is not None:
+        cfg["openrouter_api_keys"] = parse_openrouter_keys(openrouter_keys_raw)
+    if isinstance(preferences, dict):
+        merged = dict(cfg.get("preferences") or {})
+        merged.update(preferences)
+        cfg["preferences"] = merged
+        if preferences.get("default_voice"):
+            cfg["default_voice"] = str(preferences["default_voice"])
     if default_voice:
         cfg["default_voice"] = default_voice
     STUDIO_CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
     return cfg
+
+
+def get_all_openrouter_keys(extra_key: str = "") -> List[str]:
+    keys: List[str] = parse_openrouter_keys(extra_key) if extra_key else []
+    cfg = load_studio_config()
+    for k in parse_openrouter_keys(cfg.get("openrouter_api_keys") or []):
+        if k not in keys:
+            keys.append(k)
+    for k in parse_openrouter_keys(os.environ.get("OPENROUTER_API_KEY", "")):
+        if k not in keys:
+            keys.append(k)
+    return keys
+
+
+def pick_rotated_openrouter_keys(extra_key: str = "") -> List[str]:
+    global _KEY_ROTATION_INDEX
+    keys = get_all_openrouter_keys(extra_key)
+    if len(keys) <= 1:
+        return keys
+    start = _KEY_ROTATION_INDEX % len(keys)
+    _KEY_ROTATION_INDEX += 1
+    return keys[start:] + keys[:start]
+
+
+async def test_openrouter_api_key(api_key: str = "") -> Tuple[bool, str]:
+    keys = parse_openrouter_keys(api_key) if api_key.strip() else get_all_openrouter_keys()
+    if not keys:
+        return False, "ยังไม่ได้ใส่ OpenRouter API Key"
+
+    last_err = "ไม่สามารถเชื่อมต่อ OpenRouter API ได้"
+    for idx, key in enumerate(keys, 1):
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    "https://openrouter.ai/api/v1/key",
+                    headers={"Authorization": f"Bearer {key}"},
+                )
+                if resp.status_code == 200:
+                    return True, f"OpenRouter API ใช้งานได้! (คีย์ที่ {idx}/{len(keys)})"
+                err = resp.text[:160]
+                last_err = f"OpenRouter คีย์ที่ {idx} HTTP {resp.status_code}: {err}"
+        except Exception as exc:
+            last_err = f"OpenRouter คีย์ที่ {idx}: {exc}"
+    return False, last_err
 
 
 def get_all_gemini_keys(extra_key: str = "") -> List[str]:
@@ -215,9 +353,9 @@ async def _probe_key(client: httpx.AsyncClient, key: str) -> Tuple[Optional[str]
     }
     last_err = ""
     for model in GEMINI_TEXT_MODELS:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         try:
-            resp = await client.post(url, json=payload)
+            resp = await client.post(url, json=payload, headers={"x-goog-api-key": key})
         except Exception as exc:
             last_err = str(exc)
             continue
@@ -254,20 +392,23 @@ def extract_simple_product_category(title: str, description: str = "") -> str:
     """
     Extract a simple everyday Thai noun for the product (e.g. 'กิ๊บติดผม', 'หม้อไฟฟ้า', 'กระเป๋า')
     instead of reading out a noisy or machine-translated Shopee product title.
+
+    Only the TITLE is used, and the earliest match wins (Shopee titles lead with the product
+    itself; accessories like "พร้อมกระเป๋าเก็บ" come later). The description is never scanned:
+    it mentions bundled extras, so a tent became "กระเป๋า". Returns "" when unsure so the AI
+    names the product itself from the title + description.
     """
-    combined_title = (title or "").lower()
+    text = (title or "").lower()
+    best: Tuple[int, int, str] | None = None  # (position, -pattern_length, noun)
     for patterns, noun in SIMPLE_PRODUCT_NOUN_PATTERNS:
         for pat in patterns:
-            if pat.lower() in combined_title:
-                return noun
-
-    combined_desc = (description or "").lower()
-    for patterns, noun in SIMPLE_PRODUCT_NOUN_PATTERNS:
-        for pat in patterns:
-            if pat.lower() in combined_desc:
-                return noun
-
-    return "ไอเทมชิ้นนี้"
+            pos = text.find(pat.lower())
+            if pos < 0:
+                continue
+            cand = (pos, -len(pat), noun)
+            if best is None or cand < best:
+                best = cand
+    return best[2] if best else ""
 
 
 STORE_BOILERPLATE_KEYWORDS = [
@@ -301,7 +442,7 @@ def filter_real_product_features(raw_desc: str) -> str:
         if any(bad in s for bad in STORE_BOILERPLATE_KEYWORDS):
             continue
         kept.append(s)
-    return "\n".join(kept[:12])
+    return "\n".join(kept[:20])
 
 
 # ---------------------------------------------------------------------------
@@ -449,8 +590,83 @@ def smart_split_scenes(text: str, target_sec: int = 20) -> List[Dict[str, str]]:
     return scenes
 
 
+OPENROUTER_TEXT_MODELS = [
+    "baidu/ernie-5.5-flash-preview:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free",
+    "openrouter/free",
+]
+
+
+def _parse_json_from_llm_text(raw_text: str) -> Optional[Dict[str, Any]]:
+    text = (raw_text or "").strip()
+    if not text:
+        return None
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
+        text = re.sub(r"\s*```$", "", text)
+    try:
+        cand = json.loads(text)
+        if isinstance(cand, dict) and (cand.get("scenes") or cand.get("spoken_script")):
+            return cand
+    except Exception:
+        pass
+    m = re.search(r"\{[\s\S]*\}", text)
+    if m:
+        try:
+            cand = json.loads(m.group(0))
+            if isinstance(cand, dict) and (cand.get("scenes") or cand.get("spoken_script")):
+                return cand
+        except Exception:
+            pass
+    return None
+
+
+async def _generate_script_via_openrouter(
+    prompt_text: str, extra_key: str = ""
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    or_keys = pick_rotated_openrouter_keys(extra_key)
+    if not or_keys:
+        return None, None
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    async with httpx.AsyncClient(timeout=25.0) as client:
+        for key in or_keys:
+            for model in OPENROUTER_TEXT_MODELS:
+                try:
+                    resp = await client.post(
+                        url,
+                        headers={
+                            "Authorization": f"Bearer {key}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "http://localhost:8000",
+                            "X-Title": "Douyin Bilibili Hub Studio",
+                        },
+                        json={
+                            "model": model,
+                            "messages": [{"role": "user", "content": prompt_text}],
+                            "temperature": 0.65,
+                        },
+                    )
+                    if resp.status_code != 200:
+                        continue
+                    data = resp.json()
+                    content = (
+                        ((data.get("choices") or [{}])[0].get("message") or {}).get("content")
+                        or ""
+                    )
+                    cand = _parse_json_from_llm_text(content)
+                    if cand:
+                        actual_model = data.get("model") or model
+                        return cand, f"openrouter:{actual_model}"
+                except Exception as exc:
+                    print(f"[Studio] OpenRouter script generation ({model}) notice: {repr(exc)}")
+    return None, None
+
+
 # ---------------------------------------------------------------------------
-# AI Script + Header + Subtitles Generation (Google Gemini)
+# AI Script + Header + Subtitles Generation (OpenRouter -> Google Gemini Fallback)
 # ---------------------------------------------------------------------------
 async def generate_product_review_script(
     product_title: str,
@@ -460,6 +676,7 @@ async def generate_product_review_script(
     custom_header: str = "",
     voice_gender: str = "Male",
     api_key: str = "",
+    openrouter_api_key: str = "",
 ) -> Dict[str, Any]:
     target_sec = max(10, min(90, int(target_duration or 20)))
     target_scenes = max(4, min(18, int(round(target_sec / 3.2))))
@@ -468,6 +685,16 @@ async def generate_product_review_script(
 
     simple_noun = extract_simple_product_category(product_title, product_description)
     clean_features = filter_real_product_features(product_description)
+    # When the keyword table doesn't know the product, let the AI name it from title + details
+    noun_ref = simple_noun or "[คำเรียกสินค้า]"
+    if simple_noun:
+        noun_rule = f'- คำเรียกสินค้าในคลิป: "{simple_noun}" (ใช้คำนี้เรียกสินค้าตลอดบท)'
+    else:
+        noun_rule = (
+            "- คำเรียกสินค้าในคลิป: ให้อ่านชื่อสินค้าและรายละเอียดแล้วสรุปเองว่าสินค้าคืออะไร "
+            "แล้วเรียกด้วยคำนามภาษาไทยสั้นๆ ที่คนทั่วไปใช้ (1-3 คำ เช่น เต็นท์ หม้อทอด ไฟฉาย) "
+            "แทน [คำเรียกสินค้า] ในตัวอย่างด้านล่าง"
+        )
 
     # (role, tone) per selected script style — the voice itself is chosen separately
     angle_instructions = {
@@ -498,23 +725,27 @@ async def generate_product_review_script(
     prompt_text = f"""คุณคือ{role_desc} กำลังรีวิวของใช้ดีๆ ในชีวิตประจำวันสำหรับคลิปสั้น
 หน้าที่ของคุณ: เขียน "บทพากย์ภาษาไทย" และ "พาดหัวด้านบนคลิป (short_headline)" ความยาวประมาณ {target_sec} วินาที
 
-ข้อมูลอ้างอิง:
-- ประเภทสินค้าที่ต้องใช้เรียกในคลิป: "{simple_noun}"
-- ข้อมูลเสริมจากร้านค้า (ใช้ดูเฉพาะลักษณะสินค้า ห้ามลอกคำแปลกๆ มาพูด): {product_title[:120]} | {clean_features[:800]}
+ข้อมูลสินค้า:
+- ชื่อสินค้า (ข้อมูลหลัก ใช้ตัดสินว่าสินค้าคืออะไร): {product_title[:200]}
+- รายละเอียดจากร้านค้า (ใช้ดูคุณสมบัติและจุดเด่นของสินค้า ห้ามลอกคำแปลกๆ มาพูด):
+{clean_features[:1500] or "-"}
+{noun_rule}
 - สไตล์และโทนการพูด: {tone_desc}
 
 กฎเหล็กสำคัญที่สุด (ต้องทำตาม 100%):
+0. **บทต้องพูดถึงสินค้าตามชื่อสินค้าข้างบนเท่านั้น!** ของแถมหรืออุปกรณ์ที่มาด้วย (เช่น กระเป๋าเก็บ สายชาร์จ ถุงผ้า) ห้ามพูดราวกับเป็นสินค้าหลัก
+   - เล่าจุดเด่นจากรายละเอียดจริงของสินค้านี้ ห้ามแต่งคุณสมบัติที่ไม่มีในข้อมูล
 1. **ห้ามมีคำลงท้าย 'ครับ', 'นะครับ', 'ค่ะ', 'นะคะ', 'คะ' ในบทพูดแม้แต่คำเดียว (มีโทษปรับตกทันที)!**
    - ให้ประโยคจบอย่างกระชับ เล่าแบบสนทนาเปิดใจ เช่น 'วันนี้มีไอเทมเด็ดมาบอกต่อ' 'ตัวนี้ตอบโจทย์มาก' 'ใครชอบความคุ้มค่าลองดูตัวนี้ได้เลย'
    - **ห้ามขึ้นต้นบทด้วยคำทักทาย เช่น 'ทุกคน', 'สวัสดีทุกคน', 'หวัดดีทุกคน', 'เพื่อนๆ' ให้เปิดด้วย hook เข้าเรื่องสินค้าทันที**
 2. **ห้ามพูดชื่อสินค้าเต็มๆ ห้ามพูดชื่อรุ่นยาวๆ และห้ามเอาคำแปลภาษาจีนแปลกๆ ในชื่อสินค้ามาพูดเด็ดขาด!**
-   - ให้เรียกสินค้าสั้นๆ แค่ว่าเป็นอะไร เช่น "{simple_noun}ตัวนี้", "{simple_noun}ชิ้นนี้", หรือ "{simple_noun}รุ่นนี้" เท่านั้น!
+   - ให้เรียกสินค้าสั้นๆ แค่ว่าเป็นอะไร เช่น "{noun_ref}ตัวนี้", "{noun_ref}ชิ้นนี้", หรือ "{noun_ref}รุ่นนี้" เท่านั้น!
 3. **ห้ามขายของเกินจริงเด็ดขาด!**
    - ห้ามใช้คำเว่อร์ๆ เช่น ดีที่สุดในโลก, วิเศษ, เทพสุดๆ, เปลี่ยนชีวิต
    - ห้ามเอาข้อความเงื่อนไขการรับประกัน การจัดส่ง หรือการเคลมสินค้าของร้านค้ามาพูดเด็ดขาด
    - ให้พูดรีวิวแบบคนทั่วไปใช้งานจริง เช่น ใช้ทำอะไรได้บ้าง หยิบใช้ง่ายยังไง พกพาสะดวกไหม
 4. **"short_headline" (Header ด้านบนคลิป)**:
-   - ต้องเป็นคำไทยสั้นๆ ที่อ่านเข้าใจทันที บอกแค่ว่าคืออะไร เช่น "{simple_noun} หยิบใช้ง่ายพกพาสะดวก" หรือ "{simple_noun} เก็บทรงสวยใช้งานง่าย"
+   - ต้องเป็นคำไทยสั้นๆ ที่อ่านเข้าใจทันที บอกแค่ว่าคืออะไร เช่น "{noun_ref} หยิบใช้ง่ายพกพาสะดวก" หรือ "{noun_ref} เก็บทรงสวยใช้งานง่าย"
    - ความยาวไม่เกิน 18 ตัวอักษร และเว้นวรรคระหว่างวลีให้ชัดเจน **ห้ามตัดคำกลางคันเด็ดขาด**
 5. **การแบ่งท่อนซับไตเติ้ล ("scenes") จำนวนประมาณ {target_scenes} ท่อน**:
    - แต่ละท่อนมี "line_top" (บรรทัดบน) และ "line_bottom" (บรรทัดล่าง)
@@ -526,7 +757,7 @@ async def generate_product_review_script(
 
 ตอบกลับเป็น JSON เท่านั้น โครงสร้าง:
 {{
-  "short_headline": "{simple_noun} ใช้งานง่ายสะดวก",
+  "short_headline": "{noun_ref} ใช้งานง่ายสะดวก",
   "spoken_script": "บทพูดรวมทั้งหมด...",
   "scenes": [
     {{
@@ -537,47 +768,50 @@ async def generate_product_review_script(
   ]
 }}"""
 
-    keys = pick_rotated_keys(api_key)
-    models = GEMINI_TEXT_MODELS
-    parsed_result: Optional[Dict[str, Any]] = None
-    model_used: Optional[str] = None
+    # 1. Try OpenRouter first for script generation; if unconfigured or exhausted, fall back to Google Gemini
+    parsed_result, model_used = await _generate_script_via_openrouter(
+        prompt_text, extra_key=openrouter_api_key
+    )
 
-    for key in keys:
-        for m in models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={key}"
-            gen_cfg: Dict[str, Any] = {
-                "responseMimeType": "application/json",
-                "temperature": 0.65,
-            }
-            # Thinking off: faster, and the whole output budget goes to the JSON script
-            gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
+    if not parsed_result:
+        keys = pick_rotated_keys(api_key)
+        models = GEMINI_TEXT_MODELS
+        for key in keys:
+            for m in models:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
+                gen_cfg: Dict[str, Any] = {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.65,
+                }
+                # Thinking off: faster, and the whole output budget goes to the JSON script
+                gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
 
-            payload = {
-                "contents": [{"parts": [{"text": prompt_text}]}],
-                "generationConfig": gen_cfg,
-            }
-            try:
-                async with httpx.AsyncClient(timeout=20.0) as client:
-                    resp = await client.post(url, json=payload)
-                    if resp.status_code != 200:
-                        continue
-                    data = resp.json()
-                    raw_json = (
-                        data.get("candidates", [{}])[0]
-                        .get("content", {})
-                        .get("parts", [{}])[0]
-                        .get("text", "")
-                    )
-                    if raw_json:
-                        cand = json.loads(raw_json)
-                        if isinstance(cand, dict) and (cand.get("scenes") or cand.get("spoken_script")):
-                            parsed_result = cand
-                            model_used = m
-                            break
-            except Exception as exc:
-                print(f"[Studio] Gemini script generation ({m}) notice: {repr(exc)}")
-        if parsed_result:
-            break
+                payload = {
+                    "contents": [{"parts": [{"text": prompt_text}]}],
+                    "generationConfig": gen_cfg,
+                }
+                try:
+                    async with httpx.AsyncClient(timeout=20.0) as client:
+                        resp = await client.post(url, json=payload, headers={"x-goog-api-key": key})
+                        if resp.status_code != 200:
+                            continue
+                        data = resp.json()
+                        raw_json = (
+                            data.get("candidates", [{}])[0]
+                            .get("content", {})
+                            .get("parts", [{}])[0]
+                            .get("text", "")
+                        )
+                        if raw_json:
+                            cand = json.loads(raw_json)
+                            if isinstance(cand, dict) and (cand.get("scenes") or cand.get("spoken_script")):
+                                parsed_result = cand
+                                model_used = m
+                                break
+                except Exception as exc:
+                    print(f"[Studio] Gemini script generation ({m}) notice: {repr(exc)}")
+            if parsed_result:
+                break
 
     if parsed_result:
         raw_scenes = parsed_result.get("scenes") or []
@@ -616,6 +850,7 @@ async def generate_product_review_script(
             break
     else:
         # Clean, realistic, non-exaggerated fallback using only simple_noun!
+        simple_noun = simple_noun or "ไอเทมชิ้นนี้"
         short_headline = (custom_header or f"{simple_noun} ใช้งานง่ายพกพาสะดวก").strip()
         normalized_scenes = [
             {
@@ -647,7 +882,7 @@ async def generate_product_review_script(
 
     combined_script = " ".join(s["full_narration"] for s in normalized_scenes)
     if not short_headline:
-        short_headline = f"{simple_noun} ใช้งานง่ายสะดวก"
+        short_headline = f"{simple_noun or 'ไอเทมชิ้นนี้'} ใช้งานง่ายสะดวก"
 
     return {
         "short_headline": short_headline,
@@ -727,7 +962,7 @@ async def _synthesize_gemini_tts(
     last_err = ""
     for key in keys:
         for model in tts_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
             payload = {
                 "contents": [
                     {
@@ -751,7 +986,7 @@ async def _synthesize_gemini_tts(
             }
             try:
                 async with httpx.AsyncClient(timeout=28.0) as client:
-                    resp = await client.post(url, json=payload)
+                    resp = await client.post(url, json=payload, headers={"x-goog-api-key": key})
                     if resp.status_code != 200:
                         last_err = f"HTTP {resp.status_code}"
                         continue
@@ -882,6 +1117,84 @@ def get_audio_duration_seconds(audio_bytes: bytes, mime_type: str = "audio/mpeg"
     return round(max(4.0, len(audio_bytes) / 4200.0), 2)
 
 
+def _heygen_voice_cfg(voice_slug: str, label: str) -> Dict[str, Any]:
+    return {
+        "model": "heygen/heygen-voice-1-turbo:free",
+        "voice": voice_slug,
+        "response_format": "pcm",
+        "sample_rate": 44100,
+        "label": label,
+    }
+
+
+OPENROUTER_TTS_CONFIG: Dict[str, Dict[str, Any]] = {
+    "or-heygen-turbo": _heygen_voice_cfg("vincent", "Vincent (Router API Heygen)"),
+    "or-heygen-vincent": _heygen_voice_cfg("vincent", "Vincent (Router API Heygen)"),
+    "or-heygen-lucian": _heygen_voice_cfg("lucian", "Lucian (Router API Heygen)"),
+    "or-heygen-weston": _heygen_voice_cfg("weston", "Weston (Router API Heygen)"),
+    "or-heygen-sabrina": _heygen_voice_cfg("sabrina", "Sabrina (Router API Heygen)"),
+    "or-heygen-nadine": _heygen_voice_cfg("nadine", "Nadine (Router API Heygen)"),
+    "or-heygen-noelle": _heygen_voice_cfg("noelle", "Noelle (Router API Heygen)"),
+    "or-fish-s21": {
+        "model": "fish-audio/s2.1-pro-free:free",
+        "voice": "",
+        "response_format": "mp3",
+        "sample_rate": 0,
+        "label": "Fish Audio S2.1 Pro (Router API Fish)",
+    },
+}
+
+
+async def _synthesize_openrouter_tts(
+    text: str, voice_id: str, api_key: str = ""
+) -> Tuple[bytes, str, str]:
+    keys = pick_rotated_openrouter_keys(api_key)
+    if not keys:
+        raise RuntimeError("ยังไม่ได้ใส่ OpenRouter API Key สำหรับใช้เสียงนี้")
+
+    cfg = OPENROUTER_TTS_CONFIG.get(voice_id)
+    if not cfg:
+        raise RuntimeError(f"ไม่รู้จักเสียง OpenRouter: {voice_id}")
+
+    clean_text = strip_polite_particles(text)
+    payload: Dict[str, Any] = {
+        "model": cfg["model"],
+        "input": clean_text,
+        "response_format": cfg["response_format"],
+    }
+    if cfg.get("voice"):
+        payload["voice"] = cfg["voice"]
+
+    last_err = "OpenRouter TTS failed"
+    for key in keys:
+        try:
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                resp = await client.post(
+                    "https://openrouter.ai/api/v1/audio/speech",
+                    headers={
+                        "Authorization": f"Bearer {key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "http://localhost:8000",
+                        "X-Title": "Douyin Bilibili Hub Studio",
+                    },
+                    json=payload,
+                )
+                if resp.status_code != 200:
+                    last_err = f"HTTP {resp.status_code}: {resp.text[:160]}"
+                    continue
+                raw_bytes = resp.content
+                if not raw_bytes or len(raw_bytes) < 200:
+                    last_err = "OpenRouter returned empty audio"
+                    continue
+                if cfg["response_format"] == "pcm":
+                    wav_bytes = _pcm16_to_wav_bytes(raw_bytes, int(cfg.get("sample_rate") or 44100))
+                    return wav_bytes, "audio/wav", cfg["label"]
+                return raw_bytes, "audio/mpeg", cfg["label"]
+        except Exception as exc:
+            last_err = str(exc)
+    raise RuntimeError(last_err)
+
+
 async def synthesize_voiceover_and_timings(
     scenes: List[Dict[str, Any]],
     spoken_script: str,
@@ -889,6 +1202,7 @@ async def synthesize_voiceover_and_timings(
     speed_rate: str = "+15%",
     sales_angle: str = "podcast_ad",
     api_key: str = "",
+    openrouter_api_key: str = "",
 ) -> Dict[str, Any]:
     clean_scenes = [s for s in scenes if (s.get("full_narration") or "").strip()]
     if not clean_scenes and spoken_script:
@@ -903,15 +1217,35 @@ async def synthesize_voiceover_and_timings(
     engine_label = ""
     fallback_notice = ""
 
-    # Only Google AI (Gemini) voices are enabled. Edge TTS (Niwat / Premwadee) and
-    # Google Thai (gTTS) are disabled — no explicit selection and no silent fallback.
-    gemini_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
-    try:
-        audio_bytes, mime_type, engine_label = await _synthesize_gemini_tts(
-            combined_text, voice_name=gemini_voice, api_key=api_key, sales_angle=sales_angle
-        )
-    except Exception as ge:
-        raise RuntimeError(f"เสียงพากย์ Google AI ล้มเหลว: {str(ge)[:120]}") from ge
+    # Free voices (Edge TTS / Google Thai gTTS) and OpenRouter voices are ONLY used when explicitly selected.
+    # Google AI (Gemini) voices never silently fall back to free voices when credits/quota run out.
+    if voice_name in OPENROUTER_TTS_CONFIG:
+        try:
+            audio_bytes, mime_type, engine_label = await _synthesize_openrouter_tts(
+                combined_text, voice_id=voice_name, api_key=openrouter_api_key
+            )
+        except Exception as ore:
+            raise RuntimeError(f"เสียงพากย์ OpenRouter ล้มเหลว: {str(ore)[:140]}") from ore
+    elif voice_name in ("th-TH-NiwatNeural", "th-TH-PremwadeeNeural"):
+        try:
+            audio_bytes, mime_type, engine_label = await _synthesize_edge_tts(
+                combined_text, voice_name=voice_name, speed_rate=speed_rate
+            )
+        except Exception as ee:
+            raise RuntimeError(f"เสียงพากย์ฟรี (Edge TTS) ล้มเหลว: {str(ee)[:120]}") from ee
+    elif voice_name == "gtts-th":
+        try:
+            audio_bytes, mime_type, engine_label = await _synthesize_google_gtts(combined_text)
+        except Exception as ge2:
+            raise RuntimeError(f"เสียงพากย์ฟรี (Google Thai) ล้มเหลว: {str(ge2)[:120]}") from ge2
+    else:
+        gemini_voice = voice_name if voice_name in GEMINI_VOICES else "Puck"
+        try:
+            audio_bytes, mime_type, engine_label = await _synthesize_gemini_tts(
+                combined_text, voice_name=gemini_voice, api_key=api_key, sales_angle=sales_angle
+            )
+        except Exception as ge:
+            raise RuntimeError(f"เสียงพากย์ Google AI ล้มเหลว: {str(ge)[:120]}") from ge
 
     duration_sec = get_audio_duration_seconds(audio_bytes, mime_type)
 
@@ -970,8 +1304,8 @@ def convert_video_file_to_mp4(in_file: str, out_file: str, fps: int = 30) -> Non
         "-avoid_negative_ts", "make_zero",
         "-i", in_file,
         "-c:v", "libx264",
-        "-crf", "20",
-        "-preset", "veryfast",
+        "-crf", "18",
+        "-preset", "faster",
         "-r", str(safe_fps),
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
@@ -992,8 +1326,8 @@ def convert_video_file_to_mp4(in_file: str, out_file: str, fps: int = 30) -> Non
         "-avoid_negative_ts", "make_zero",
         "-i", in_file,
         "-c:v", "libx264",
-        "-crf", "20",
-        "-preset", "veryfast",
+        "-crf", "18",
+        "-preset", "faster",
         "-r", str(safe_fps),
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",

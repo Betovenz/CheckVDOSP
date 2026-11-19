@@ -1,0 +1,257 @@
+/* RedNote Helper & Video Downloader Styles */
+
+/* Ensure parent containers have relative positioning for our absolute badges */
+.note-item,
+section.note-item,
+[class*="note-item"],
+.cover {
+  position: relative !important;
+}
+
+/* Card Badge Wrapper */
+.rh-card-badge-wrap {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  opacity: 0.92;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.note-item:hover .rh-card-badge-wrap,
+section.note-item:hover .rh-card-badge-wrap,
+.cover:hover .rh-card-badge-wrap {
+  opacity: 1;
+  transform: scale(1.02);
+}
+
+/* Download Badge Pill Button */
+.rh-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.rh-dl-btn:hover {
+  background: #ff2442 !important;
+  border-color: #ff2442 !important;
+  box-shadow: 0 4px 16px rgba(255, 36, 66, 0.55);
+  color: #ffffff !important;
+}
+
+.rh-dl-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.rh-dl-btn .rh-btn-text {
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+
+/* Arrow toggler for popup menu */
+.rh-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  margin-left: 2px;
+  padding-left: 2px;
+  opacity: 0.8;
+  cursor: pointer;
+}
+
+.rh-menu-toggle:hover {
+  opacity: 1;
+}
+
+/* Floating Card Popup Menu */
+.rh-card-popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 175px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 1000;
+  backdrop-filter: blur(12px);
+  animation: rhFadeIn 0.15s ease-out;
+}
+
+.rh-card-popup.show {
+  display: flex !important;
+}
+
+.rh-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.rh-menu-item:hover {
+  background: rgba(255, 36, 66, 0.15);
+  color: #ff4761;
+}
+
+.rh-menu-item.hub-item:hover {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.rh-menu-item svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Modal Floating Action Bar (When video viewer is open) */
+.rh-modal-bar {
+  position: fixed;
+  top: 18px;
+  right: 65px;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 6px 12px;
+  border-radius: 9999px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  animation: rhSlideDown 0.25s ease-out;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.rh-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  color: #ffffff;
+}
+
+.rh-modal-btn.primary {
+  background: #ff2442;
+  box-shadow: 0 4px 14px rgba(255, 36, 66, 0.45);
+}
+
+.rh-modal-btn.primary:hover {
+  background: #e01936;
+  transform: translateY(-1px);
+}
+
+.rh-modal-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.rh-modal-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+/* Toast Notification */
+.rh-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 36, 66, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  padding: 10px 20px;
+  border-radius: 9999px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10000000;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  animation: rhToastIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rh-toast.success {
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+.rh-toast.error {
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* Spinner */
+.rh-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: rhSpin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes rhSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rhFadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rhSlideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rhToastIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

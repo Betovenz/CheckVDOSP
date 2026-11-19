@@ -8,8 +8,9 @@ import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 import httpx
+from services.net_guard import guarded_client
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+from services.paths import DATA_ROOT as BASE_DIR
 CHANNELS_FILE = BASE_DIR / "shopee_channels.json"
 AFFILIATE_BASE = "https://affiliate.shopee.co.th"
 
@@ -19,6 +20,17 @@ THAI_TO_ZH_PRODUCT_DICT: List[Tuple[str, str]] = [
     ("หม้อทอดไร้น้ำมัน", "空气炸锅"),
     ("หม้อทอดอากาศ", "空气炸锅"),
     ("หม้ออบลมร้อน", "空气炸锅"),
+    ("หม้อทอด", "空气炸锅"),
+    ("เตาอบไฟฟ้า", "电烤箱"),
+    ("เตาอบไมโครเวฟ", "微波炉"),
+    ("ไมโครเวฟ", "微波炉"),
+    ("เตาอบ", "烤箱"),
+    ("เตาปิ้งย่างไฟฟ้า", "电烤盘"),
+    ("เตาปิ้งย่าง", "电烤盘"),
+    ("เตาย่างบาร์บีคิว", "电烧烤炉"),
+    ("เครื่องปิ้งขนมปัง", "烤面包机"),
+    ("เครื่องทำวาฟเฟิล", "华夫饼机"),
+    ("เครื่องทำน้ำแข็ง", "制冰机"),
     ("หม้อหุงข้าว", "电饭煲"),
     ("หม้อชาบู", "电火锅"),
     ("หม้อต้มไฟฟ้า", "电煮锅"),
@@ -39,10 +51,26 @@ THAI_TO_ZH_PRODUCT_DICT: List[Tuple[str, str]] = [
     ("พัดลมคล้องคอ", "挂脖风扇"),
     ("พัดลมไร้สาย", "无线风扇"),
     ("พัดลมไอเย็น", "冷风机"),
+    ("พัดลมไอน้ำ", "冷风扇"),
     ("พัดลมตั้งโต๊ะ", "桌面风扇"),
     ("พัดลม", "电风扇"),
     ("เตารีดไอน้ำ", "挂烫机"),
     ("เตารีด", "电熨斗"),
+    ("เครื่องซักผ้ามินิ", "迷你洗衣机"),
+    ("เครื่องซักผ้า", "洗衣机"),
+    ("กระดาษทิชชู่เปียก", "湿巾"),
+    ("ทิชชู่เปียก", "湿巾"),
+    ("กระดาษทิชชู่เช็ดหน้า", "面巾纸"),
+    ("กระดาษทิชชู่", "抽纸"),
+    ("ทิชชู่", "抽纸"),
+    ("กระดาษเช็ดหน้า", "面巾纸"),
+    ("กระดาษชำระ", "卫生纸"),
+    ("กระดาษอเนกประสงค์", "厨房纸巾"),
+    ("สำลีแผ่น", "化妆棉"),
+    ("ถุงขยะ", "垃圾袋"),
+    ("น้ำยาซักผ้า", "洗衣液"),
+    ("น้ำยาปรับผ้านุ่ม", "柔顺剂"),
+    ("ไม้ถูพื้น", "拖把"),
     ("ไดร์เป่าผม", "吹风机"),
     ("เครื่องหนีบผม", "直发器"),
     ("เครื่องม้วนผม", "卷发棒"),
@@ -72,23 +100,28 @@ THAI_TO_ZH_PRODUCT_DICT: List[Tuple[str, str]] = [
     ("เมาส์ไร้สาย", "无线鼠标"),
     ("เมาส์เกมมิ่ง", "游戏鼠标"),
     ("เมาส์", "鼠标"),
-    ("ไม้กันสั่นมือถือ", "手机稳定器 云台"),
-    ("ไม้กันสั่น", "手机稳定器 云台"),
-    ("กิมบอล", "手机云台 稳定器"),
-    ("ขาตั้งไม้เซลฟี่", "自拍杆 手机支架"),
-    ("ขาตั้งมือถือ", "手机支架 桌面支架"),
-    ("ขาตั้งกล้อง", "三脚架 拍摄支架 手机支架"),
+    ("ไม้กันสั่นมือถือ", "手机稳定器"),
+    ("ไม้กันสั่น", "手机稳定器"),
+    ("กิมบอล", "手机云台"),
+    ("ขาตั้งไม้เซลฟี่", "自拍杆支架"),
+    ("ขาตั้งมือถือ", "手机支架"),
+    ("ขาตั้งกล้อง", "三脚架"),
     ("ไม้เซลฟี่", "自拍杆"),
     ("ไฟไลฟ์สด", "补光灯"),
+    ("โคมไฟโซล่าเซลล์", "太阳能灯"),
+    ("ไฟโซล่าเซลล์", "太阳能灯"),
     ("ไมโครโฟนไร้สาย", "无线麦克风"),
     ("ไมค์ไร้สาย", "无线领夹麦克风"),
     ("ไมค์ติดปกเสื้อ", "领夹麦克风"),
     ("กล้องแอคชั่น", "运动相机"),
+    ("กล้องวงจรปิดไร้สาย", "无线监控摄像头"),
     ("กล้องวงจรปิด", "监控摄像头"),
     ("กล้องติดรถยนต์", "行车记录仪"),
     ("โปรเจคเตอร์", "投影仪"),
     ("เครื่องพิมพ์ฉลาก", "标签打印机"),
     ("เครื่องพิมพ์ใบเสร็จ", "热敏小票打印机"),
+    ("เครื่องพิมพ์พกพา", "便携打印机"),
+    ("เครื่องพิมพ์ไร้สาย", "无线打印机"),
     ("เครื่องพิมพ์", "打印机"),
     ("เครื่องปริ้น", "打印机"),
     ("เครื่องปริ๊น", "打印机"),
@@ -119,7 +152,7 @@ THAI_TO_ZH_PRODUCT_DICT: List[Tuple[str, str]] = [
     ("กิ๊บหนีบผมฉลาม", "鲨鱼夹"),
     ("คลิปฉลาม", "鲨鱼夹"),
     ("กิ๊บฉลาม", "鲨鱼夹"),
-    ("กิ๊บหนีบผม", "抓夹 发夹"),
+    ("กิ๊บหนีบผม", "抓夹"),
     ("กิ๊บติดผม", "发夹"),
     ("ยางรัดผม", "发圈"),
     ("ที่คาดผม", "发箍"),
@@ -349,22 +382,31 @@ def extract_core_thai_keyword(title: str, description: str = "") -> str:
         main_noun = _first_thai_chunk(title)
 
     keywords_out: List[str] = []
-    if brand_model and _is_spec_token(brand_model) and main_noun:
-        # "A4" alone finds paper / cars — use the product noun, and pair the spec with it
+
+    # 1. Product name (ชื่อสินค้า) ALWAYS comes first as requested by user!
+    if main_noun:
         keywords_out.append(main_noun)
-        keywords_out.append(f"{brand_model} {main_noun}")
-    elif brand_model:
-        keywords_out.append(brand_model)
+    elif desc_product_name:
+        keywords_out.append(desc_product_name)
+
+    # 2. Model / Brand (ชื่อรุ่น / แบรนด์) comes second
+    if brand_model:
+        if _is_spec_token(brand_model) and main_noun:
+            bm_kw = f"{brand_model} {main_noun}"
+        else:
+            bm_kw = brand_model
+        if bm_kw not in keywords_out:
+            keywords_out.append(bm_kw)
+
+    # 3. Additional matched Thai terms
     for t in matched_thai_terms[:2]:
         if t not in keywords_out:
             keywords_out.append(t)
     if not keywords_out and desc_product_name:
         keywords_out.append(desc_product_name)
 
-    # Fill up to 3 keywords with modifier variants found in the title (e.g. เครื่องพิมพ์ + พกพา)
+    # 4. Fill up to 3 keywords with modifier variants found in the title (e.g. เครื่องพิมพ์ + พกพา)
     if main_noun and len(keywords_out) < 3:
-        if main_noun not in keywords_out:
-            keywords_out.append(main_noun)
         for th_mod, _ in THAI_MODIFIERS_ZH:
             if len(keywords_out) >= 3:
                 break
@@ -372,6 +414,9 @@ def extract_core_thai_keyword(title: str, description: str = "") -> str:
                 variant = f"{main_noun}{th_mod}"
                 if not any(th_mod in k for k in keywords_out):
                     keywords_out.append(variant)
+
+    if not keywords_out and brand_model:
+        keywords_out.append(brand_model)
 
     if keywords_out:
         return ", ".join(keywords_out[:3])
@@ -469,60 +514,54 @@ BRAND_EN_TO_ZH: List[Tuple[str, str]] = [
     ("gaabor", "Gaabor"),
 ]
 
+_ZH_TRANSLATION_CACHE: Dict[str, str] = {}
+
 
 async def _translate_single_phrase_to_chinese(phrase: str) -> str:
     q = (phrase or "").strip()
     if not q:
         return ""
 
-    # If already contains Chinese characters, return as-is
-    if re.search(r'[\u4e00-\u9fff]', q):
+    # If already contains Chinese characters and has NO Thai characters left, return as-is
+    if re.search(r'[\u4e00-\u9fff]', q) and not re.search(r'[\u0e00-\u0e7f]', q):
         return q
+
+    if q in _ZH_TRANSLATION_CACHE:
+        return _ZH_TRANSLATION_CACHE[q]
 
     # Check known brand/model mappings (keep model numbers like "8P" intact!)
     q_lower = q.lower()
     for brand_en, brand_zh in BRAND_EN_TO_ZH:
         if brand_en in q_lower:
-            # Replace brand prefix case-insensitively while keeping model suffix (e.g. "8P")
             translated_brand = re.sub(re.escape(brand_en), brand_zh, q, flags=re.I).strip()
-            # If the whole phrase is ASCII/model name, return it directly without mangling model numbers
-            if not re.search(r'[\u0e00-\u0e7f]', translated_brand):
+            if not re.search(r'[\u0e00-\u0e7f]', translated_brand) and re.search(r'[\u4e00-\u9fff]', translated_brand):
+                _ZH_TRANSLATION_CACHE[q] = translated_brand
                 return translated_brand
-
-    # If pure English Brand + Alphanumeric model (e.g. "iPhone 16 Pro", "Sony ZV-E10"), keep it intact if it has model digits
-    if re.match(r'^[A-Za-z0-9\s\-\.+]+$', q) and re.search(r'\d', q):
-        return q
 
     # Exact match in curated Thai dictionary
     for th_term, zh_term in THAI_TO_ZH_PRODUCT_DICT:
         if q == th_term:
+            _ZH_TRANSLATION_CACHE[q] = zh_term
             return zh_term
-    # Partial match if phrase starts with a curated Thai term (e.g. "ไม้กันสั่นมีรีโมท" -> "手机稳定器 云台")
-    # Keep extra spec tokens (e.g. "A4") and modifiers (e.g. "พกพา" -> 便携) around the matched term
+
+    # Partial match if phrase contains a curated Thai term (e.g. "A4 เครื่องพิมพ์" -> "A4 打印机")
     for th_term, zh_term in THAI_TO_ZH_PRODUCT_DICT:
         if th_term in q and len(th_term) >= 4:
             rest = q.replace(th_term, " ")
             ascii_part = " ".join(re.findall(r'[A-Za-z0-9\-\.+]+', rest))
             mods = "".join(zh for th, zh in THAI_MODIFIERS_ZH if th in rest and zh not in zh_term)
-            return f"{ascii_part} {mods}{zh_term}".strip()
+            res = f"{ascii_part} {mods}{zh_term}".strip()
+            _ZH_TRANSLATION_CACHE[q] = res
+            return res
 
-    async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
-        # Provider 1: MyMemory API (autodetect)
-        try:
-            r1 = await client.get(
-                "https://api.mymemory.translated.net/get",
-                params={"q": q, "langpair": "autodetect|zh-CN"},
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            )
-            if r1.status_code == 200:
-                t1 = (r1.json().get("responseData") or {}).get("translatedText") or ""
-                t1 = t1.strip(" 。，、,.!")
-                if t1 and re.search(r'[\u4e00-\u9fff]', t1) and "MYMEMORY WARNING" not in t1.upper():
-                    return t1
-        except Exception:
-            pass
+    # If pure English Brand + Alphanumeric model (e.g. "SMARTHOME SM OV1600", "Sony ZV-E10"), return as model token
+    # (prepare_chinese_keywords will pair it with the Chinese product noun so it's never searched without Chinese!)
+    if re.match(r'^[A-Za-z0-9\s\-\.+]+$', q) and re.search(r'\d', q):
+        _ZH_TRANSLATION_CACHE[q] = q
+        return q
 
-        # Provider 2: clients5.google.com/translate_a/t (auto)
+    async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as client:
+        # Fast Provider 1: clients5.google.com (100ms response)
         try:
             r2 = await client.get(
                 "https://clients5.google.com/translate_a/t",
@@ -535,11 +574,12 @@ async def _translate_single_phrase_to_chinese(phrase: str) -> str:
                     first = data2[0]
                     t2 = (first[0] if isinstance(first, list) else str(first)).strip(" 。，、,.!")
                     if t2 and re.search(r'[\u4e00-\u9fff]', t2):
+                        _ZH_TRANSLATION_CACHE[q] = t2
                         return t2
         except Exception:
             pass
 
-        # Provider 3: translate.googleapis.com/translate_a/single (auto)
+        # Fast Provider 2: translate.googleapis.com
         try:
             r3 = await client.get(
                 "https://translate.googleapis.com/translate_a/single",
@@ -550,35 +590,86 @@ async def _translate_single_phrase_to_chinese(phrase: str) -> str:
                 data3 = r3.json()
                 t3 = "".join(part[0] for part in data3[0] if part and part[0]).strip(" 。，、,.!")
                 if t3 and re.search(r'[\u4e00-\u9fff]', t3):
+                    _ZH_TRANSLATION_CACHE[q] = t3
                     return t3
+        except Exception:
+            pass
+
+        # Fallback Provider 3: MyMemory API (autodetect)
+        try:
+            r1 = await client.get(
+                "https://api.mymemory.translated.net/get",
+                params={"q": q, "langpair": "autodetect|zh-CN"},
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
+            if r1.status_code == 200:
+                t1 = (r1.json().get("responseData") or {}).get("translatedText") or ""
+                t1 = t1.strip(" 。，、,.!")
+                if t1 and re.search(r'[\u4e00-\u9fff]', t1) and "MYMEMORY WARNING" not in t1.upper():
+                    _ZH_TRANSLATION_CACHE[q] = t1
+                    return t1
         except Exception:
             pass
 
     return q
 
 
-async def translate_to_chinese(text: str) -> str:
+async def prepare_chinese_keywords(text: str, max_keywords: int = 3) -> List[str]:
     """
-    Translates single or multiple Thai/English keywords into Simplified Chinese (zh-CN).
-    When multiple keywords are provided (e.g. "สายชาร์จ ขาตั้งกล้อง" or "DJI Osmo Mobile 8P, ไม้กันสั่น"),
-    translates each keyword individually and joins them with ' | ' so downstream search engines
-    fetch videos for ALL keywords equally!
+    Splits single or multi-keyword input into individual keywords and translates each one
+    into Simplified Chinese (zh-CN).
+    - Guarantees every returned keyword contains Chinese characters (if a keyword is an English
+      Brand/Model like 'SMARTHOME SM OV1600', pairs it with the primary Chinese product noun
+      like 'SMARTHOME SM OV1600 电烤箱' so Chinese platforms never return off-topic English results).
+    - Orders pure Chinese product keywords FIRST for maximum accuracy and speed.
     """
     phrases = split_multi_keywords(text)
     if not phrases:
-        return ""
-    if len(phrases) == 1:
-        return await _translate_single_phrase_to_chinese(phrases[0])
+        return []
 
     translated_list = await asyncio.gather(
         *[_translate_single_phrase_to_chinese(p) for p in phrases]
     )
-    cleaned_list: List[str] = []
+
+    # Identify primary Chinese product noun (first phrase that contains Chinese characters)
+    main_zh_noun = ""
     for t in translated_list:
         t_clean = (t or "").strip()
-        if t_clean and t_clean not in cleaned_list:
-            cleaned_list.append(t_clean)
-    return " | ".join(cleaned_list)
+        cjk_only = "".join(re.findall(r'[\u4e00-\u9fff]+', t_clean))
+        if cjk_only:
+            main_zh_noun = cjk_only
+            break
+
+    pure_cjk_kws: List[str] = []
+    mixed_cjk_kws: List[str] = []
+
+    for t in translated_list:
+        t_clean = (t or "").strip()
+        if not t_clean:
+            continue
+        has_cjk = bool(re.search(r'[\u4e00-\u9fff]', t_clean))
+        if not has_cjk and main_zh_noun:
+            # Attach primary Chinese product noun to bare Brand/Model (e.g. "SMARTHOME SM OV1600 电烤箱")
+            t_clean = f"{t_clean} {main_zh_noun}".strip()
+            has_cjk = True
+
+        if re.fullmatch(r'[\u4e00-\u9fff\s]+', t_clean):
+            if t_clean not in pure_cjk_kws:
+                pure_cjk_kws.append(t_clean)
+        else:
+            if t_clean not in mixed_cjk_kws and t_clean not in pure_cjk_kws:
+                mixed_cjk_kws.append(t_clean)
+
+    ordered = pure_cjk_kws + mixed_cjk_kws
+    return ordered[:max_keywords] if ordered else [text.strip()]
+
+
+async def translate_to_chinese(text: str) -> str:
+    """
+    Translates single or multiple Thai/English keywords into Simplified Chinese (zh-CN).
+    """
+    zh_list = await prepare_chinese_keywords(text, max_keywords=3)
+    return " | ".join(zh_list)
 
 
 translate_thai_to_chinese = translate_to_chinese
@@ -586,40 +677,39 @@ translate_thai_to_chinese = translate_to_chinese
 
 async def build_chinese_search_keywords(title: str, description: str = "", custom_keyword: str = "") -> Dict[str, Any]:
     """
-    Build the primary Chinese keyword(s) and suggested search angles for Douyin & Bilibili.
-    Supports multi-keyword extraction and individual keyword chips.
+    Build ordered Chinese search keywords (zh_keywords) and suggested search angles for Douyin, Bilibili & RedNote.
+    Each keyword in zh_keywords is searched sequentially one-by-one in Chinese and displayed as soon as it finishes!
     """
     if custom_keyword and custom_keyword.strip():
         core_th = custom_keyword.strip()
     else:
         core_th = extract_core_thai_keyword(title, description)
 
-    phrases_th = split_multi_keywords(core_th)
-    translated_phrases = await asyncio.gather(
-        *[_translate_single_phrase_to_chinese(p) for p in phrases_th]
-    )
-    zh_list = [t.strip() for t in translated_phrases if t and t.strip()]
-    primary_zh = " | ".join(dict.fromkeys(zh_list)) if zh_list else core_th
+    zh_list = await prepare_chinese_keywords(core_th, max_keywords=3)
+    first_zh = zh_list[0] if zh_list else core_th
 
-    # Build suggested search angle pills so user can switch between combined multi-keyword or individual keywords
-    suggestions: List[Dict[str, str]] = [
-        {"keyword": primary_zh, "label": "วิดีโอสินค้า (รวมทุกคำค้นหา)" if len(zh_list) > 1 else "วิดีโอสินค้า"},
-    ]
-    if len(zh_list) >= 2:
-        direct_combined = f"{zh_list[0]} {zh_list[1]}".strip()
-        suggestions.append({"keyword": direct_combined, "label": "ตรงรุ่น + หมวดหมู่"})
+    # Ensure if only 1-2 keywords were extracted for a product, we also have high-yield Chinese review/unboxing variants
+    if first_zh and re.search(r'[\u4e00-\u9fff]', first_zh) and len(zh_list) < 3:
+        for angle in (f"{first_zh} 测评", f"{first_zh} 开箱"):
+            if len(zh_list) < 3 and angle not in zh_list:
+                zh_list.append(angle)
 
-    if len(phrases_th) > 1 and len(zh_list) == len(phrases_th):
-        for th_p, zh_p in zip(phrases_th, zh_list):
-            suggestions.append({"keyword": zh_p, "label": f"เฉพาะ: {th_p}"})
+    primary_zh = " | ".join(zh_list) if zh_list else core_th
 
-    first_zh = zh_list[0] if zh_list else primary_zh
-    suggestions.append({"keyword": f"{first_zh} 测评", "label": "รีวิวการใช้งาน"})
-    suggestions.append({"keyword": f"{first_zh} 开箱", "label": "แกะกล่องสินค้าจริง"})
+    suggestions: List[Dict[str, str]] = []
+    for idx, zh_kw in enumerate(zh_list):
+        label_prefix = "คีย์เวิร์ดหลัก" if idx == 0 else f"คีย์เวิร์ด {idx + 1}"
+        suggestions.append({"keyword": zh_kw, "label": f"{label_prefix}: {zh_kw}"})
+
+    if first_zh:
+        for angle_kw, angle_label in ((f"{first_zh} 测评", "รีวิวการใช้งาน"), (f"{first_zh} 开箱", "แกะกล่องสินค้าจริง")):
+            if not any(s["keyword"] == angle_kw for s in suggestions):
+                suggestions.append({"keyword": angle_kw, "label": angle_label})
 
     return {
         "thai_keyword": core_th,
-        "zh_keyword": primary_zh,
+        "zh_keyword": first_zh,
+        "zh_keywords": zh_list,
         "translated_title_zh": primary_zh,
         "suggested_keywords": suggestions,
     }
@@ -988,7 +1078,7 @@ async def fetch_shopee_product_info(raw_input: str, custom_keyword: str = "") ->
     elif "-i." in url:
         link_type = "full_slug_link"
 
-    async with httpx.AsyncClient(timeout=12.0) as client:
+    async with guarded_client(timeout=12.0) as client:
         # Step 1: If short link (s.shopee.co.th / shp.ee), resolve redirect to get shop_id & item_id
         if not shop_id or not item_id:
             try:
@@ -1007,48 +1097,49 @@ async def fetch_shopee_product_info(raw_input: str, custom_keyword: str = "") ->
             except Exception:
                 pass
 
-        # Step 1.5: Try Shopee's `/api/v4/pdp/get_pc` endpoint first (GitHub standard PDP API)
-        if shop_id and item_id:
-            pdp_data = await fetch_via_shopee_get_pc(shop_id, item_id)
-            if pdp_data and pdp_data.get("title"):
-                title = pdp_data["title"]
-                description = pdp_data.get("description", "")
-                image = pdp_data.get("image", "")
-                price = pdp_data.get("price", 0)
-                shop_name = pdp_data.get("shop_name", "")
-                categories = pdp_data.get("categories") or []
-                attributes = pdp_data.get("attributes") or []
-                extraction_method = "api/v4/pdp/get_pc"
-            else:
-                # If we had saved channels marked "ok" but get_pc failed, verify their live cookie status
-                active_channels = [c for c in _load_raw_channels() if c.get("status") == "ok"]
-                if active_channels:
-                    await refresh_all_channels()
-
         cache_key = f"{shop_id}:{item_id}" if (shop_id and item_id) else url
-        if not title and cache_key in _PRODUCT_MEM_CACHE:
+        if cache_key in _PRODUCT_MEM_CACHE:
             cached = _PRODUCT_MEM_CACHE[cache_key]
             title = cached.get("title", "")
             description = cached.get("description", "")
             image = cached.get("image", "")
             canonical_url = cached.get("canonical_url", canonical_url)
 
+        # Step 1.5: If an active Shopee cookie is configured, try Shopee's `/api/v4/pdp/get_pc`
+        if not title and shop_id and item_id:
+            active_cookie = get_shopee_cookie()
+            if active_cookie:
+                try:
+                    pdp_data = await fetch_via_shopee_get_pc(shop_id, item_id, active_cookie)
+                    if pdp_data and pdp_data.get("title"):
+                        title = pdp_data["title"]
+                        description = pdp_data.get("description", "")
+                        image = pdp_data.get("image", "")
+                        price = pdp_data.get("price", 0)
+                        shop_name = pdp_data.get("shop_name", "")
+                        categories = pdp_data.get("categories") or []
+                        attributes = pdp_data.get("attributes") or []
+                        extraction_method = "api/v4/pdp/get_pc"
+                except Exception:
+                    pass
+
         # Step 2: Fetch OpenGraph SSR metadata using Social Preview Crawler User-Agent (WhatsApp/2.23.20.0)
         if not title:
-            target_urls_to_probe = [url]
+            target_urls_to_probe = []
             if shop_id and item_id:
-                bare_url = f"https://shopee.co.th/product/{shop_id}/{item_id}"
-                if bare_url not in target_urls_to_probe:
-                    target_urls_to_probe.append(bare_url)
+                target_urls_to_probe.append(f"https://shopee.co.th/product/{shop_id}/{item_id}")
+            if url not in target_urls_to_probe:
+                target_urls_to_probe.append(url)
 
             for probe_url in target_urls_to_probe:
-                for crawler_ua in ["WhatsApp/2.23.20.0", "Twitterbot/1.0", "TelegramBot (like TwitterBot)"]:
+                for crawler_ua in ["WhatsApp/2.23.20.0", "Twitterbot/1.0"]:
                     try:
                         client.cookies.clear()
                         r_og = await client.get(
                             probe_url,
                             headers={"User-Agent": crawler_ua},
                             follow_redirects=True,
+                            timeout=5.0,
                         )
                         if r_og.status_code == 200 and ("og:title" in r_og.text or "<title>" in r_og.text):
                             og_title = _extract_meta(r_og.text, "og:title") or _extract_meta(r_og.text, "twitter:title")
@@ -1129,6 +1220,7 @@ async def fetch_shopee_product_info(raw_input: str, custom_keyword: str = "") ->
         "image": image or "",
         "thai_keyword": kw_info["thai_keyword"],
         "zh_keyword": kw_info["zh_keyword"],
+        "zh_keywords": kw_info.get("zh_keywords", []),
         "translated_title_zh": kw_info["translated_title_zh"],
         "suggested_keywords": kw_info["suggested_keywords"],
         "expired_channels": expired_channels,

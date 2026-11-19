@@ -2,6 +2,7 @@ import asyncio
 import re
 import html
 import httpx
+from services.net_guard import guarded_client
 from typing import List, Dict, Any, Optional
 
 USER_AGENT = (
@@ -175,7 +176,7 @@ class BilibiliService:
             return items[:limit]
 
     async def resolve_url(self, raw_url: str) -> Optional[Dict[str, Any]]:
-        async with httpx.AsyncClient(
+        async with guarded_client(
             headers=self.headers,
             cookies=self._cookies,
             follow_redirects=True,
