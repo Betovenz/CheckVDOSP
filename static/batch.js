@@ -59,6 +59,7 @@
       subY: Number(E().get("subPosY") ?? 77),
       censorOn: true,
       randomize: false,
+      searchPlatforms: ["douyin", "bilibili", "xhs"],
     };
   }
 
@@ -251,9 +252,39 @@
     return list.map((o) => ({ ...o, label: shortLabel(o.label) }));
   }
 
+  // Frame grabbed by ffmpeg from the downloaded clip (when the site's cover is missing/expired)
+  function ffThumb(c) {
+    if (!c || !c.platform || !c.itemId || c.status === "downloading" || c.status === "uploading" || c.status === "error") return "";
+    return `/api/studio/clip-thumb?platform=${enc(c.platform)}&id=${enc(c.itemId)}`;
+  }
+
+  // Site covers that failed to load: remembered so card re-renders (download
+  // progress redraws the card often) go straight to the ffmpeg frame.
+  const badThumbs = new Set();
+  window.__bThumbBad = (img) => {
+    const site = img.dataset.site || "";
+    const ff = img.dataset.ff || "";
+    if (site) badThumbs.add(site);
+    if (ff && img.getAttribute("src") !== ff) img.src = ff;
+    else img.style.visibility = "hidden";
+  };
+
+  function clipThumbUrl(c) {
+    return (c.thumb && !badThumbs.has(c.thumb) && c.thumb) || ffThumb(c);
+  }
+
+  // <img> attributes for a clip thumbnail with the cover → ffmpeg frame → hide fallback
+  function thumbAttrs(c) {
+    return `src="${esc(clipThumbUrl(c))}" data-site="${esc(c.thumb || "")}" data-ff="${esc(ffThumb(c))}" onerror="__bThumbBad(this)"`;
+  }
+
+  function thumbClip(p) {
+    return p.clips.find((x) => clipThumbUrl(x)) || null;
+  }
+
   function thumbSrc(p) {
-    const c = p.clips.find((x) => x.thumb);
-    if (c) return c.thumb;
+    const c = thumbClip(p);
+    if (c) return clipThumbUrl(c);
     if (p.productImage) return `/api/proxy-image?url=${enc(p.productImage)}`;
     return "";
   }
@@ -266,7 +297,7 @@
         const err = c.status === "error";
         const pct = Math.max(0, Math.min(100, Math.round(c._pct || 0)));
         return `<div class="relative group/clip w-9 h-14 rounded-md overflow-hidden border ${err ? "border-rose-500" : c.censoredUrl && p.censorOn ? "border-emerald-500/60" : "border-slate-600"} bg-slate-800 shrink-0" title="${esc(c.title)}${c.sourceUrl ? " · ลิงก์: " + esc(c.sourceUrl) : ""}${err ? " — " + esc(c.error || "โหลดไม่สำเร็จ") : ""}">
-          ${c.thumb ? `<img src="${esc(c.thumb)}" class="w-full h-full object-cover" alt="" onerror="this.remove()">` : `<div class="w-full h-full flex items-center justify-center text-sm">${c.platform === "pc" ? "💻" : "🎞️"}</div>`}
+          ${clipThumbUrl(c) ? `<img ${thumbAttrs(c)} class="w-full h-full object-cover" alt="">` : `<div class="w-full h-full flex items-center justify-center text-sm">${c.platform === "pc" ? "💻" : "🎞️"}</div>`}
           ${busy ? `<div class="absolute inset-0 bg-black/60 flex items-center justify-center text-[9px] font-bold text-white">${c.status === "uploading" ? "⬆" : pct + "%"}</div>` : ""}
           ${err ? `<div class="absolute inset-0 bg-rose-900/60 flex items-center justify-center text-xs">!</div>` : ""}
           <button type="button" data-act="clip-remove" data-key="${esc(c.key)}" class="hidden group-hover/clip:flex absolute top-0 right-0 w-4 h-4 bg-black/80 text-[9px] text-white items-center justify-center" title="เอาคลิปนี้ออก">✕</button>
@@ -279,11 +310,24 @@
     </div>`;
   }
 
+  function kwRow(p) {
+    const kws = Array.isArray(p.zhKeywords) ? p.zhKeywords : [];
+    if (!kws.length) return "";
+    return `<div class="flex flex-wrap items-center gap-1" title="คีย์เวิร์ดจีนจากสินค้า — กดเพื่อค้นวิดีโอที่เกี่ยวข้อง">
+      <span class="text-[10px] text-slate-500">🔎</span>
+      ${kws
+        .slice(0, 4)
+        .map((k) => `<button type="button" data-act="rel-open" data-kw="${esc(k)}" class="px-1.5 py-0.5 rounded-md bg-sky-500/10 hover:bg-sky-500/25 border border-sky-500/30 text-[10px] text-sky-200">${esc(k)}</button>`)
+        .join("")}
+    </div>`;
+  }
+
   function clipPanel(p) {
     if (!p._clipPanel) return "";
     return `<div class="rounded-xl bg-slate-950/80 border border-fuchsia-500/40 p-2 space-y-2">
       <textarea data-field="_linkDraft" rows="2" placeholder="วางลิงก์ Douyin / RedNote / Bilibili (หลายลิงก์ได้)" class="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-500">${esc(p._linkDraft || "")}</textarea>
       <div class="flex flex-wrap gap-1.5">
+        <button type="button" data-act="rel-open" class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-[11px] font-bold text-white" title="ค้นวิดีโอจากคีย์เวิร์ดจีนของสินค้านี้ แล้วกดเพิ่มเข้าโปรเจคได้เลย">🔍 ดูวิดีโอที่เกี่ยวข้อง</button>
         <button type="button" data-act="clip-links" class="px-2.5 py-1 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-[11px] font-bold text-white" ${p._linkBusy ? "disabled" : ""}>${p._linkBusy ? "⏳ กำลังดึง…" : "⬇️ โหลดลิงก์"}</button>
         <label class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 cursor-pointer">💻 จากเครื่อง<input type="file" data-act="clip-files" accept="video/*" multiple class="hidden"></label>
         <button type="button" data-act="clip-page2" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200" title="คัดลอกคลิปทั้งหมดที่อยู่ในคิวหน้า 2">📥 คลิปจากหน้า 2</button>
@@ -296,7 +340,7 @@
     const busy = p.st.shopee === "busy";
     return `<div class="flex items-center gap-2 p-1.5 rounded-xl bg-slate-950/70 border ${p.productTitle ? "border-orange-500/30" : "border-dashed border-orange-500/50"}">
       ${p.productImage
-        ? `<img src="/api/proxy-image?url=${enc(p.productImage)}" class="w-9 h-9 rounded-lg object-cover bg-white shrink-0" alt="" title="รูปสินค้าจาก Shopee" onerror="this.style.visibility='hidden'">`
+        ? `<img src="/api/proxy-image?url=${enc(p.productImage)}" data-zoom="/api/proxy-image?url=${enc(p.productImage)}" data-zoom-cap="${esc(p.productName || p.productTitle || "")}" class="w-9 h-9 rounded-lg object-cover bg-white shrink-0 cursor-zoom-in hover:ring-2 hover:ring-orange-400" alt="" title="กดเพื่อขยายรูปสินค้า" onerror="this.style.visibility='hidden'">`
         : `<div class="w-9 h-9 rounded-lg border border-dashed border-slate-600 flex items-center justify-center text-base text-slate-500 shrink-0">🛒</div>`}
       <input data-field="shopeeUrl" value="${esc(p.shopeeUrl)}" placeholder="วางลิงก์สินค้า Shopee (หรือพิมพ์ชื่อสินค้า)" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-orange-500">
       <button type="button" data-act="shopee" class="px-2.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-[11px] font-bold text-white shrink-0" ${busy ? "disabled" : ""}>${busy ? "⏳" : "📥 ดึง"}</button>
@@ -344,7 +388,7 @@
     return `<div data-pid="${esc(p.id)}" class="rounded-2xl bg-slate-900/90 border ${rendering ? "border-emerald-400" : p.sel ? "border-indigo-500/50" : "border-slate-800"} p-3 space-y-2.5 flex flex-col">
       <div class="flex items-start gap-2.5">
         <button type="button" data-act="preview" class="w-20 aspect-[9/16] rounded-lg relative overflow-hidden shrink-0 group bg-gradient-to-br from-slate-700 to-slate-900 border border-slate-700" title="เปิดพรีวิว">
-          ${thumb ? `<img src="${esc(thumb)}" class="absolute inset-0 w-full h-full object-cover" alt="" onerror="this.remove()">` : `<span class="absolute inset-0 flex items-center justify-center text-2xl">🎬</span>`}
+          ${thumb ? (thumbClip(p) ? `<img ${thumbAttrs(thumbClip(p))} class="absolute inset-0 w-full h-full object-cover" alt="">` : `<img src="${esc(thumb)}" class="absolute inset-0 w-full h-full object-cover" alt="" onerror="this.style.visibility='hidden'">`) : `<span class="absolute inset-0 flex items-center justify-center text-2xl">🎬</span>`}
           ${p.header && p.showHeader ? `<span class="absolute inset-x-1 text-[7px] leading-tight font-black text-yellow-300 text-center" style="top:${Math.max(2, p.headerY - 6)}%;-webkit-text-stroke:.4px #000">${esc(p.header)}</span>` : ""}
           <span class="absolute inset-0 bg-black/0 group-hover:bg-black/45 flex items-center justify-center transition"><span class="opacity-0 group-hover:opacity-100 text-white text-lg">▶</span></span>
           ${rendering ? `<span class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[10px] font-bold text-emerald-300">${p._renderPhase === "convert" ? "แปลงไฟล์" : `${p._renderPct || 0}%`}</span>` : ""}
@@ -358,6 +402,7 @@
           </div>
           <div class="text-xs font-bold line-clamp-2 text-white">${p.productName ? esc(p.productName) : p.productTitle ? esc(p.productTitle) : '<span class="text-slate-500 font-normal">ยังไม่มีสินค้า — วางลิงก์ Shopee ด้านล่าง</span>'}</div>
           ${p.header ? `<div class="text-[11px] text-yellow-300 font-bold truncate">🅷 ${esc(p.header)}</div>` : ""}
+          ${kwRow(p)}
           ${chips(p, false)}
         </div>
       </div>
@@ -380,7 +425,7 @@
         </label>
         <button type="button" data-act="gen-full" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 disabled:opacity-50" ${busyGen ? "disabled" : ""} title="ให้ AI เขียนบทใหม่ + พากย์ใหม่">🔁 เจนบทใหม่</button>
         <button type="button" data-act="gen-voice" class="px-2 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[11px] font-bold text-white disabled:opacity-50" ${busyGen || !p.script ? "disabled" : ""} title="พากย์ใหม่จากบทในกล่อง (เปลี่ยนเสียงได้)">🎙️ พากย์ใหม่</button>
-        <div class="relative b-menu-wrap" tabindex="-1">
+        <div class="relative b-menu-wrap${state.menuPid === p.id ? " open" : ""}" tabindex="-1">
           <button type="button" data-act="menu" class="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200">⋯</button>
           <div class="b-menu absolute right-0 bottom-full mb-1 z-20 w-48 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl p-1 text-[11px]">
             <button type="button" data-act="to-page2" class="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800 text-slate-200">🛠️ เปิดแก้ละเอียดในหน้า 2</button>
@@ -457,6 +502,7 @@
       ${sel("template", E().templates.map((t) => ({ value: t.id, label: t.name })), "Template")}
       <label class="flex items-center gap-1.5 text-[11px] text-slate-300 self-center cursor-pointer"><input type="checkbox" data-def="randomize" ${d.randomize ? "checked" : ""} class="accent-rose-500">🎲 สุ่มเสียง/มุมขายไม่ให้ซ้ำกัน (โปรเจคใหม่)</label>
       <label class="flex items-center gap-1.5 text-[11px] text-slate-300 self-center cursor-pointer"><input type="checkbox" data-def="censorOn" ${d.censorOn ? "checked" : ""} class="accent-rose-500">🀄 เซนเซอร์จีน (โปรเจคใหม่)</label>
+      <div class="self-center flex items-center gap-1.5 text-[11px] text-slate-300"><span>🔍 ค้นวิดีโอจาก</span>${platToggles()}</div>
       <button type="button" data-def-apply class="ml-auto px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold border border-slate-700 text-slate-200">↧ ใช้กับที่เลือก (${selected().length})</button>
     </div>`;
   }
@@ -471,6 +517,7 @@
     el.innerHTML = `
       <label class="flex items-center gap-2 text-xs text-slate-300 pr-2 border-r border-slate-700 cursor-pointer"><input type="checkbox" data-bar="sel-all" ${n && n === total ? "checked" : ""} class="w-4 h-4 accent-rose-500">เลือก <b class="text-white">${n}</b>/${total}</label>
       <button type="button" data-bar="add" class="px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold text-white">➕ เพิ่มโปรเจค (วางลิงก์ Shopee หลายลิงก์)</button>
+      <button type="button" data-bar="delete" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/60 border border-rose-500/50 text-rose-300 text-xs font-bold disabled:opacity-50 disabled:hover:bg-slate-800" ${!n ? "disabled" : ""}>🗑️ ลบที่เลือก (${n})</button>
       <div class="flex-1"></div>
       <button type="button" data-bar="gen" class="px-3 py-2 rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 text-xs font-extrabold text-white shadow-lg shadow-rose-500/20 disabled:opacity-60" ${!n ? "disabled" : ""}>${genBusy ? `⏳ กำลังเจน (${state.genActive + state.genQueue.length})` : `✨ เจนบท + เสียง (${n})`}</button>
       <button type="button" data-bar="censor" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-rose-500/40 text-rose-200 text-xs font-bold disabled:opacity-60" ${!czCount ? "disabled" : ""}>${state.censorRunning ? `⏳ เซนเซอร์ (${state.censorQueue.length + 1})` : `🀄 เซนเซอร์ที่เปิดไว้ (${czCount})`}</button>
@@ -548,7 +595,21 @@
       : "";
     p.productDesc = [filtered, highlights].filter(Boolean).join("\n") || cleanCategory || product.title || "";
     p.productImage = product.image || "";
+    p.zhKeywords = zhKeywordsOf(product);
     if (!p.header && cleanCategory) p.header = `${cleanCategory} ใช้งานง่ายสะดวก`;
+  }
+
+  // Chinese search keywords from the Shopee product (same list page 1 searches with)
+  function zhKeywordsOf(product) {
+    const out = [];
+    const add = (k) => {
+      k = String(k || "").trim();
+      if (k && !out.includes(k) && out.length < 5) out.push(k);
+    };
+    (Array.isArray(product.zh_keywords) ? product.zh_keywords : []).forEach(add);
+    if (!out.length) add(product.zh_keyword);
+    (Array.isArray(product.suggested_keywords) ? product.suggested_keywords : []).forEach((x) => add(x && x.keyword));
+    return out;
   }
 
   async function fetchShopee(p) {
@@ -654,6 +715,7 @@
           } catch (_) {}
         })
       );
+      relTickDownloads();
     }, 800);
   }
 
@@ -1505,12 +1567,33 @@
       return;
     }
     if (!window.confirm(`ลบโปรเจค #${num2(idxOf(p) + 1)} ${p.productName || ""}?\n(ไฟล์ MP4 ที่เซฟไว้แล้วจะไม่ถูกลบ)`)) return;
-    if (state.pv.pid === p.id) closePreview();
-    if (state.audioPid === p.id) stopCardAudio();
-    state.projects = state.projects.filter((x) => x !== p);
-    state.renderQueue = state.renderQueue.filter((pid) => pid !== p.id);
-    state.genQueue = state.genQueue.filter((q) => q.pid !== p.id);
-    state.censorQueue = state.censorQueue.filter((pid) => pid !== p.id);
+    removeProjects([p]);
+  }
+
+  function deleteSelected() {
+    const sel = selected();
+    const list = sel.filter((p) => p.id !== state.renderPid);
+    if (!list.length) {
+      toast("โปรเจคที่เลือกกำลังเรนเดอร์อยู่ ลบไม่ได้");
+      return;
+    }
+    const msg =
+      `ลบโปรเจคที่เลือก ${list.length} โปรเจค?` +
+      (sel.length > list.length ? "\n(ข้ามโปรเจคที่กำลังเรนเดอร์อยู่)" : "") +
+      "\n(ไฟล์ MP4 ที่เซฟไว้แล้วจะไม่ถูกลบ)";
+    if (!window.confirm(msg)) return;
+    removeProjects(list);
+    toast(`🗑️ ลบแล้ว ${list.length} โปรเจค`, false, 2500);
+  }
+
+  function removeProjects(list) {
+    const ids = new Set(list.map((p) => p.id));
+    if (ids.has(state.pv.pid)) closePreview();
+    if (ids.has(state.audioPid)) stopCardAudio();
+    state.projects = state.projects.filter((x) => !ids.has(x.id));
+    state.renderQueue = state.renderQueue.filter((pid) => !ids.has(pid));
+    state.genQueue = state.genQueue.filter((q) => !ids.has(q.pid));
+    state.censorQueue = state.censorQueue.filter((pid) => !ids.has(pid));
     renderAll();
     saveNow();
   }
@@ -1538,6 +1621,7 @@
         } else if (a === "gen") genSelected();
         else if (a === "censor") censorSelected();
         else if (a === "render") renderSelected();
+        else if (a === "delete") deleteSelected();
         else if (a === "stop") {
           state.renderStop = true;
           renderActionBar();
@@ -1566,11 +1650,15 @@
       if (act === "sel" || act === "clip-files") return; // handled on change
       e.preventDefault();
       const wrap = actEl.closest(".b-menu-wrap");
-      if (wrap && act !== "menu") wrap.classList.remove("open");
+      if (wrap && act !== "menu") {
+        wrap.classList.remove("open");
+        state.menuPid = null;
+      }
       switch (act) {
         case "menu":
           document.querySelectorAll(".b-menu-wrap.open").forEach((w) => w !== wrap && w.classList.remove("open"));
-          wrap?.classList.toggle("open");
+          // remembered in state so the menu survives card re-renders (e.g. clip download progress)
+          state.menuPid = wrap?.classList.toggle("open") ? p.id : null;
           break;
         case "preview":
           openPreview(p);
@@ -1582,6 +1670,9 @@
           p._clipPanel = !p._clipPanel;
           refreshCard(p);
           if (p._clipPanel) card.parentElement.querySelector(`[data-pid="${CSS.escape(p.id)}"] [data-field="_linkDraft"]`)?.focus();
+          break;
+        case "rel-open":
+          openRelated(p, actEl.dataset.kw || "");
           break;
         case "clip-links":
           addClipLinks(p);
@@ -1653,7 +1744,10 @@
     });
 
     document.addEventListener("click", (e) => {
-      if (!e.target.closest(".b-menu-wrap")) document.querySelectorAll(".b-menu-wrap.open").forEach((w) => w.classList.remove("open"));
+      if (!e.target.closest(".b-menu-wrap")) {
+        state.menuPid = null;
+        document.querySelectorAll(".b-menu-wrap.open").forEach((w) => w.classList.remove("open"));
+      }
     });
 
     view.addEventListener("change", (e) => {
@@ -1899,11 +1993,504 @@
     });
   }
 
+  // ------------------------------------------------------------------ related videos
+  // Popup that searches videos with the project's Chinese keywords; clips are added
+  // straight into the project and the popup stays open until the user closes it.
+  const PLATS = [
+    { id: "douyin", label: "Douyin", on: "bg-rose-600 border-rose-400 text-white", badge: "bg-rose-600" },
+    { id: "bilibili", label: "Bilibili", on: "bg-sky-600 border-sky-400 text-white", badge: "bg-sky-600" },
+    { id: "xhs", label: "RedNote", on: "bg-red-600 border-red-400 text-white", badge: "bg-red-600" },
+  ];
+  const rel = { pid: null, kw: "", items: [], loading: false, notice: "", token: 0, play: null };
+
+  function searchPlats() {
+    const list = Array.isArray(state.defaults.searchPlatforms) ? state.defaults.searchPlatforms : [];
+    const ok = list.filter((x) => PLATS.some((p) => p.id === x));
+    return ok.length ? ok : ["douyin", "bilibili"];
+  }
+
+  function platToggles() {
+    const on = searchPlats();
+    return PLATS.map(
+      (pl) =>
+        `<button type="button" data-search-plat="${pl.id}" class="px-2 py-1 rounded-lg border text-[11px] font-bold transition ${
+          on.includes(pl.id) ? pl.on : "bg-slate-950 border-slate-700 text-slate-500 hover:text-slate-300"
+        }">${on.includes(pl.id) ? "✓ " : ""}${pl.label}</button>`
+    ).join("");
+  }
+
+  function toggleSearchPlat(id) {
+    const cur = searchPlats();
+    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+    if (!next.length) {
+      toast("ต้องเลือกอย่างน้อย 1 เว็บ");
+      return;
+    }
+    state.defaults.searchPlatforms = PLATS.map((p) => p.id).filter((x) => next.includes(x));
+    renderDefaultsBar();
+    saveSoon();
+    if (rel.pid) {
+      renderRelated();
+      searchRelated(rel.kw);
+    }
+  }
+
+  function relModal() {
+    let m = $("batchRelModal");
+    if (m) return m;
+    m = document.createElement("div");
+    m.id = "batchRelModal";
+    m.className = "hidden fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3";
+    m.innerHTML = `<div class="w-full max-w-6xl max-h-[92vh] flex flex-col rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl overflow-hidden" data-rel-box>
+      <div id="batchRelHead" class="p-3 border-b border-slate-800 space-y-2"></div>
+      <div class="flex-1 min-h-0 flex flex-col lg:flex-row">
+        <div id="batchRelPlayer" class="hidden lg:w-[300px] shrink-0 p-3 border-b lg:border-b-0 lg:border-r border-slate-800 space-y-2"></div>
+        <div id="batchRelGrid" class="flex-1 overflow-y-auto p-3"></div>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+    m.addEventListener("click", onRelClick);
+    m.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target.id === "batchRelInput") {
+        e.preventDefault();
+        searchRelated(e.target.value);
+      }
+    });
+    return m;
+  }
+
+  async function openRelated(p, kw) {
+    rel.pid = p.id;
+    rel.items = [];
+    rel.notice = "";
+    rel.play = null;
+    relModal().classList.remove("hidden");
+    let kws = Array.isArray(p.zhKeywords) ? p.zhKeywords : [];
+    if (!kws.length) {
+      const name = (p.productName || p.productTitle || "").trim();
+      if (!name) {
+        rel.kw = "";
+        renderRelated();
+        setTimeout(() => $("batchRelInput")?.focus(), 50);
+        return;
+      }
+      rel.loading = true;
+      rel.kw = "";
+      renderRelated();
+      try {
+        const r = await fetch(`/api/prepare-search?q=${enc(name.slice(0, 120))}`);
+        const d = await r.json();
+        kws = Array.isArray(d.zh_keywords) ? d.zh_keywords.filter(Boolean).slice(0, 5) : [];
+        if (kws.length) {
+          p.zhKeywords = kws;
+          refreshCard(p);
+          saveSoon();
+        }
+      } catch (_) {}
+      if (rel.pid !== p.id) return;
+    }
+    searchRelated(kw || kws[0] || "");
+  }
+
+  function closeRelated() {
+    const m = $("batchRelModal");
+    if (!m || m.classList.contains("hidden")) return;
+    m.classList.add("hidden");
+    const v = m.querySelector("video");
+    if (v) {
+      v.pause();
+      v.removeAttribute("src");
+      v.load();
+    }
+    rel.pid = null;
+    rel.play = null;
+    rel.token++;
+  }
+
+  // Searches each chosen site in parallel so results appear as soon as one site
+  // answers, and the popup can show a real % (sites done) plus a time estimate.
+  const REL_EXPECT_MS = 20000;
+
+  async function searchRelated(kw) {
+    kw = String(kw || "").trim();
+    rel.kw = kw;
+    if (!kw) {
+      rel.loading = false;
+      renderRelated();
+      return;
+    }
+    const token = ++rel.token;
+    const plats = searchPlats();
+    rel.loading = true;
+    rel.items = [];
+    rel.notice = "";
+    rel.started = Date.now();
+    rel.sites = plats.map((id) => ({ id, state: "busy", n: 0, items: [] }));
+    renderRelated();
+    clearInterval(rel.timer);
+    rel.timer = setInterval(() => (token === rel.token ? updateRelProgress() : clearInterval(rel.timer)), 400);
+    const notices = [];
+    await Promise.all(
+      rel.sites.map(async (site) => {
+        try {
+          const qs = `q=${enc(kw)}&platform=${enc(site.id)}&single=true&limit=40`;
+          const r = await fetch(`/api/search?${qs}`);
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+          site.items = Array.isArray(d.items) ? d.items : [];
+          if (d.xhs_notice) notices.push(d.xhs_notice);
+          site.state = "done";
+        } catch (err) {
+          site.state = "error";
+          site.err = err.message || String(err);
+        }
+        site.n = site.items.length;
+        if (token !== rel.token) return;
+        rel.items = interleaveSites(rel.sites);
+        rel.notice = notices.join(" · ");
+        rel.loading = rel.sites.some((x) => x.state === "busy");
+        if (!rel.loading) clearInterval(rel.timer);
+        renderRelated();
+      })
+    );
+  }
+
+  function interleaveSites(sites) {
+    const out = [];
+    const seen = new Set();
+    const max = Math.max(0, ...sites.map((x) => x.items.length));
+    for (let i = 0; i < max; i++) {
+      for (const site of sites) {
+        const it = site.items[i];
+        if (!it) continue;
+        const k = `${it.platform}:${it.id}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(it);
+      }
+    }
+    return out;
+  }
+
+  function relPct() {
+    const sites = rel.sites || [];
+    if (!sites.length) return 0;
+    const done = sites.filter((x) => x.state !== "busy").length;
+    const timeFrac = Math.min(0.9, (Date.now() - (rel.started || Date.now())) / REL_EXPECT_MS);
+    return Math.min(99, Math.round((100 * (done + (sites.length - done) * timeFrac)) / sites.length));
+  }
+
+  function relProgressHtml() {
+    const pct = relPct();
+    const parts = (rel.sites || []).map((x) => {
+      const pl = PLATS.find((q) => q.id === x.id);
+      const label = pl ? pl.label : x.id;
+      if (x.state === "busy") return `<span class="text-slate-400">⏳ ${label}</span>`;
+      if (x.state === "error") return `<span class="text-rose-300" title="${esc(x.err || "")}">⚠️ ${label} ค้นไม่สำเร็จ</span>`;
+      return `<span class="text-emerald-300">✓ ${label} ${x.n} คลิป</span>`;
+    });
+    return `<div class="flex items-center gap-2 text-[11px]">
+        <span class="font-bold text-sky-300 w-28 shrink-0">🔍 กำลังค้น ${pct}%</span>
+        <div class="flex-1 h-1.5 rounded bg-slate-800 overflow-hidden"><div class="h-full bg-sky-400 transition-all duration-300" style="width:${pct}%"></div></div>
+      </div>
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] mt-1">${parts.join("")}</div>`;
+  }
+
+  function updateRelProgress() {
+    const el = $("batchRelProg");
+    if (el) el.innerHTML = relProgressHtml();
+  }
+
+  // ➕ button; once added it shows the clip's download % (then ✓ / ⚠️)
+  function relAddBtn(p, it, size) {
+    const key = `${it.platform}:${it.id}`;
+    const c = p.clips.find((x) => x.key === key);
+    const base = size === "big" ? "flex-1 py-1.5 text-xs" : "mt-auto py-1 text-[11px]";
+    const attrs = `type="button" data-rel="add" data-idx="${rel.items.indexOf(it)}" data-relkey="${esc(key)}" data-size="${size}"`;
+    if (!c) return `<button ${attrs} class="${base} rounded-lg font-bold bg-orange-600 hover:bg-orange-500 text-white">${size === "big" ? "➕ เพิ่มคลิปนี้" : "➕ เพิ่ม"}</button>`;
+    if (c.status === "downloading") {
+      const pct = Math.max(0, Math.min(99, Math.round(c._pct || 0)));
+      return `<button ${attrs} disabled class="${base} relative overflow-hidden rounded-lg font-bold bg-slate-800 border border-sky-500/50 text-sky-200"><span class="absolute inset-y-0 left-0 bg-sky-500/30 transition-all duration-500" style="width:${pct}%"></span><span class="relative">⬇️ กำลังโหลด ${pct}%</span></button>`;
+    }
+    if (c.status === "error") return `<button ${attrs} disabled class="${base} rounded-lg font-bold bg-rose-900/40 border border-rose-500/50 text-rose-200" title="${esc(c.error || "")}">⚠️ โหลดไม่สำเร็จ</button>`;
+    return `<button ${attrs} disabled class="${base} rounded-lg font-bold bg-emerald-600/20 border border-emerald-500/50 text-emerald-300">${size === "big" ? "✓ อยู่ในโปรเจคแล้ว" : "✓ เพิ่มแล้ว"}</button>`;
+  }
+
+  // Called by the download poller: refresh only the add buttons (no grid re-render)
+  function relTickDownloads() {
+    const p = byId(rel.pid);
+    const m = $("batchRelModal");
+    if (!p || !m || m.classList.contains("hidden")) return;
+    m.querySelectorAll("[data-relkey]").forEach((btn) => {
+      const it = rel.items[Number(btn.dataset.idx)];
+      if (!it) return;
+      const html = relAddBtn(p, it, btn.dataset.size);
+      if (btn.outerHTML !== html) btn.outerHTML = html;
+    });
+  }
+
+  function relHasClip(p, item) {
+    return p.clips.some((c) => c.key === `${item.platform}:${item.id}`);
+  }
+
+  function relAdd(item) {
+    const p = byId(rel.pid);
+    if (!p || !item) return;
+    const c = clipFromItem(item);
+    if (!addClipToProject(p, c)) return;
+    prefetchClip(c);
+    refreshCard(p);
+    saveSoon();
+    renderRelated();
+    toast(`➕ เพิ่มเข้าโปรเจค #${num2(idxOf(p) + 1)} แล้ว (รวม ${p.clips.length} คลิป)`, false, 2000);
+  }
+
+  function relStreamUrl(item) {
+    const hint = item.direct_video_url || (item.platform === "xhs" ? item.url || "" : "");
+    return `/api/stream?platform=${enc(item.platform)}&id=${enc(item.id)}&direct_url=${enc(hint)}`;
+  }
+
+  function fmtCount(n) {
+    n = Number(n) || 0;
+    if (n >= 1e4) return `${(n / 1e4).toFixed(1).replace(/\.0$/, "")}万`;
+    return String(n);
+  }
+
+  function renderRelated() {
+    const p = byId(rel.pid);
+    if (!p) return;
+    const head = $("batchRelHead");
+    const grid = $("batchRelGrid");
+    const player = $("batchRelPlayer");
+    const kws = Array.isArray(p.zhKeywords) ? p.zhKeywords : [];
+    head.innerHTML = `
+      <div class="flex items-center gap-2">
+        ${p.productImage ? `<img src="/api/proxy-image?url=${enc(p.productImage)}" data-zoom="/api/proxy-image?url=${enc(p.productImage)}" data-zoom-cap="${esc(p.productName || p.productTitle || "")}" class="w-11 h-11 rounded-lg object-cover bg-white shrink-0 cursor-zoom-in hover:ring-2 hover:ring-orange-400" alt="" title="กดเพื่อขยายรูปสินค้า">` : ""}
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-bold text-white truncate">🔍 วิดีโอที่เกี่ยวข้อง · #${num2(idxOf(p) + 1)} ${esc(p.productName || p.productTitle || "")}</div>
+          <div class="text-[11px] text-slate-400">กด ➕ เพิ่ม เพื่อใส่คลิปเข้าโปรเจคนี้ (ตอนนี้มี ${p.clips.length} คลิป) · หน้าต่างนี้ไม่ปิดเองจนกว่าจะกดปิด</div>
+        </div>
+        <button type="button" data-rel="close" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">✕ ปิด</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-1.5">
+        ${kws.map((k) => `<button type="button" data-rel="kw" data-kw="${esc(k)}" class="px-2 py-1 rounded-lg border text-[11px] font-semibold ${k === rel.kw ? "bg-orange-500 border-orange-400 text-white" : "bg-slate-950 border-slate-700 text-slate-300 hover:bg-slate-800"}">${esc(k)}</button>`).join("")}
+        <input id="batchRelInput" value="${esc(rel.kw)}" placeholder="พิมพ์คีย์เวิร์ด (จีน/ไทย) แล้วกด Enter" class="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+        <button type="button" data-rel="search" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-bold text-white">ค้นหา</button>
+        <span class="text-[11px] text-slate-400 ml-1">จาก</span>${platToggles()}
+      </div>`;
+
+    if (rel.play) {
+      const it = rel.play;
+      const inProj = relHasClip(p, it);
+      player.classList.remove("hidden");
+      const cur = player.querySelector("video");
+      if (!cur || cur.dataset.id !== `${it.platform}:${it.id}`) {
+        player.innerHTML = `<video data-id="${esc(`${it.platform}:${it.id}`)}" src="${esc(relStreamUrl(it))}" controls autoplay playsinline class="w-full max-h-[48vh] rounded-xl bg-black"></video>
+          <div class="text-[11px] text-slate-200 line-clamp-2" data-rel-ptitle></div>
+          <div class="flex gap-1.5" data-rel-pbtns></div>`;
+      }
+      player.querySelector("[data-rel-ptitle]").textContent = it.title || "";
+      player.querySelector("[data-rel-pbtns]").innerHTML = `
+        ${relAddBtn(p, it, "big")}
+        <button type="button" data-rel="unplay" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">ปิดวิดีโอ</button>`;
+    } else {
+      player.classList.add("hidden");
+      const v = player.querySelector("video");
+      if (v) {
+        v.pause();
+        v.removeAttribute("src");
+        v.load();
+      }
+      player.innerHTML = "";
+    }
+
+    const prog = rel.loading && rel.sites ? `<div id="batchRelProg" class="mb-2 px-3 py-2 rounded-lg bg-slate-950 border border-sky-500/30">${relProgressHtml()}</div>` : "";
+    if (rel.loading && !rel.sites) {
+      grid.innerHTML = `<div class="py-16 text-center text-sm text-slate-400">⏳ กำลังเตรียมคีย์เวิร์ด…</div>`;
+      return;
+    }
+    if (rel.loading && !rel.items.length) {
+      grid.innerHTML = `${prog}<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 opacity-40">${Array.from({ length: 10 }, () => `<div class="aspect-[3/4] rounded-xl b-shimmer"></div>`).join("")}</div>`;
+      return;
+    }
+    if (!rel.kw) {
+      grid.innerHTML = `<div class="py-16 text-center text-sm text-slate-500">ยังไม่มีคีย์เวิร์ด — ดึงสินค้า Shopee ในการ์ดก่อน หรือพิมพ์คีย์เวิร์ดด้านบน</div>`;
+      return;
+    }
+    const notice = prog + (rel.notice ? `<div class="mb-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">${esc(rel.notice)}</div>` : "");
+    if (!rel.items.length) {
+      grid.innerHTML = `${notice}<div class="py-16 text-center text-sm text-slate-500">ไม่พบวิดีโอสำหรับ “${esc(rel.kw)}” — ลองคีย์เวิร์ดอื่น หรือเปิดเว็บเพิ่ม</div>`;
+      return;
+    }
+    grid.innerHTML = `${notice}<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">${rel.items
+      .map((it, i) => {
+        const pl = PLATS.find((x) => x.id === it.platform) || PLATS[0];
+        const inProj = relHasClip(p, it);
+        const playing = rel.play === it;
+        const stat = it.platform === "bilibili" ? `👁 ${fmtCount(it.views)}` : `❤ ${fmtCount(it.likes)}`;
+        return `<div class="rounded-xl overflow-hidden bg-slate-950 border ${inProj ? "border-emerald-500/60" : playing ? "border-sky-500" : "border-slate-800"} flex flex-col">
+          <button type="button" data-rel="play" data-idx="${i}" class="relative aspect-[3/4] bg-slate-900 group/rel" title="กดดูวิดีโอ">
+            <img src="/api/proxy-image?url=${enc(it.cover || "")}" loading="lazy" class="w-full h-full object-cover" alt="" onerror="this.style.visibility='hidden'">
+            <span class="absolute top-1 left-1 px-1.5 rounded text-[9px] font-bold text-white ${pl.badge}">${pl.label}</span>
+            ${it.duration && it.duration !== "0:00" ? `<span class="absolute bottom-1 right-1 px-1 rounded bg-black/70 font-mono text-[9px] text-white">${esc(it.duration)}</span>` : ""}
+            ${inProj ? `<span class="absolute top-1 right-1 px-1.5 rounded bg-emerald-600 text-[9px] font-bold text-white">✓ ในโปรเจค</span>` : ""}
+            <span class="absolute inset-0 hidden group-hover/rel:flex items-center justify-center bg-black/40 text-2xl">▶</span>
+          </button>
+          <div class="p-1.5 flex-1 flex flex-col gap-1">
+            <div class="text-[10px] text-slate-200 line-clamp-2 leading-snug" title="${esc(it.title || "")}">${esc(it.title || "")}</div>
+            <div class="text-[9px] text-slate-500 truncate">${stat} · ${esc(it.author || "")}</div>
+            ${relAddBtn(p, it, "small")}
+          </div>
+        </div>`;
+      })
+      .join("")}</div>`;
+  }
+
+  function onRelClick(e) {
+    if (!e.target.closest("[data-rel-box]")) {
+      closeRelated(); // backdrop
+      return;
+    }
+    const plat = e.target.closest("[data-search-plat]");
+    if (plat) return; // handled by the document-level handler
+    const b = e.target.closest("[data-rel]");
+    if (!b) return;
+    const a = b.dataset.rel;
+    if (a === "close") closeRelated();
+    else if (a === "kw") searchRelated(b.dataset.kw);
+    else if (a === "search") searchRelated($("batchRelInput")?.value);
+    else if (a === "add") relAdd(rel.items[Number(b.dataset.idx)]);
+    else if (a === "play") {
+      rel.play = rel.items[Number(b.dataset.idx)] || null;
+      renderRelated();
+    } else if (a === "unplay") {
+      rel.play = null;
+      renderRelated();
+    }
+  }
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-search-plat]");
+    if (b) toggleSearchPlat(b.dataset.searchPlat);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && rel.pid) {
+      if (rel.play) {
+        rel.play = null;
+        renderRelated();
+      } else closeRelated();
+    }
+  });
+
+  // ------------------------------------------------------------------ image zoom
+  // Click any <img data-zoom="url"> to see it large; click anywhere or Esc to close.
+  function zoomEl() {
+    let z = $("batchZoom");
+    if (z) return z;
+    z = document.createElement("div");
+    z.id = "batchZoom";
+    z.className = "hidden fixed inset-0 z-[85] bg-black/85 flex flex-col items-center justify-center gap-3 p-4 cursor-zoom-out";
+    z.innerHTML = `<img class="max-w-[92vw] max-h-[82vh] rounded-xl bg-white object-contain shadow-2xl" alt="">
+      <div class="max-w-[92vw] text-center text-sm font-semibold text-white" data-zoom-caption></div>
+      <div class="text-[11px] text-slate-400">คลิกที่ไหนก็ได้ หรือกด Esc เพื่อปิด</div>`;
+    z.addEventListener("click", closeZoom);
+    document.body.appendChild(z);
+    return z;
+  }
+
+  function openZoom(src, caption) {
+    const z = zoomEl();
+    z.querySelector("img").src = src;
+    z.querySelector("[data-zoom-caption]").textContent = caption || "";
+    z.classList.remove("hidden");
+  }
+
+  function closeZoom() {
+    const z = $("batchZoom");
+    if (z) z.classList.add("hidden");
+  }
+
+  document.addEventListener("click", (e) => {
+    const img = e.target.closest("[data-zoom]");
+    if (!img) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openZoom(img.dataset.zoom, img.dataset.zoomCap);
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    const z = $("batchZoom");
+    if (e.key === "Escape" && z && !z.classList.contains("hidden")) {
+      e.stopImmediatePropagation(); // close only the zoom, not the popup under it
+      closeZoom();
+    }
+  }, true);
+
+  // ------------------------------------------------------------------ clip cache
+  function fmtBytes(n) {
+    n = Number(n) || 0;
+    if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
+    if (n >= 1024 ** 2) return `${Math.round(n / 1024 ** 2)} MB`;
+    return `${Math.round(n / 1024)} KB`;
+  }
+
+  function fmtAgo(ts) {
+    if (!ts) return "";
+    const min = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60));
+    if (min < 1) return "เมื่อกี้";
+    if (min < 60) return `${min} นาทีก่อน`;
+    return `${Math.round(min / 60)} ชม.ก่อน`;
+  }
+
+  function renderCacheInfo(d) {
+    const el = $("batchCacheInfo");
+    if (!el || !d) return;
+    let txt = `🧹 แคชคลิป ${fmtBytes(d.total_bytes)}`;
+    if (d.last_run_at) {
+      txt += ` · ลบอัตโนมัติล่าสุด ${fmtAgo(d.last_run_at)}`;
+      if (d.last_freed_bytes > 0) txt += ` (คืนพื้นที่ ${fmtBytes(d.last_freed_bytes)})`;
+    }
+    el.textContent = txt;
+  }
+
+  async function loadCacheInfo() {
+    try {
+      const r = await fetch("/api/cache/status");
+      if (r.ok) renderCacheInfo(await r.json());
+    } catch (_) {}
+  }
+
+  async function cleanCacheNow() {
+    const btn = $("batchCacheCleanBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "กำลังลบ…";
+    }
+    try {
+      await saveNow();
+      const r = await fetch("/api/cache/cleanup", { method: "POST" });
+      const d = await r.json();
+      renderCacheInfo(d);
+      toast(d.freed > 0 ? `🧹 คืนพื้นที่ ${fmtBytes(d.freed)} (${d.files} ไฟล์)` : "🧹 ไม่มีไฟล์ที่ลบได้ — คลิปที่เหลือยังมีโปรเจคใช้หรือเพิ่งเปิดใช้ภายใน 3 วัน", false, 4000);
+    } catch (_) {
+      toast("ลบแคชไม่สำเร็จ");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "ลบตอนนี้";
+      }
+    }
+  }
+
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#batchCacheCleanBtn")) cleanCacheNow();
+  });
+
   // ------------------------------------------------------------------ page hooks
   window.BatchApp = {
     onShow() {
       if (!state.loaded) load();
       else renderAll();
+      loadCacheInfo();
     },
     beforeLeave() {
       if (state.renderRunning) {
@@ -1911,6 +2498,7 @@
         return false;
       }
       closePreview();
+      closeRelated();
       stopCardAudio();
       saveNow();
       return true;

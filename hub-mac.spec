@@ -29,6 +29,7 @@ hiddenimports = [
     "services.video_studio_service",
     "services.censor_service",
     "services.batch_service",
+    "services.cache_service",
 ]
 
 for pkg in ("uvicorn", "yt_dlp", "imageio_ffmpeg", "edge_tts", "anyio", "curl_cffi", "rapidocr_onnxruntime", "onnxruntime"):

@@ -467,6 +467,9 @@
       if (window.BatchApp.beforeLeave() === false) return;
     }
     studioState.activePage = target;
+    try {
+      localStorage.setItem("app_active_page", target); // reopen this page after a refresh
+    } catch (_) {}
     const isStudio = target === "studio";
     const isBatch = target === "batch";
 
@@ -3752,6 +3755,18 @@
     clipCount: () => studioState.clips.length,
   };
   window.dispatchEvent(new CustomEvent("studio:clips-changed"));
+
+  // After a refresh, go back to the page the user was on (not always page 1).
+  // Waits for DOMContentLoaded so batch.js (page 3) has registered itself.
+  function restoreActivePage() {
+    let saved = "";
+    try {
+      saved = localStorage.getItem("app_active_page") || "";
+    } catch (_) {}
+    if ((saved === "studio" || saved === "batch") && studioState.activePage !== saved) switchAppPage(saved);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", restoreActivePage);
+  else setTimeout(restoreActivePage, 0);
 
   // Boot
   try {

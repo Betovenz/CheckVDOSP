@@ -10,6 +10,7 @@ from urllib.parse import quote
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from starlette.background import BackgroundTask
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -32,6 +33,7 @@ from services.shopee_service import (
 )
 from services.net_guard import guarded_client
 from services import batch_service
+from services import cache_service
 from services import xhs_service
 from services.xhs_browser import xhs_browser
 from services.downloader import (
@@ -137,6 +139,18 @@ class UpdateChannelLabelRequest(BaseModel):
 async def startup_event():
     # Pre-warm guest cookies in background so first Douyin download/preview is instant
     asyncio.create_task(douyin_service.ensure_signing_cookies())
+    asyncio.create_task(_cache_cleanup_loop())
+
+
+async def _cache_cleanup_loop():
+    """Clean the clip cache + temp downloads at startup, then every 6 hours."""
+    await asyncio.sleep(5)
+    while True:
+        try:
+            await asyncio.to_thread(cache_service.run_cleanup)
+        except Exception as exc:  # never let cleanup take the server down
+            print(f"[cache] cleanup failed: {exc}")
+        await asyncio.sleep(cache_service.INTERVAL_SECONDS)
 
 
 @app.on_event("shutdown")
@@ -644,6 +658,8 @@ async def download_video(
         path=str(file_path),
         filename=f"{safe_title}.{file_path.suffix.lstrip('.')}",
         media_type="audio/mpeg" if audio_only else "video/mp4",
+        # The browser keeps its own copy in Downloads; drop ours once it is sent.
+        background=BackgroundTask(lambda: file_path.unlink(missing_ok=True)),
     )
 
 
@@ -963,9 +979,46 @@ _CLIP_PROGRESS: Dict[str, Dict[str, Any]] = {}
 
 
 def _clip_cache_key_and_path(platform: str, id: str) -> tuple[str, Path]:
-    plat = platform.lower().strip()
-    safe_id = re.sub(r"[^a-zA-Z0-9_\-]", "", id)[:60] or "clip"
-    return f"{plat}_{safe_id}", CLIP_CACHE_DIR / f"{plat}_{safe_id}.mp4"
+    stem = cache_service.clip_stem(platform, id)
+    return stem, CLIP_CACHE_DIR / f"{stem}.mp4"
+
+
+def _make_clip_thumb(video: Path, thumb: Path) -> bool:
+    """Grab one frame of a cached clip as a small JPG (used when the site's cover is missing/expired)."""
+    import subprocess
+
+    from services.video_studio_service import get_ffmpeg_binary
+
+    tmp = thumb.with_suffix(".tmp.jpg")
+    for seek in ("0.8", "0"):
+        try:
+            subprocess.run(
+                [get_ffmpeg_binary(), "-y", "-ss", seek, "-i", str(video), "-frames:v", "1",
+                 "-vf", "scale=240:-2", "-q:v", "5", str(tmp)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=20,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception:
+            continue
+        if tmp.exists() and tmp.stat().st_size > 500:
+            tmp.replace(thumb)
+            return True
+    tmp.unlink(missing_ok=True)
+    return False
+
+
+@app.get("/api/studio/clip-thumb")
+async def api_studio_clip_thumb(platform: str = Query(...), id: str = Query(...)):
+    stem, video = _clip_cache_key_and_path(platform, id)
+    thumb = CLIP_CACHE_DIR / f"{stem}.jpg"
+    if not thumb.exists():
+        if not video.exists() or video.stat().st_size <= 10000:
+            raise HTTPException(status_code=404, detail="คลิปยังโหลดไม่เสร็จ")
+        if not await asyncio.to_thread(_make_clip_thumb, video, thumb):
+            raise HTTPException(status_code=500, detail="สร้างภาพปกไม่สำเร็จ")
+    return FileResponse(path=str(thumb), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/studio/clip-progress")
@@ -995,6 +1048,7 @@ async def api_studio_clip_file(
     if cached_path.exists() and cached_path.stat().st_size > 10000:
         sz = cached_path.stat().st_size
         _CLIP_PROGRESS[lock_key] = {"status": "done", "loaded": sz, "total": sz, "pct": 100}
+        cache_service.touch(cached_path)
         return FileResponse(
             path=str(cached_path),
             media_type="video/mp4",
@@ -1111,6 +1165,7 @@ async def api_studio_censored_file(key: str = Query(...)):
     censored_path = CLIP_CACHE_DIR / f"{safe_key}.censored.mp4"
     if not censored_path.exists() or censored_path.stat().st_size <= 10000:
         raise HTTPException(status_code=404, detail="ไม่พบไฟล์คลิปที่เซนเซอร์แล้ว")
+    cache_service.touch(censored_path)
     return FileResponse(
         path=str(censored_path),
         media_type="video/mp4",
@@ -1329,8 +1384,24 @@ async def api_batch_get_projects():
 
 @app.put("/api/batch/projects")
 async def api_batch_save_projects(payload: BatchSaveRequest):
-    await asyncio.to_thread(batch_service.save_projects, payload.projects, payload.defaults)
+    def _save() -> None:
+        old = batch_service.load_projects().get("projects") or []
+        batch_service.save_projects(payload.projects, payload.defaults)
+        cache_service.drop_after_project_change(old, payload.projects)
+
+    await asyncio.to_thread(_save)
     return {"status": "ok"}
+
+
+@app.get("/api/cache/status")
+async def api_cache_status():
+    return {"status": "ok", **(await asyncio.to_thread(cache_service.status))}
+
+
+@app.post("/api/cache/cleanup")
+async def api_cache_cleanup():
+    result = await asyncio.to_thread(cache_service.run_cleanup)
+    return {"status": "ok", **result, **(await asyncio.to_thread(cache_service.status))}
 
 
 @app.put("/api/batch/audio/{project_id}")

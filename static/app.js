@@ -319,16 +319,8 @@ function renderGrid() {
               : ""
           }
           ${inStudio ? `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-fuchsia-600 text-white text-[10px] font-bold group-hover:opacity-0 transition">✓ ในคิว</span>` : ""}
-          <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-2">
-            <button type="button" data-action="send-to-studio" data-index="${idx}" class="w-full py-1.5 rounded-lg text-[11px] font-bold transition ${
-              inStudio
-                ? "bg-fuchsia-500/20 border border-fuchsia-500/60 text-fuchsia-200"
-                : "bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 text-white"
-            }">${inStudio ? "✓ อยู่ในคิวแล้ว" : "🎬 ส่งไปทำคลิป"}</button>
-            <div class="flex gap-1.5 w-full">
-              <button type="button" data-action="download" data-index="${idx}" class="flex-1 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs" title="โหลด MP4 ไม่มีลายน้ำ">⬇ MP4</button>
-              <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" data-action="open" class="flex-1 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs text-center" title="เปิดหน้าเว็บต้นฉบับ">↗</a>
-            </div>
+          <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-2 pointer-events-none">
+            <span class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white text-[11px] font-bold shadow">🔍 กดดูเพิ่มเติม</span>
           </div>
         </div>
         <div class="px-2 py-1.5">

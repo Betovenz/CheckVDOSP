@@ -701,6 +701,10 @@
             </select>
           </div>
           <div class="text-slate-500">ชื่อไฟล์: <code>01_ชื่อสินค้า.mp4</code> · ใช้โฟลเดอร์เดียวกับหน้า 2</div>
+          <div class="flex items-center gap-2 pt-2 border-t border-slate-800 text-slate-400">
+            <span id="batchCacheInfo" class="flex-1" title="ลบคลิปที่ไม่มีโปรเจคใช้และไม่ได้เปิดเกิน 3 วันให้อัตโนมัติ (ทุก 6 ชม.) · ถ้าแคชเกิน 5 GB จะลบคลิปที่ไม่ได้ใช้ที่เก่าสุดก่อน">🧹 แคชคลิป …</span>
+            <button type="button" id="batchCacheCleanBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 whitespace-nowrap">ลบตอนนี้</button>
+          </div>
         </section>
       </div>
     </div>
@@ -948,13 +952,13 @@
   </div>
 
   <!-- Toast Notification -->
-  <div id="toastBox" class="fixed bottom-5 right-5 z-50 hidden px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-medium text-white shadow-2xl flex items-center gap-2.5">
+  <div id="toastBox" class="fixed bottom-5 right-5 z-[90] hidden px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-medium text-white shadow-2xl flex items-center gap-2.5">
     <span id="toastSpinner" class="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin hidden"></span>
     <span id="toastText"></span>
   </div>
 
-  <script src="/app.js?v=28"></script>
-  <script src="/studio.js?v=33"></script>
-  <script src="/batch.js?v=2"></script>
+  <script src="/app.js?v=29"></script>
+  <script src="/studio.js?v=36"></script>
+  <script src="/batch.js?v=12"></script>
 </body>
 </html>
